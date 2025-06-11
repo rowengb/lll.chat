@@ -50,7 +50,10 @@ const Home: NextPage = () => {
         <Head>
           <title>lll.chat - High-Performance AI Chat</title>
           <meta name="description" content="Experience lightning-fast AI conversations with lll.chat's optimized chat platform" />
-          <link rel="icon" href="/favicon.ico" />
+          <link rel="icon" href="/favicon.ico" sizes="any" />
+          <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+          <link rel="manifest" href="/site.webmanifest" />
         </Head>
         
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -295,7 +298,10 @@ const Home: NextPage = () => {
       <Head>
         <title>lll.chat</title>
         <meta name="description" content="lll.chat - High-performance AI chat application" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/site.webmanifest" />
       </Head>
       <main className="h-screen">
         <Sidebar 
