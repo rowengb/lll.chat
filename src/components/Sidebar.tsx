@@ -80,6 +80,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
 
   const createThread = trpc.chat.createThread.useMutation({
     onSuccess: (newThread) => {
+      // Invalidate and refetch threads to update the UI
+      utils.chat.getThreads.invalidate();
       onThreadSelect(newThread.id);
     },
     onError: () => {
@@ -90,6 +92,9 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
 
   const deleteThread = trpc.chat.deleteThread.useMutation({
     onSuccess: () => {
+      // Invalidate and refetch threads to update the UI
+      utils.chat.getThreads.invalidate();
+      
       if (currentThreadId && threads?.find(t => t.id === currentThreadId)) {
         // If current thread was deleted, redirect to home
         router.push("/");
@@ -102,10 +107,40 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
   });
 
   const updateThread = trpc.chat.updateThread.useMutation({
-    onError: () => {
+    onMutate: async (newData) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await utils.chat.getThreads.cancel();
+
+      // Snapshot the previous value
+      const previousThreads = utils.chat.getThreads.getData();
+
+      // Optimistically update to the new value
+      utils.chat.getThreads.setData(undefined, (old) => {
+        if (!old) return old;
+        
+        return old.map(thread => 
+          thread.id === newData.id 
+            ? { 
+                ...thread, 
+                title: newData.title !== undefined ? newData.title : thread.title,
+                pinned: newData.pinned !== undefined ? newData.pinned : thread.pinned
+              }
+            : thread
+        );
+      });
+
+      // Return a context object with the snapshotted value
+      return { previousThreads };
+    },
+    onError: (err, newData, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousThreads) {
+        utils.chat.getThreads.setData(undefined, context.previousThreads);
+      }
       toast.dismiss();
       toast.error("Failed to update conversation");
     },
+    // Remove onSettled to avoid unnecessary refetch since we have optimistic updates
   });
 
   // Handle floating buttons delay
@@ -185,6 +220,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
     // Create a special mutation for collapsed state that doesn't auto-navigate
     const createThreadCollapsed = trpc.chat.createThread.useMutation({
       onSuccess: (newThread) => {
+        // Invalidate and refetch threads to update the UI
+        utils.chat.getThreads.invalidate();
         // Don't call onThreadSelect when collapsed to avoid auto-expanding
         toast.dismiss();
         toast.success("New conversation created");
@@ -209,16 +246,26 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
   };
 
   const handlePinThread = (threadId: string) => {
+    // Prevent multiple calls while mutation is in progress or if already processing this thread
+    if (updateThread.isLoading) return;
+    
     const thread = threads?.find(t => t.id === threadId);
-    if (thread) {
-      const isCurrentlyPinned = (thread as any).pinned;
-      updateThread.mutate({
-        id: threadId,
-        pinned: !isCurrentlyPinned,
-      });
+    if (!thread) return;
+    
+    const isCurrentlyPinned = (thread as any).pinned;
+    
+    // Use mutateAsync to prevent duplicate calls
+    updateThread.mutateAsync({
+      id: threadId,
+      pinned: !isCurrentlyPinned,
+    }).then(() => {
+      // Success toast only after mutation completes
       toast.dismiss();
       toast.success(isCurrentlyPinned ? "Conversation unpinned" : "Conversation pinned");
-    }
+    }).catch(() => {
+      // Error is already handled in onError
+    });
+    
     setContextMenu(null);
   };
 
@@ -279,7 +326,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
     
     return (
       <div
-        className={`group relative flex w-full items-center gap-3 rounded-lg p-2 text-left text-sm transition-all duration-150 hover:bg-gray-200 cursor-pointer ${
+        className={`group relative flex w-full items-center gap-3 rounded-lg p-2 text-left text-sm hover:bg-gray-200 cursor-pointer ${
           currentThreadId === thread.id ? "bg-gray-200 text-gray-900" : "text-gray-700"
         }`}
         onClick={() => !isEditing && onThreadSelect(thread.id)}
@@ -307,11 +354,11 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
                 autoFocus
               />
             ) : (
-              <div className="flex-1 text-left relative overflow-hidden pr-0 group-hover:pr-16 transition-all duration-150">
+              <div className="flex-1 text-left relative overflow-hidden pr-0 group-hover:pr-16">
                 <div className="flex items-center gap-2">
                   {isPinned && <PinIcon className="h-3 w-3 text-blue-500 flex-shrink-0" />}
                   <span 
-                    className="whitespace-nowrap overflow-hidden text-ellipsis transition-all duration-150 flex-1"
+                    className="whitespace-nowrap overflow-hidden text-ellipsis flex-1"
                     title={thread.title || `Chat ${thread.id.slice(0, 8)}`}
                   >
                     {thread.title || `Chat ${thread.id.slice(0, 8)}`}
@@ -322,15 +369,21 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
             
             {/* Hover Actions - Absolutely positioned to not take up layout space */}
             {!isEditing && (
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-x-2 group-hover:translate-x-0 transition-all duration-150">
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-75">
                 <Button
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     handlePinThread(thread.id);
                   }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
                   size="sm"
                   variant="ghost"
-                  className={`h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm border border-gray-300/60 transition-all duration-150 hover:bg-gray-300 hover:border-gray-400 ${isPinned ? 'text-blue-500' : ''}`}
+                  disabled={updateThread.isLoading}
+                  className={`h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm border border-gray-300/60 hover:bg-gray-300 hover:border-gray-400 ${isPinned ? 'text-blue-500' : ''} ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title={isPinned ? "Unpin" : "Pin"}
                 >
                   <PinIcon className="h-3 w-3" />
@@ -342,7 +395,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
                   }}
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm border border-gray-300/60 transition-all duration-150 hover:bg-red-200 hover:text-red-600 hover:border-red-300"
+                  className="h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm border border-gray-300/60 hover:bg-red-200 hover:text-red-600 hover:border-red-300"
                   title="Delete"
                 >
                   <TrashIcon className="h-3 w-3" />
