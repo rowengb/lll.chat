@@ -160,6 +160,10 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     },
   });
 
+  const deleteMessage = trpc.chat.deleteMessage.useMutation();
+  const deleteMessagesFromPoint = trpc.chat.deleteMessagesFromPoint.useMutation();
+  const saveAssistantMessage = trpc.chat.saveAssistantMessage.useMutation();
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -182,7 +186,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       const messageIndex = localMessages.findIndex(msg => msg.id === messageId);
       if (messageIndex === -1) return;
 
-      const messagesUpToPoint = localMessages.slice(0, messageIndex + 1);
+      const messagesUpToPoint = localMessages.slice(0, messageIndex + 1).filter(msg => !msg.isOptimistic);
       
       // Create a new thread with these messages
       const newThread = await createThread.mutateAsync({
@@ -190,22 +194,46 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         model: selectedModel,
       });
 
-      // Save all messages up to the branch point to the new thread
-      for (const message of messagesUpToPoint) {
-        if (!message.isOptimistic && message.role === "user") {
-          // Only send user messages to create the conversation flow
+      // Group messages into user-assistant pairs and save them
+      const messagePairs: Array<{user: Message, assistant?: Message}> = [];
+      
+      for (let i = 0; i < messagesUpToPoint.length; i++) {
+        const message = messagesUpToPoint[i];
+        if (message && message.role === "user") {
+          const nextMessage = messagesUpToPoint[i + 1];
+          const assistantMessage = nextMessage && nextMessage.role === "assistant" ? nextMessage : undefined;
+          messagePairs.push({ user: message, assistant: assistantMessage });
+          if (assistantMessage) i++; // Skip the assistant message we just processed
+        }
+      }
+
+      // Save each user-assistant pair
+      for (const pair of messagePairs) {
+        if (pair.assistant) {
+          // Save complete user-assistant pair
+          await saveStreamedMessage.mutateAsync({
+            threadId: newThread.id,
+            userContent: pair.user.content,
+            assistantContent: pair.assistant.content,
+            model: pair.assistant.model || selectedModel,
+          });
+        } else {
+          // Just a user message without response - send it to get a new response
           await sendMessage.mutateAsync({
             threadId: newThread.id,
-            content: message.content,
-            model: message.model || undefined,
+            content: pair.user.content,
+            model: selectedModel,
           });
         }
       }
 
+      // Refresh the threads list to show the new branch immediately
+      await refetchThreads();
+      
       // Navigate to the new thread
       onThreadCreate(newThread.id);
       toast.dismiss();
-      toast.success("Created new conversation branch");
+      toast.success("Created conversation branch with full context");
     } catch (error) {
       console.error("Failed to branch off:", error);
               toast.dismiss();
@@ -213,36 +241,73 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     }
   };
 
-  const handleRetryMessage = async (messageId: string, isUserMessage: boolean) => {
+    const handleRetryMessage = async (messageId: string, isUserMessage: boolean) => {
     try {
       const messageIndex = localMessages.findIndex(msg => msg.id === messageId);
       if (messageIndex === -1) return;
 
       if (isUserMessage) {
-        // For user messages, resend the message
+        // For user messages, find the AI response that followed and delete it from DB, then regenerate
         const userMessage = localMessages[messageIndex];
+        const nextMessageIndex = messageIndex + 1;
+        const nextMessage = localMessages[nextMessageIndex];
+        
         if (userMessage) {
-          await sendMessageProgrammatically(userMessage.content);
+          // Use the AI model from the response that followed, or fallback to selectedModel
+          const modelToUse = (nextMessage?.role === "assistant" && nextMessage.model) ? nextMessage.model : selectedModel;
+          
+          // Delete the AI response and any messages after it from database
+          if (nextMessage && !nextMessage.isOptimistic && threadId) {
+            await deleteMessagesFromPoint.mutateAsync({
+              threadId,
+              fromMessageId: nextMessage.id,
+            });
+          }
+          
+          // Remove from local state too (keep the user message)
+          setLocalMessages(prev => prev.slice(0, messageIndex + 1));
+          setIsLoading(true);
+          
+          if (threadId) {
+            // Generate new AI response for the existing user message
+            await streamResponseWithModel(threadId, userMessage.content, modelToUse);
+          }
         }
       } else {
-        // For assistant messages, regenerate from the previous user message
+        // For assistant messages, delete from DB and regenerate without creating new user message
+        const assistantMessage = localMessages[messageIndex];
         const userMessageIndex = messageIndex - 1;
+        
         if (userMessageIndex >= 0 && localMessages[userMessageIndex]?.role === "user") {
           const userMessage = localMessages[userMessageIndex];
           
-          // Remove the current assistant message and regenerate
+          // Use the AI model that generated this response
+          const modelToUse = assistantMessage?.model || selectedModel;
+          
+          // Delete the assistant message and any messages after it from database
+          if (assistantMessage && !assistantMessage.isOptimistic && threadId) {
+            await deleteMessagesFromPoint.mutateAsync({
+              threadId,
+              fromMessageId: assistantMessage.id,
+            });
+          }
+          
+          // Remove from local state
           setLocalMessages(prev => prev.slice(0, messageIndex));
-          if (userMessage) {
-            await sendMessageProgrammatically(userMessage.content);
+          setIsLoading(true);
+          
+          if (userMessage && threadId) {
+            // Directly stream the response without creating a new user message
+            await streamResponseWithModel(threadId, userMessage.content, modelToUse);
           }
         }
       }
-              toast.dismiss();
-        toast.success("Message retried");
+      toast.dismiss();
+      toast.success("Message retried");
     } catch (error) {
       console.error("Failed to retry message:", error);
-              toast.dismiss();
-        toast.error("Failed to retry message");
+      toast.dismiss();
+      toast.error("Failed to retry message");
     }
   };
 
@@ -258,33 +323,59 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     try {
       if (!editingContent.trim()) return;
 
-      // Update the message in local state
-      setLocalMessages(prev => 
-        prev.map(msg => 
-          msg.id === messageId 
-            ? { ...msg, content: editingContent.trim() }
-            : msg
-        )
-      );
+      // Find the original message
+      const originalMessage = localMessages.find(msg => msg.id === messageId);
+      if (!originalMessage) return;
 
-      // Find the message index to remove all subsequent messages
+      // Check if the content has actually changed
+      if (editingContent.trim() === originalMessage.content.trim()) {
+        // No change, just cancel editing
+        setEditingMessageId(null);
+        setEditingContent("");
+        return;
+      }
+
+      // Content has changed - delete original and everything after it from database
+      if (!originalMessage.isOptimistic && threadId) {
+        await deleteMessagesFromPoint.mutateAsync({
+          threadId,
+          fromMessageId: originalMessage.id,
+        });
+      }
+
+      // Find the message index to remove from local state
       const messageIndex = localMessages.findIndex(msg => msg.id === messageId);
       if (messageIndex !== -1) {
-        // Remove all messages after the edited one
-        setLocalMessages(prev => prev.slice(0, messageIndex + 1));
-        
-        // Resend the edited message
-        await sendMessageProgrammatically(editingContent.trim());
+        // Remove all messages from the edited one forward in local state
+        setLocalMessages(prev => prev.slice(0, messageIndex));
       }
+
+             // Create new user message with edited content and get AI response
+       if (threadId) {
+         // Add optimistic user message for the edited content
+         const optimisticUserMessage: Message = {
+           id: `temp-edit-${Date.now()}`,
+           content: editingContent.trim(),
+           role: "user",
+           createdAt: new Date(),
+           isOptimistic: true,
+         };
+         
+         setLocalMessages(prev => [...prev, optimisticUserMessage]);
+         setIsLoading(true);
+         
+         // Stream the AI response (this will save both user and assistant messages)
+         await streamResponse(threadId, editingContent.trim());
+       }
 
       setEditingMessageId(null);
       setEditingContent("");
-              toast.dismiss();
-        toast.success("Message edited and resent");
+      toast.dismiss();
+      toast.success("Message edited and conversation updated");
     } catch (error) {
       console.error("Failed to save edit:", error);
-              toast.dismiss();
-        toast.error("Failed to save edit");
+      toast.dismiss();
+      toast.error("Failed to save edit");
     }
   };
 
@@ -293,7 +384,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     setEditingContent("");
   };
 
-  // Helper function to send a message programmatically
+  // Helper function to send a message programmatically and get AI response
   const sendMessageProgrammatically = async (content: string) => {
     if (!threadId || !content.trim()) return;
 
@@ -314,6 +405,39 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         threadId,
         content: content.trim(),
         model: selectedModel,
+      });
+      
+      // After saving user message, stream the AI response
+      await streamResponse(threadId, content.trim());
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      // Remove the optimistic message on error
+      setLocalMessages(prev => prev.filter(msg => msg.id !== messageId));
+      setIsLoading(false);
+    }
+  };
+
+  // Helper function to send a message programmatically with a specific model
+  const sendMessageProgrammaticallyWithModel = async (content: string, model: string) => {
+    if (!threadId || !content.trim()) return;
+
+    const messageId = `temp-${Date.now()}`;
+    const optimisticMessage: Message = {
+      id: messageId,
+      content: content.trim(),
+      role: "user",
+      createdAt: new Date(),
+      isOptimistic: true,
+    };
+
+    setLocalMessages(prev => [...prev, optimisticMessage]);
+    setIsLoading(true);
+
+    try {
+      await sendMessage.mutateAsync({
+        threadId,
+        content: content.trim(),
+        model: model,
       });
     } catch (error) {
       console.error("Failed to send message:", error);
@@ -556,6 +680,125 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     }
   };
 
+  const streamResponseWithModel = async (threadId: string, content: string, model: string) => {
+    // Create optimistic assistant message for streaming
+    const optimisticAssistantMessage: Message = {
+      id: `temp-assistant-${Date.now()}`,
+      content: "",
+      role: "assistant",
+      createdAt: new Date(),
+      isOptimistic: true,
+    };
+
+    setLocalMessages(prev => [...prev, optimisticAssistantMessage]);
+
+    try {
+      // Get conversation history for streaming (exclude the message we're retrying)
+      const messages = localMessages
+        .filter(msg => !msg.isOptimistic) // Don't include optimistic messages
+        .map(msg => ({ role: msg.role, content: msg.content }));
+
+      // Create streaming request
+      const response = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messages,
+          model: model, // Use the specified model instead of selectedModel
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Read the streaming response
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      const decoder = new TextDecoder();
+      let fullContent = "";
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              
+              if (data === '[DONE]') {
+                // Stream complete - save to DB
+                
+                // For retry, only save the assistant message (user message already exists)
+                await saveAssistantMessage.mutateAsync({
+                  threadId,
+                  content: fullContent,
+                  model: model, // Use the specified model
+                });
+
+                // Update thread metadata with the retry model
+                if (threadId) {
+                  await updateThreadMetadata.mutateAsync({
+                    threadId,
+                    lastModel: model,
+                    // TODO: Add cost and token calculation here
+                  });
+                }
+                
+                // Remove the optimistic message and refresh to sync with server
+                setLocalMessages(prev => prev.filter(msg => msg.id !== optimisticAssistantMessage.id));
+                await refetchMessages();
+                return;
+              }
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.content) {
+                  fullContent += parsed.content;
+                  
+                  // Hide loading as soon as we get first content
+                  if (fullContent.length > 0) {
+                    setIsLoading(false);
+                  }
+                  
+                  // Update the streaming message immediately for real-time feel
+                  setLocalMessages(prev => 
+                    prev.map(msg => 
+                      msg.id === optimisticAssistantMessage.id 
+                        ? { ...msg, content: fullContent }
+                        : msg
+                    )
+                  );
+                }
+              } catch (e) {
+                // Ignore JSON parse errors
+              }
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+    } catch (error) {
+      console.error("Streaming error:", error);
+      // Remove optimistic assistant message on error
+      setLocalMessages(prev => prev.filter(msg => msg.id !== optimisticAssistantMessage.id));
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (!threadId) {
     const examplePrompts = [
       {
@@ -740,23 +983,27 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
             <div></div>
             <div className="w-full">
               <div className={sharedLayoutClasses} id="messages-container">
-              <div className="space-y-6">
+              <div className="space-y-0">
             {localMessages?.filter(message => 
               // Filter out empty optimistic assistant messages
               !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
             ).map((message: Message) => (
               <div className="flex justify-start">
-                <div className="w-full flex">
-                  <div className={`${message.role === "user" ? "ml-auto max-w-[80%]" : "max-w-full"} flex flex-col group`}>
-                    <div
-                      className={`rounded-2xl px-5 py-3 ${
+                <div className="w-full">
+                  <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
+                                          <div
+                        className={`rounded-2xl px-5 ${
+                        message.role === "user" 
+                          ? "py-4" 
+                          : "pt-3 pb-1"
+                        } ${
                         message.role === "user"
                           ? message.isOptimistic 
-                            ? "bg-blue-500 text-white opacity-75"
-                            : "bg-blue-500 text-white shadow-sm"
+                            ? "bg-blue-50 text-gray-900 border border-blue-500 opacity-75"
+                            : "bg-blue-50 text-gray-900 border border-blue-500 shadow-sm"
                           : message.isOptimistic
-                            ? "bg-gray-100 text-gray-900 opacity-75"
-                            : "bg-gray-100 text-gray-900 shadow-sm"
+                            ? "text-gray-900 opacity-75"
+                            : "text-gray-900"
                       }`}
                     >
                       {editingMessageId === message.id ? (
@@ -861,10 +1108,10 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
 
                     {/* Message Actions */}
                     {!message.isOptimistic && (
-                      <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3" : "mt-0"} opacity-0 group-hover:opacity-100 transition-opacity`}>
                         {message.role === "assistant" && (
-                          <div className="flex items-center gap-1 mr-2">
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                          <div className="flex items-center gap-1 mr-1">
+                            <div className="flex items-center gap-1 text-sm text-gray-500 px-5">
                               {getProviderFromModel(message.model)}
                               <span>•</span>
                               <span>{message.model}</span>
@@ -872,41 +1119,67 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                           </div>
                         )}
                         
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleCopyMessage(message.content)}
-                          className="h-7 px-2 text-gray-400 hover:text-gray-600"
-                        >
-                          <CopyIcon className="h-3 w-3" />
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleBranchOff(message.id)}
-                          className="h-7 px-2 text-gray-400 hover:text-gray-600"
-                        >
-                          <GitBranchIcon className="h-3 w-3" />
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                          className="h-7 px-2 text-gray-400 hover:text-gray-600"
-                        >
-                          <RotateCcwIcon className="h-3 w-3" />
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditMessage(message.id)}
-                          className="h-7 px-2 text-gray-400 hover:text-gray-600"
-                        >
-                          <EditIcon className="h-3 w-3" />
-                        </Button>
+                        {message.role === "user" ? (
+                          // User message actions: retry, edit, copy
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRetryMessage(message.id, message.role === "user")}
+                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                            >
+                              <RotateCcwIcon className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditMessage(message.id)}
+                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                            >
+                              <EditIcon className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopyMessage(message.content)}
+                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                            >
+                              <CopyIcon className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          // AI message actions: copy, branch off, retry
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopyMessage(message.content)}
+                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                            >
+                              <CopyIcon className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleBranchOff(message.id)}
+                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                            >
+                              <GitBranchIcon className="h-4 w-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRetryMessage(message.id, message.role === "user")}
+                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                            >
+                              <RotateCcwIcon className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

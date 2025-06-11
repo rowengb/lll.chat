@@ -173,6 +173,34 @@ export const chatConvexRouter = createTRPCRouter({
       };
     }),
 
+  saveAssistantMessage: protectedProcedure
+    .input(z.object({ 
+      threadId: z.string(),
+      content: z.string(),
+      model: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      const messageId = await convex.mutation(api.messages.createAssistantMessage, {
+        content: input.content,
+        model: input.model,
+        threadId: input.threadId as Id<"threads">,
+        userId: convexUser._id,
+      });
+
+      return { 
+        id: messageId,
+        content: input.content,
+        role: "assistant",
+        model: input.model,
+      };
+    }),
+
   updateThreadMetadata: protectedProcedure
     .input(z.object({
       threadId: z.string(),
@@ -292,6 +320,42 @@ export const chatConvexRouter = createTRPCRouter({
         threadId: input.threadId as Id<"threads">,
         firstMessage: input.firstMessage,
         apiKey: apiKey,
+      });
+
+      return result;
+    }),
+
+  deleteMessage: protectedProcedure
+    .input(z.object({ messageId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      await convex.mutation(api.messages.deleteMessage, {
+        messageId: input.messageId as Id<"messages">,
+      });
+
+      return { success: true };
+    }),
+
+  deleteMessagesFromPoint: protectedProcedure
+    .input(z.object({ 
+      threadId: z.string(),
+      fromMessageId: z.string()
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      const result = await convex.mutation(api.messages.deleteMessagesFromPoint, {
+        threadId: input.threadId as Id<"threads">,
+        fromMessageId: input.fromMessageId as Id<"messages">,
       });
 
       return result;
