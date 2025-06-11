@@ -9,6 +9,14 @@ import { ModelSelector, getProviderIcon } from "./ModelSelector";
 import toast from "react-hot-toast";
 import Logo from './Logo';
 
+// Shared layout CSS for perfect alignment
+const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
+const sharedGridClasses = "grid grid-cols-[1fr_min(900px,100%)_1fr] px-6";
+
+// Slightly wider chatbox for visual hierarchy
+const chatboxLayoutClasses = "max-w-[81%] w-full mx-auto";
+const chatboxGridClasses = "grid grid-cols-[1fr_min(950px,100%)_1fr] px-5";
+
 interface ChatWindowProps {
   threadId: string | null;
   onThreadCreate: (threadId: string) => void;
@@ -33,8 +41,10 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
+  const [scrollbarWidth, setScrollbarWidth] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   
   const { data: serverMessages, refetch: refetchMessages } = trpc.chat.getMessages.useQuery(
     { threadId: threadId! },
@@ -65,6 +75,33 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       })));
     }
   }, [serverMessages]);
+
+  // Detect scrollbar width and compensate chatbox position
+  useEffect(() => {
+    const detectScrollbarWidth = () => {
+      if (messagesContainerRef.current) {
+        const element = messagesContainerRef.current;
+        const hasScrollbar = element.scrollHeight > element.clientHeight;
+        const currentScrollbarWidth = hasScrollbar ? (element.offsetWidth - element.clientWidth) : 0;
+        setScrollbarWidth(currentScrollbarWidth);
+      }
+    };
+
+    detectScrollbarWidth();
+    
+    // Watch for content changes that might affect scrollbar
+    const observer = new ResizeObserver(detectScrollbarWidth);
+    if (messagesContainerRef.current) {
+      observer.observe(messagesContainerRef.current);
+    }
+
+    window.addEventListener('resize', detectScrollbarWidth);
+    
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', detectScrollbarWidth);
+    };
+  }, [localMessages]);
 
   // Get default model using user preferences and API key availability
   const getDefaultModel = (): string => {
@@ -680,29 +717,36 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                     </div>
                   </div>
                 </form>
-              </div>
-            </div>
+                          </div>
           </div>
+          <div></div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div 
       className="fixed top-0 right-0 bottom-0 flex flex-col bg-white transition-all duration-500 ease-out"
       style={{ left: sidebarCollapsed ? '0px' : `${sidebarWidth}px` }}
     >
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 py-8 pb-48">
-          <div className="space-y-6">
+
+
+      {/* Messages + Chatbox Area */}
+      <div className="flex-1 overflow-hidden relative">
+        <div ref={messagesContainerRef} className="h-full overflow-y-auto overlay-scrollbar">
+                      <div className={`${sharedGridClasses} pt-8 pb-48`}>
+            <div></div>
+            <div className="w-full">
+              <div className={sharedLayoutClasses} id="messages-container">
+              <div className="space-y-6">
             {localMessages?.filter(message => 
               // Filter out empty optimistic assistant messages
               !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
             ).map((message: Message) => (
               <div className="flex justify-start">
-                <div className="max-w-[85%] w-full flex mx-auto">
+                <div className="w-full flex">
                   <div className={`${message.role === "user" ? "ml-auto max-w-[80%]" : "max-w-full"} flex flex-col group`}>
                     <div
                       className={`rounded-2xl px-5 py-3 ${
@@ -872,7 +916,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
             
             {isLoading && (
               <div className="flex justify-start">
-                <div className="max-w-[85%] w-full flex mx-auto">
+                <div className="w-full flex">
                   <div className="max-w-full rounded-2xl bg-gray-100 px-5 py-3 shadow-sm">
                     <div className="flex items-center space-x-2">
                       <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400"></div>
@@ -885,16 +929,21 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
             )}
             
             <div ref={messagesEndRef} />
+                </div>
+              </div>
+            </div>
+            <div></div>
           </div>
         </div>
-      </div>
-
-      {/* Floating Input Area */}
-      <div className="absolute bottom-0 left-0 right-0 pb-6">
-        <div className="max-w-4xl mx-auto px-6">
-          <div className="max-w-[90%] mx-auto">
-            <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl p-4">
-              <form onSubmit={handleSubmit}>
+        
+        {/* Chatbox - Absolutely positioned within scrolling container */}
+        <div className="absolute bottom-6 left-0 z-20" style={{ right: `${scrollbarWidth}px` }}>
+          <div className={chatboxGridClasses}>
+            <div></div>
+            <div className="w-full">
+              <div className={chatboxLayoutClasses}>
+                <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl px-5 py-4">
+                <form onSubmit={handleSubmit}>
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
                     <textarea
@@ -936,7 +985,9 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                     Press Enter to send
                   </div>
                 </div>
-              </form>
+                </form>
+                </div>
+              </div>
             </div>
           </div>
         </div>
