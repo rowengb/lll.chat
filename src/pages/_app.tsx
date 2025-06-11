@@ -23,8 +23,8 @@ const MyApp: AppType = ({
   return (
     <ClerkProvider
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      afterSignInUrl="/"
-      afterSignUpUrl="/"
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
     >
       <div className="h-full min-h-screen bg-gray-50">
         <ConvexClientProvider>

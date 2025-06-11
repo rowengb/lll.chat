@@ -36,15 +36,6 @@ const Home: NextPage = () => {
     }
   }, [bestDefaultModel, selectedModel]);
 
-  // Don't render until we have a valid selectedModel
-  if (!selectedModel) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
-  }
-
   if (!isLoaded) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -272,6 +263,15 @@ const Home: NextPage = () => {
           </main>
         </div>
       </PageTransition>
+    );
+  }
+
+  // For authenticated users, don't render until we have a valid selectedModel
+  if (!selectedModel) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
     );
   }
 
