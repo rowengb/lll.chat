@@ -365,4 +365,36 @@ export const chatConvexRouter = createTRPCRouter({
 
       return result;
     }),
+
+  createManyMessages: protectedProcedure
+    .input(z.object({
+      threadId: z.string(),
+      messages: z.array(z.object({
+        content: z.string(),
+        role: z.string(),
+        model: z.string().optional(),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      const messages = await convex.mutation(api.messages.createMany, {
+        messages: input.messages.map(msg => ({
+          content: msg.content,
+          role: msg.role,
+          model: msg.model,
+          threadId: input.threadId as Id<"threads">,
+          userId: convexUser._id,
+        })),
+      });
+
+      return { 
+        messageIds: messages,
+        count: messages.length 
+      };
+    }),
 }); 

@@ -10,6 +10,7 @@ import toast from "react-hot-toast";
 import Logo from './Logo';
 import { useChatStore } from "../stores/chatStore";
 import { CustomScrollbar } from './CustomScrollbar';
+import { ActionButton } from './ActionButton';
 
 // Shared layout CSS for perfect alignment
 const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
@@ -82,6 +83,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
 
   // Add threads query to trigger sidebar refresh when titles change
   const { refetch: refetchThreads } = trpc.chat.getThreads.useQuery();
+  const utils = trpc.useUtils();
 
   // T3.chat style: Show welcome elements dynamically based on input content
   const showWelcomeElements = !threadId && input.trim() === "";
@@ -183,6 +185,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   const deleteMessage = trpc.chat.deleteMessage.useMutation();
   const deleteMessagesFromPoint = trpc.chat.deleteMessagesFromPoint.useMutation();
   const saveAssistantMessage = trpc.chat.saveAssistantMessage.useMutation();
+  const createManyMessages = trpc.chat.createManyMessages.useMutation();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -805,15 +808,39 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       if (result && result.id) {
         const newThreadId = result.id;
         
-        // Copy messages up to the branch point
-        const messagesToCopy = currentMessages.slice(0, messageIndex);
-        setMessages(newThreadId, messagesToCopy);
+        // Copy messages up to and including the branch point (excluding optimistic messages)
+        const messagesToCopy = currentMessages
+          .slice(0, messageIndex + 1)
+          .filter(msg => !msg.isOptimistic);
         
-        // Navigate to new thread
+        // Save copied messages to database if there are any
+        if (messagesToCopy.length > 0) {
+          await createManyMessages.mutateAsync({
+            threadId: newThreadId,
+            messages: messagesToCopy.map(msg => ({
+              content: msg.content,
+              role: msg.role,
+              model: msg.model || undefined,
+            })),
+          });
+        }
+        
+        // Navigate to new thread (messages will be loaded from server)
         onThreadCreate(newThreadId);
+        
+        // Refresh the messages query for the new thread to ensure immediate sync
+        await refetchMessages();
+        
+        // Invalidate threads cache to immediately update sidebar
+        utils.chat.getThreads.invalidate();
+        
+        toast.dismiss();
+        toast.success("Conversation branched successfully");
       }
     } catch (error) {
       console.error("Error branching conversation:", error);
+      toast.dismiss();
+      toast.error("Failed to branch conversation");
     } finally {
       setLoading(null, false);
     }
@@ -1162,62 +1189,62 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                         {message.role === "user" ? (
                           // User message actions: retry, edit, copy
                           <>
-                            <Button
+                            <ActionButton
                               variant="ghost"
                               size="sm"
                               onClick={() => handleRetryMessage(message.id, message.role === "user")}
                               className="h-8 px-2 text-gray-400 hover:text-gray-600"
                             >
                               <RotateCcwIcon className="h-4 w-4" />
-                            </Button>
+                            </ActionButton>
                             
-                            <Button
+                            <ActionButton
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEditMessage(message.id)}
                               className="h-8 px-2 text-gray-400 hover:text-gray-600"
                             >
                               <EditIcon className="h-4 w-4" />
-                            </Button>
+                            </ActionButton>
                             
-                            <Button
+                            <ActionButton
                               variant="ghost"
                               size="sm"
                               onClick={() => handleCopyMessage(message.content)}
                               className="h-8 px-2 text-gray-400 hover:text-gray-600"
                             >
                               <CopyIcon className="h-4 w-4" />
-                            </Button>
+                            </ActionButton>
                           </>
                         ) : (
                           // AI message actions: copy, branch off, retry
                           <>
-                            <Button
+                            <ActionButton
                               variant="ghost"
                               size="sm"
                               onClick={() => handleCopyMessage(message.content)}
                               className="h-8 px-2 text-gray-400 hover:text-gray-600"
                             >
                               <CopyIcon className="h-4 w-4" />
-                            </Button>
+                            </ActionButton>
                             
-                            <Button
+                            <ActionButton
                               variant="ghost"
                               size="sm"
                               onClick={() => handleBranchOff(message.id)}
                               className="h-8 px-2 text-gray-400 hover:text-gray-600"
                             >
                               <GitBranchIcon className="h-4 w-4" />
-                            </Button>
+                            </ActionButton>
                             
-                            <Button
+                            <ActionButton
                               variant="ghost"
                               size="sm"
                               onClick={() => handleRetryMessage(message.id, message.role === "user")}
                               className="h-8 px-2 text-gray-400 hover:text-gray-600"
                             >
                               <RotateCcwIcon className="h-4 w-4" />
-                            </Button>
+                            </ActionButton>
                           </>
                         )}
                       </div>
