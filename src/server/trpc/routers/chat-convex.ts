@@ -148,6 +148,7 @@ export const chatConvexRouter = createTRPCRouter({
       userContent: z.string(),
       assistantContent: z.string(),
       model: z.string().optional(),
+      userAttachments: z.array(z.string()).optional(), // Array of file IDs
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -164,6 +165,7 @@ export const chatConvexRouter = createTRPCRouter({
             role: "user",
             threadId: input.threadId as Id<"threads">,
             userId: convexUser._id,
+            attachments: input.userAttachments?.map(id => id as Id<"files">),
           },
           {
             content: input.assistantContent,

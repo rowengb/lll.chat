@@ -12,6 +12,8 @@ import { useChatStore } from "../stores/chatStore";
 import { CustomScrollbar } from './CustomScrollbar';
 import { ActionButton } from './ActionButton';
 import { CodeBlock } from './CodeBlock';
+import { FileUpload, UploadedFile } from './FileUpload';
+import { FileAttachment, FileAttachmentData } from './FileAttachment';
 
 // Shared layout CSS for perfect alignment
 const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
@@ -19,7 +21,7 @@ const sharedGridClasses = "grid grid-cols-[1fr_min(900px,100%)_1fr] px-6";
 
 // Slightly wider chatbox for visual hierarchy
 const chatboxLayoutClasses = "max-w-[81%] w-full mx-auto";
-const chatboxGridClasses = "grid grid-cols-[1fr_min(950px,100%)_1fr] px-5";
+const chatboxGridClasses = "grid grid-cols-[1fr_min(800px,100%)_1fr] gap-4 px-4";
 
 interface ChatWindowProps {
   threadId: string | null;
@@ -37,10 +39,12 @@ interface Message {
   model?: string | null;
   createdAt: Date;
   isOptimistic?: boolean;
+  attachments?: FileAttachmentData[];
 }
 
 export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth }: ChatWindowProps) {
   const [input, setInput] = useState("");
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
@@ -106,11 +110,13 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         // If we have optimistic messages, don't sync
         const hasOptimistic = currentMessages.some(msg => msg.isOptimistic);
         if (!hasOptimistic) {
-          // Convert server messages
-          const serverMsgs = serverMessages.map(msg => ({ 
+          // Convert server messages and handle file attachments
+          const serverMsgs: Message[] = serverMessages.map(msg => ({ 
             ...msg, 
             createdAt: new Date(msg._creationTime),
-            isOptimistic: false 
+            isOptimistic: false,
+            // Convert file IDs to empty array for now - we'll fetch file details separately
+            attachments: msg.attachments ? [] : undefined
           }));
           
           setMessages(threadId, serverMsgs);
@@ -187,6 +193,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   const deleteMessagesFromPoint = trpc.chat.deleteMessagesFromPoint.useMutation();
   const saveAssistantMessage = trpc.chat.saveAssistantMessage.useMutation();
   const createManyMessages = trpc.chat.createManyMessages.useMutation();
+  const updateFileAssociations = trpc.files.updateFileAssociations.useMutation();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -222,7 +229,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         
         const userMessage = currentMessages[messageIndex];
         if (userMessage) {
-          await streamResponse(threadId, userMessage.content);
+          await streamResponse(threadId, userMessage.content, userMessage.attachments || []);
         }
       } else {
         // For assistant messages, remove this message and all after it, then resend the last user message
@@ -232,7 +239,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         // Find the last user message to resend
         const lastUserMessage = messagesToKeep.reverse().find(msg => msg.role === "user");
         if (lastUserMessage) {
-          await streamResponse(threadId, lastUserMessage.content);
+          await streamResponse(threadId, lastUserMessage.content, lastUserMessage.attachments || []);
         }
       }
     } catch (error) {
@@ -410,10 +417,20 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() && uploadedFiles.length === 0) return;
 
     const messageContent = input.trim();
+    const messageFiles = uploadedFiles.map(file => ({
+      id: file.id,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      url: file.url,
+      storageId: file.storageId
+    }));
+    
     setInput("");
+    setUploadedFiles([]);
 
     try {
       if (!threadId) {
@@ -421,7 +438,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         console.log(`[SUBMIT] Creating new thread and streaming message: "${messageContent.slice(0, 30)}..."`);
         const defaultModel = getDefaultModel();
         const newThread = await createThread.mutateAsync({
-          title: messageContent.slice(0, 50),
+          title: messageContent.slice(0, 50) || (messageFiles.length > 0 ? `File: ${messageFiles[0]?.name}` : 'New Chat'),
           model: defaultModel,
         });
         onModelChange(defaultModel);
@@ -437,6 +454,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
           role: "user",
           createdAt: new Date(),
           isOptimistic: true,
+          attachments: messageFiles.length > 0 ? messageFiles : undefined,
         };
 
         // Add optimistic user message BEFORE URL change
@@ -446,7 +464,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         onThreadCreate(newThread.id);
 
         // Start streaming response on the new thread
-        await streamResponse(newThread.id, messageContent);
+        await streamResponse(newThread.id, messageContent, messageFiles);
         
         // Refresh sidebar to show the new thread
         await refetchThreads();
@@ -461,13 +479,14 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
           role: "user",
           createdAt: new Date(),
           isOptimistic: true,
+          attachments: messageFiles.length > 0 ? messageFiles : undefined,
         };
 
         // Add optimistic user message
         addMessage(threadId, optimisticUserMessage);
 
         // Start streaming response
-        await streamResponse(threadId, messageContent);
+        await streamResponse(threadId, messageContent, messageFiles);
       }
       
     } catch (error) {
@@ -476,7 +495,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     }
   };
 
-  const streamResponse = async (threadId: string, content: string) => {
+  const streamResponse = async (threadId: string, content: string, files: FileAttachmentData[] = []) => {
     console.log(`[STREAM] Starting stream for thread: ${threadId}`);
     
     // Create optimistic assistant message for streaming
@@ -516,6 +535,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
           messages,
           model: selectedModel,
           threadId,
+          files: files.length > 0 ? files : undefined,
         }),
       });
 
@@ -589,12 +609,22 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                 console.log(`[STREAM] Stream done, final content length: ${fullContent.length}, server reported: ${doneData.length || 'unknown'}`);
                 
                 // Stream complete - save to DB and clean up
-                await saveStreamedMessage.mutateAsync({
+                const savedMessages = await saveStreamedMessage.mutateAsync({
                   threadId,
                   userContent: content,
                   assistantContent: fullContent,
                   model: selectedModel,
+                  userAttachments: files.map(file => file.id),
                 });
+
+                // Update file associations if there are files
+                if (files.length > 0 && savedMessages.userMessage.id) {
+                  await updateFileAssociations.mutateAsync({
+                    fileIds: files.map(file => file.id),
+                    messageId: savedMessages.userMessage.id,
+                    threadId,
+                  });
+                }
 
                 // Update thread metadata
                 if (threadId) {
@@ -661,7 +691,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     }
   };
 
-  const streamResponseWithModel = async (threadId: string, content: string, model: string) => {
+  const streamResponseWithModel = async (threadId: string, content: string, model: string, files: FileAttachmentData[] = []) => {
     // Create optimistic assistant message for streaming
     const optimisticAssistantMessage: Message = {
       id: `temp-assistant-${Date.now()}`,
@@ -693,6 +723,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         body: JSON.stringify({
           messages,
           model: model, // Use the specified model instead of selectedModel
+          files: files.length > 0 ? files : undefined,
         }),
       });
 
@@ -986,6 +1017,18 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                 <div className={chatboxLayoutClasses}>
                   <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl px-5 py-4 chatbox-stable">
                     <form onSubmit={handleSubmit}>
+                      {/* File Upload Area */}
+                      {uploadedFiles.length > 0 && (
+                        <div className="mb-3">
+                          <FileUpload
+                            files={uploadedFiles}
+                            onFilesChange={setUploadedFiles}
+                            disabled={isLoading}
+                            maxFiles={5}
+                          />
+                        </div>
+                      )}
+                      
                       <div className="flex items-center gap-3">
                         <div className="textarea-container">
                           <textarea
@@ -1013,7 +1056,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                         </div>
                         <Button 
                           type="submit" 
-                          disabled={!input.trim() || isLoading}
+                          disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}
                           className="rounded-xl h-12 w-12 bg-blue-500 hover:bg-blue-600 shadow-sm transition-all"
                           size="sm"
                         >
@@ -1021,10 +1064,20 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                         </Button>
                       </div>
                       <div className="border-t border-gray-100 mt-2 pt-2 flex items-center justify-between">
-                        <ModelSelector
-                          selectedModel={selectedModel}
-                          onModelChange={onModelChange}
-                        />
+                        <div className="flex items-center gap-2">
+                          <ModelSelector
+                            selectedModel={selectedModel}
+                            onModelChange={onModelChange}
+                          />
+                          {uploadedFiles.length === 0 && (
+                            <FileUpload
+                              files={uploadedFiles}
+                              onFilesChange={setUploadedFiles}
+                              disabled={isLoading}
+                              maxFiles={5}
+                            />
+                          )}
+                        </div>
                         <div className="text-xs text-gray-500">
                           Press Enter to send
                         </div>
@@ -1108,9 +1161,19 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                           </div>
                         </div>
                       ) : message.role === "user" ? (
-                        <p className="whitespace-pre-wrap text-sm leading-loose">
-                          {message.content}
-                        </p>
+                        <div>
+                          <p className="whitespace-pre-wrap text-sm leading-loose">
+                            {message.content}
+                          </p>
+                          {/* Display file attachments for user messages */}
+                          {message.attachments && message.attachments.length > 0 && (
+                            <div className="mt-2 space-y-2">
+                              {message.attachments.map((file) => (
+                                <FileAttachment key={file.id} file={file} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div className="prose prose-sm max-w-none text-gray-900 text-sm leading-loose">
                           <ReactMarkdown 

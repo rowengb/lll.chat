@@ -29,7 +29,20 @@ export default defineSchema({
     model: v.optional(v.string()),
     threadId: v.id("threads"),
     userId: v.id("users"),
+    attachments: v.optional(v.array(v.id("files"))), // Array of file IDs
   }).index("by_thread", ["threadId"]).index("by_user", ["userId"]),
+
+  files: defineTable({
+    name: v.string(), // Original filename
+    type: v.string(), // MIME type
+    size: v.number(), // File size in bytes
+    storageId: v.id("_storage"), // Convex file storage ID
+    userId: v.id("users"), // Owner of the file
+    messageId: v.optional(v.id("messages")), // Associated message
+    threadId: v.optional(v.id("threads")), // Associated thread
+  }).index("by_user", ["userId"])
+    .index("by_message", ["messageId"])
+    .index("by_thread", ["threadId"]),
 
   apiKeys: defineTable({
     userId: v.id("users"),

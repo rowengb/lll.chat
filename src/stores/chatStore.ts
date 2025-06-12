@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+interface FileAttachment {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url?: string;
+  storageId?: string;
+}
+
 interface Message {
   id: string;
   content: string;
@@ -8,6 +17,7 @@ interface Message {
   model?: string | null;
   createdAt: Date;
   isOptimistic?: boolean;
+  attachments?: FileAttachment[];
 }
 
 interface ChatStore {

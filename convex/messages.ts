@@ -8,6 +8,7 @@ export const create = mutation({
     model: v.optional(v.string()),
     threadId: v.id("threads"),
     userId: v.id("users"),
+    attachments: v.optional(v.array(v.id("files"))),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("messages", {
@@ -16,6 +17,7 @@ export const create = mutation({
       model: args.model,
       threadId: args.threadId,
       userId: args.userId,
+      attachments: args.attachments,
     });
   },
 });
@@ -39,6 +41,7 @@ export const createMany = mutation({
       model: v.optional(v.string()),
       threadId: v.id("threads"),
       userId: v.id("users"),
+      attachments: v.optional(v.array(v.id("files"))),
     })),
   },
   handler: async (ctx, args) => {
@@ -57,6 +60,7 @@ export const createAssistantMessage = mutation({
     model: v.optional(v.string()),
     threadId: v.id("threads"),
     userId: v.id("users"),
+    attachments: v.optional(v.array(v.id("files"))),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("messages", {
@@ -65,6 +69,7 @@ export const createAssistantMessage = mutation({
       model: args.model,
       threadId: args.threadId,
       userId: args.userId,
+      attachments: args.attachments,
     });
   },
 });

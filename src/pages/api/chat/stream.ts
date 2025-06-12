@@ -64,6 +64,93 @@ const getApiKeyFromDatabase = async (userId: Id<"users">, provider: string) => {
   }
 };
 
+// Helper function to process files for AI models
+const processFilesForAI = async (files: any[]) => {
+  const processedFiles = [];
+  
+  for (const file of files) {
+    try {
+      // Get the file data with URL from Convex
+      let fileWithUrl = file;
+      if (file.id && !file.url) {
+        // If we have a file ID but no URL, fetch from Convex
+        fileWithUrl = await convex.query(api.files.getFile, { fileId: file.id });
+        if (!fileWithUrl) {
+          throw new Error(`File not found: ${file.id}`);
+        }
+      }
+      
+      if (!fileWithUrl.url) {
+        console.warn(`⚠️ [LLL.CHAT] No URL available for file ${file.name}, skipping processing`);
+        processedFiles.push({
+          type: 'text',
+          text: `[File attached: ${file.name} (${file.type}, ${formatFileSize(file.size)}) - preview not available]`
+        });
+        continue;
+      }
+      
+      if (fileWithUrl.type.startsWith('image/')) {
+        // For images, fetch the file and convert to base64
+        const response = await fetch(fileWithUrl.url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString('base64');
+        
+        processedFiles.push({
+          type: 'image_url',
+          image_url: {
+            url: `data:${fileWithUrl.type};base64,${base64}`,
+            detail: 'auto'
+          }
+        });
+        
+        console.log(`📷 [LLL.CHAT] Processed image: ${fileWithUrl.name} (${fileWithUrl.type})`);
+      } else if (fileWithUrl.type === 'text/plain' || fileWithUrl.type.includes('text/')) {
+        // For text files, fetch content and include as text
+        const response = await fetch(fileWithUrl.url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+        }
+        const textContent = await response.text();
+        
+        processedFiles.push({
+          type: 'text',
+          text: `File: ${fileWithUrl.name}\n\n${textContent}`
+        });
+        
+        console.log(`📄 [LLL.CHAT] Processed text file: ${fileWithUrl.name}`);
+      } else {
+        // For other file types, just mention the file
+        processedFiles.push({
+          type: 'text',
+          text: `[File attached: ${fileWithUrl.name} (${fileWithUrl.type}, ${formatFileSize(fileWithUrl.size)})]`
+        });
+        
+        console.log(`📎 [LLL.CHAT] Referenced file: ${fileWithUrl.name} (${fileWithUrl.type})`);
+      }
+    } catch (error) {
+      console.error(`❌ [LLL.CHAT] Error processing file ${file.name}:`, error);
+      // Add a fallback reference
+      processedFiles.push({
+        type: 'text',
+        text: `[File: ${file.name} - could not process]`
+      });
+    }
+  }
+  
+  return processedFiles;
+};
+
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const requestStart = Date.now();
   console.log(`🚀 [LLL.CHAT] Request started at ${new Date().toISOString()}`);
@@ -85,8 +172,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Failed to get or create user' });
   }
 
-  const { messages, model = 'gpt-4o', threadId } = req.body;
-  console.log(`📝 [LLL.CHAT] Parsed request: model=${model}, messages count=${messages?.length || 0}`);
+  const { messages, model = 'gpt-4o', threadId, files = [] } = req.body;
+  console.log(`📝 [LLL.CHAT] Parsed request: model=${model}, messages count=${messages?.length || 0}, files count=${files?.length || 0}`);
   
   // Ensure we're using the fastest model
   if (model.includes('gpt-4') && !model.includes('gpt-4o')) {
@@ -98,6 +185,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (lastMessage?.content) {
       console.log(`📝 [LLL.CHAT] Last message content: "${lastMessage.content.substring(0, 50)}..."`);
     }
+  }
+
+  if (files && files.length > 0) {
+    console.log(`📎 [LLL.CHAT] Processing ${files.length} file(s)`);
   }
 
   if (!messages || !Array.isArray(messages)) {
@@ -132,10 +223,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const aiCallStart = Date.now();
     console.log(`🤖 [LLL.CHAT] Starting AI API call at ${new Date().toISOString()}`);
 
+    // Process files if any are provided
+    let processedFiles: any[] = [];
+    if (files && files.length > 0) {
+      processedFiles = await processFilesForAI(files);
+    }
+
+    // Prepare messages for AI, including files in the last user message if present
+    const aiMessages = messages.map((m: any, index: number) => {
+      // If this is the last message and it's from the user, and we have files, include them
+      if (index === messages.length - 1 && m.role === 'user' && processedFiles.length > 0) {
+        const content = [];
+        
+        // Add text content if present
+        if (m.content && m.content.trim()) {
+          content.push({
+            type: 'text',
+            text: m.content
+          });
+        }
+        
+        // Add processed files
+        content.push(...processedFiles);
+        
+        return {
+          role: m.role,
+          content: content
+        };
+      }
+      
+      // For other messages, use simple text format
+      return {
+        role: m.role,
+        content: m.content
+      };
+    });
+
+    console.log(`🤖 [LLL.CHAT] Sending ${aiMessages.length} messages to AI (${processedFiles.length} files processed)`);
+
     // Create AI client and stream response
     const aiClient = getAiClient(modelData.provider, apiKey);
     const stream = await aiClient.createChatCompletion({
-      messages: messages.map((m: any) => ({ role: m.role, content: m.content })),
+      messages: aiMessages,
       model: model,
       stream: true,
       apiKey,
