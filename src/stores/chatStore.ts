@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface Message {
   id: string;
@@ -21,6 +22,11 @@ interface ChatStore {
   isLoading: boolean;
   loadingThreadId: string | null;
   
+  // Sidebar state
+  sidebarCollapsed: boolean;
+  sidebarWidth: number;
+  lastExpandedWidth: number;
+  
   // Actions
   setMessages: (threadId: string, messages: Message[]) => void;
   addMessage: (threadId: string, message: Message) => void;
@@ -29,16 +35,28 @@ interface ChatStore {
   setLoading: (threadId: string | null, isLoading: boolean) => void;
   clearThread: (threadId: string) => void;
   
+  // Sidebar actions
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  setSidebarWidth: (width: number) => void;
+  toggleSidebar: () => void;
+  
   // Get messages for a thread
   getMessages: (threadId: string) => Message[];
 }
 
-export const useChatStore = create<ChatStore>((set, get) => ({
-  messagesByThread: {},
-  isStreaming: false,
-  streamingThreadId: null,
-  isLoading: false,
-  loadingThreadId: null,
+export const useChatStore = create<ChatStore>()(
+  persist(
+    (set, get) => ({
+      messagesByThread: {},
+      isStreaming: false,
+      streamingThreadId: null,
+      isLoading: false,
+      loadingThreadId: null,
+      
+      // Default sidebar state
+      sidebarCollapsed: false,
+      sidebarWidth: 288,
+      lastExpandedWidth: 288,
   
   setMessages: (threadId: string, messages: Message[]) => {
     set((state) => ({
@@ -94,4 +112,43 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   getMessages: (threadId: string) => {
     return get().messagesByThread[threadId] || [];
   },
-})); 
+  
+  // Sidebar actions
+  setSidebarCollapsed: (collapsed: boolean) => {
+    set({ sidebarCollapsed: collapsed });
+  },
+  
+  setSidebarWidth: (width: number) => {
+    set((state) => {
+      const newState = { sidebarWidth: width };
+      
+      // If sidebar is not collapsed and width > 0, update lastExpandedWidth
+      if (!state.sidebarCollapsed && width > 0) {
+        (newState as any).lastExpandedWidth = width;
+      }
+      
+      return newState;
+    });
+  },
+  
+  toggleSidebar: () => {
+    set((state) => {
+      const newCollapsed = !state.sidebarCollapsed;
+      const newWidth = newCollapsed ? 0 : state.lastExpandedWidth;
+      
+      return {
+        sidebarCollapsed: newCollapsed,
+        sidebarWidth: newWidth,
+      };
+    });
+  },
+}),
+{
+  name: 'chat-store',
+  partialize: (state) => ({
+    sidebarCollapsed: state.sidebarCollapsed,
+    sidebarWidth: state.sidebarWidth,
+    lastExpandedWidth: state.lastExpandedWidth,
+  }),
+}
+)); 

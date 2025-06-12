@@ -1,29 +1,82 @@
 import { type NextPage } from "next";
-import { useUser, SignInButton } from "@clerk/nextjs";
+import { useUser, SignInButton, UserProfile, SignOutButton } from "@clerk/nextjs";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { ChatWindow } from "@/components/ChatWindow";
+import { LoadingDots } from "@/components/LoadingDots";
+import { useChatStore } from "@/stores/chatStore";
 import { Button } from "@/components/ui/button";
-import { Waves, MessageSquare, Zap, Shield, Key } from "lucide-react";
-import PageTransition from "@/components/PageTransition";
+import { Input } from "@/components/ui/input";
+import { Waves, MessageSquare, Zap, Shield, Key, ArrowLeftIcon, KeyIcon, CheckIcon, TrashIcon, EyeIcon, EyeOffIcon, BotIcon, ChevronDownIcon, LogOutIcon } from "lucide-react";
+import toast from "react-hot-toast";
+import { getProviderIcon } from "@/components/ModelSelector";
+
 import Logo from '../components/Logo';
 import { trpc } from "@/utils/trpc";
+
+interface ApiKeys {
+  openai: string;
+  anthropic: string;
+  gemini: string;
+  deepseek: string;
+  meta: string;
+}
 
 const Home: NextPage = () => {
   const { user, isLoaded } = useUser();
   const router = useRouter();
   const [selectedModel, setSelectedModel] = useState<string | null>(null); // Start with null to indicate loading
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(288); // Default 18rem = 288px
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  // Add SPA state management for authenticated users
+  const [currentView, setCurrentView] = useState<'welcome' | 'chat' | 'settings' | 'account'>('welcome');
+  
+  const { 
+    sidebarCollapsed, 
+    sidebarWidth, 
+    setSidebarWidth, 
+    toggleSidebar 
+  } = useChatStore();
+
+  // Settings page state
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [apiKeys, setApiKeys] = useState<ApiKeys>({
+    openai: "",
+    anthropic: "",
+    gemini: "",
+    deepseek: "",
+    meta: "",
+  });
+  const [showKeys, setShowKeys] = useState<Record<keyof ApiKeys, boolean>>({
+    openai: false,
+    anthropic: false,
+    gemini: false,
+    deepseek: false,
+    meta: false,
+  });
+  const [saved, setSaved] = useState(false);
+  const [defaultModelSaved, setDefaultModelSaved] = useState(false);
+  const [selectedDefaultModel, setSelectedDefaultModel] = useState<string>("");
+  const [isDefaultModelDropdownOpen, setIsDefaultModelDropdownOpen] = useState(false);
 
   // Get user's best default model
   const { data: bestDefaultModel } = trpc.userPreferences.getBestDefaultModel.useQuery(
     undefined,
     { enabled: !!user } // Only run when user is logged in
   );
+
+  // Get thread data to determine the last used model
+  const { data: threads } = trpc.chat.getThreads.useQuery();
+  const currentThread = threads?.find(thread => thread.id === currentThreadId);
+
+  // Settings page tRPC queries and mutations
+  const { data: dbApiKeys } = trpc.apiKeys.getApiKeys.useQuery();
+  const saveApiKeyMutation = trpc.apiKeys.saveApiKey.useMutation();
+  const deleteApiKeyMutation = trpc.apiKeys.deleteApiKey.useMutation();
+  const { data: userPreferences } = trpc.userPreferences.getPreferences.useQuery();
+  const { data: allModels } = trpc.models.getModels.useQuery();
+  const setDefaultModelMutation = trpc.userPreferences.setDefaultModel.useMutation();
 
   // Initialize selectedModel based on user preferences
   useEffect(() => {
@@ -37,17 +90,704 @@ const Home: NextPage = () => {
     }
   }, [bestDefaultModel, selectedModel]);
 
+  // Handle URL routing for authenticated users using query parameters
+  useEffect(() => {
+    if (user) {
+      const { view, threadId } = router.query;
+      
+      if (view === 'chat' && threadId && typeof threadId === 'string') {
+        setCurrentView('chat');
+        setCurrentThreadId(threadId);
+      } else if (view === 'settings') {
+        setCurrentView('settings');
+        setCurrentThreadId(null);
+      } else if (view === 'account') {
+        setCurrentView('account');
+        setCurrentThreadId(null);
+      } else {
+        setCurrentView('welcome');
+        setCurrentThreadId(null);
+      }
+    }
+  }, [router.query, user]);
+
+  // Update selected model when switching threads (only if thread has a specific model)
+  useEffect(() => {
+    if (currentThread && selectedModel) {
+      const threadModel = (currentThread as any).model || currentThread.lastModel;
+      if (threadModel && threadModel !== selectedModel) {
+        setSelectedModel(threadModel);
+      }
+    }
+  }, [currentThread]);
+
+  // Settings page useEffect hooks
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDefaultModelDropdownOpen(false);
+      }
+    };
+
+    if (isDefaultModelDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDefaultModelDropdownOpen]);
+
+  useEffect(() => {
+    if (dbApiKeys) {
+      setApiKeys({
+        openai: dbApiKeys.openai || "",
+        anthropic: dbApiKeys.anthropic || "",
+        gemini: dbApiKeys.gemini || "",
+        deepseek: dbApiKeys.deepseek || "",
+        meta: dbApiKeys.meta || "",
+      });
+    }
+  }, [dbApiKeys]);
+
+  useEffect(() => {
+    if (userPreferences?.defaultModel) {
+      setSelectedDefaultModel(userPreferences.defaultModel);
+    }
+  }, [userPreferences]);
+
+  // Settings page helper functions
+  const getAvailableModels = () => {
+    if (!allModels || !dbApiKeys) return [];
+    
+    const availableProviders = new Set();
+    Object.entries(dbApiKeys).forEach(([provider, key]) => {
+      if (key && key.trim()) {
+        availableProviders.add(provider);
+      }
+    });
+
+    return allModels.filter(model => 
+      availableProviders.has(model.provider) && model.isActive
+    );
+  };
+
+  const availableModels = getAvailableModels();
+  const selectedModelData = availableModels.find(model => model.id === selectedDefaultModel);
+
+  const handleKeyChange = (provider: keyof ApiKeys, value: string) => {
+    setApiKeys(prev => ({
+      ...prev,
+      [provider]: value
+    }));
+  };
+
+  const toggleKeyVisibility = (provider: keyof ApiKeys) => {
+    setShowKeys(prev => ({
+      ...prev,
+      [provider]: !prev[provider]
+    }));
+  };
+
+  const handleSave = async () => {
+    try {
+      const savePromises = [];
+      
+      for (const [provider, key] of Object.entries(apiKeys)) {
+        if (key.trim()) {
+          savePromises.push(
+            saveApiKeyMutation.mutateAsync({
+              provider: provider as "openai" | "anthropic" | "gemini" | "deepseek" | "meta",
+              key: key.trim(),
+            })
+          );
+        }
+      }
+      
+      await Promise.all(savePromises);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      toast.dismiss();
+      toast.success("API keys saved successfully!");
+    } catch (error) {
+      console.error('Failed to save API keys:', error);
+      toast.dismiss();
+      toast.error("Failed to save API keys");
+    }
+  };
+
+  const handleSetDefaultModel = async (modelId: string) => {
+    try {
+      await setDefaultModelMutation.mutateAsync({ modelId });
+      setSelectedDefaultModel(modelId);
+      setDefaultModelSaved(true);
+      setTimeout(() => setDefaultModelSaved(false), 2000);
+      setIsDefaultModelDropdownOpen(false);
+      toast.dismiss();
+      toast.success("Default model updated!");
+    } catch (error) {
+      console.error('Failed to set default model:', error);
+      toast.dismiss();
+      toast.error("Failed to set default model");
+    }
+  };
+
+  const handleClear = async (provider: keyof ApiKeys) => {
+    try {
+      await deleteApiKeyMutation.mutateAsync({
+        provider: provider as "openai" | "anthropic" | "gemini" | "deepseek" | "meta",
+      });
+      
+      setApiKeys(prev => ({
+        ...prev,
+        [provider]: ""
+      }));
+      toast.dismiss();
+      toast.success(`${getProviderInfo(provider).name} API key cleared`);
+    } catch (error) {
+      console.error('Failed to clear API key:', error);
+      toast.dismiss();
+      toast.error("Failed to clear API key");
+    }
+  };
+
+  const maskKey = (key: string) => {
+    if (!key) return "";
+    if (key.length <= 8) return "*".repeat(key.length);
+    return key.slice(0, 4) + "*".repeat(Math.max(0, key.length - 8)) + key.slice(-4);
+  };
+
+  const getProviderInfo = (provider: keyof ApiKeys) => {
+    const info = {
+      openai: { name: "OpenAI", placeholder: "sk-..." },
+      anthropic: { name: "Anthropic", placeholder: "sk-ant-..." },
+      gemini: { name: "Google Gemini", placeholder: "AI..." },
+      deepseek: { name: "DeepSeek", placeholder: "sk-..." },
+      meta: { name: "Meta (Llama)", placeholder: "..." },
+    };
+    return info[provider];
+  };
+
+  const handleClearDefaultModel = async () => {
+    try {
+      setSelectedDefaultModel("");
+      toast.dismiss();
+      toast.success("Default model cleared! The cheapest available model will be used automatically.");
+    } catch (error) {
+      console.error('Failed to clear default model:', error);
+      toast.dismiss();
+      toast.error("Failed to clear default model");
+    }
+  };
+
+  // Navigation functions that update URL without page refresh using query parameters
+  const navigateToWelcome = () => {
+    setCurrentView('welcome');
+    setCurrentThreadId(null);
+    router.push('/', undefined, { shallow: true });
+  };
+
+  const navigateToChat = (threadId: string) => {
+    setCurrentView('chat');
+    setCurrentThreadId(threadId);
+    router.push(`/?view=chat&threadId=${threadId}`, undefined, { shallow: true });
+  };
+
+  const navigateToSettings = () => {
+    setCurrentView('settings');
+    setCurrentThreadId(null);
+    router.push('/?view=settings', undefined, { shallow: true });
+  };
+
+  const navigateToAccount = () => {
+    setCurrentView('account');
+    setCurrentThreadId(null);
+    router.push('/?view=account', undefined, { shallow: true });
+  };
+
+  const handleThreadSelect = (threadId: string) => {
+    navigateToChat(threadId);
+  };
+
+  const handleThreadCreate = (threadId: string) => {
+    navigateToChat(threadId);
+  };
+
+  const handleNewChat = () => {
+    navigateToWelcome();
+  };
+
+  const getPageTitle = () => {
+    switch (currentView) {
+      case 'chat':
+        return `lll.chat - ${currentThreadId}`;
+      case 'settings':
+        return 'lll.chat - Settings';
+      case 'account':
+        return 'lll.chat - Account';
+      default:
+        return 'lll.chat';
+    }
+  };
+
+  const renderContent = () => {
+    switch (currentView) {
+      case 'chat':
+        if (user && selectedModel) {
+          return (
+            <ChatWindow 
+              threadId={currentThreadId}
+              onThreadCreate={handleThreadCreate}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+              sidebarCollapsed={sidebarCollapsed}
+              sidebarWidth={sidebarWidth}
+            />
+          );
+        }
+        // Show loading state instead of null to prevent flashing
+        return (
+          <div 
+            className="flex-1 flex items-center justify-center"
+            style={{ 
+              marginLeft: sidebarCollapsed ? '60px' : `${sidebarWidth}px`,
+              transition: 'margin-left 0.2s ease-in-out'
+            }}
+          >
+            <div className="text-lg text-gray-500">Loading chat...</div>
+          </div>
+        );
+      case 'settings':
+        return (
+          <div 
+            className="flex-1 overflow-y-auto"
+            style={{ 
+              marginLeft: sidebarCollapsed ? '60px' : `${sidebarWidth}px`,
+              transition: 'margin-left 0.2s ease-in-out'
+            }}
+          >
+            <main className="min-h-screen bg-gray-50">
+              <div className="max-w-4xl mx-auto px-6 py-8">
+                <div className="space-y-8">
+                  {/* Header */}
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={navigateToWelcome}
+                      className="rounded-full hover:bg-gray-100 p-2"
+                    >
+                      <ArrowLeftIcon className="h-4 w-4" />
+                    </Button>
+                    <div>
+                      <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Manage your API keys and preferences
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* API Keys Section */}
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                    <div className="p-6 border-b border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gray-100 rounded-lg">
+                          <KeyIcon className="h-5 w-5 text-gray-900" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-medium text-gray-900">API Keys</h2>
+                          <p className="text-sm text-gray-500">
+                            Configure your API keys for different AI providers
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="p-6 space-y-6">
+                      {(Object.keys(apiKeys) as Array<keyof ApiKeys>).map((provider) => (
+                        <div key={provider} className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-gray-700">
+                              {getProviderInfo(provider).name}
+                            </label>
+                            {apiKeys[provider] && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleClear(provider)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          
+                          <div className="relative">
+                            <Input
+                              type={showKeys[provider] ? "text" : "password"}
+                              placeholder={getProviderInfo(provider).placeholder}
+                              value={showKeys[provider] ? apiKeys[provider] : maskKey(apiKeys[provider])}
+                              onChange={(e) => handleKeyChange(provider, e.target.value)}
+                              onFocus={() => setShowKeys(prev => ({ ...prev, [provider]: true }))}
+                              onBlur={() => setShowKeys(prev => ({ ...prev, [provider]: false }))}
+                              className="pr-12 bg-gray-50 border-gray-200 focus:bg-white focus:border-gray-900 transition-colors"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => toggleKeyVisibility(provider)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                              {showKeys[provider] ? (
+                                <EyeOffIcon className="h-4 w-4" />
+                              ) : (
+                                <EyeIcon className="h-4 w-4" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <div className="pt-4 border-t border-gray-100">
+                        <Button 
+                          onClick={handleSave}
+                          className="w-full bg-gray-900 hover:bg-gray-800 text-white rounded-xl py-2 px-4 transition-colors"
+                        >
+                          {saved ? (
+                            <span className="flex items-center gap-2">
+                              <CheckIcon className="h-4 w-4" />
+                              Saved!
+                            </span>
+                          ) : (
+                            "Save API Keys"
+                          )}
+                        </Button>
+                        
+                        <p className="text-xs text-gray-500 mt-3 text-center">
+                          API keys are encrypted and stored securely in the database.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Default Model Section */}
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                    <div className="p-6 border-b border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gray-100 rounded-lg">
+                          <BotIcon className="h-5 w-5 text-gray-900" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-medium text-gray-900">Default Model</h2>
+                          <p className="text-sm text-gray-500">
+                            Choose your preferred default model for new conversations
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="p-6">
+                      {availableModels.length > 0 ? (
+                        <div className="space-y-4">
+                          <div className="relative" ref={dropdownRef}>
+                            <button
+                              onClick={() => setIsDefaultModelDropdownOpen(!isDefaultModelDropdownOpen)}
+                              className="w-full flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                {selectedModelData ? (
+                                  <>
+                                    <div className="flex-shrink-0">
+                                      {getProviderIcon(selectedModelData.provider, selectedModelData.name)}
+                                    </div>
+                                    <div className="text-left">
+                                      <div className="font-medium text-gray-900">
+                                        {selectedModelData.name}
+                                      </div>
+                                      <div className="text-sm text-gray-500">
+                                        {selectedModelData.description}
+                                      </div>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div className="text-gray-500">Select a default model</div>
+                                )}
+                              </div>
+                              <ChevronDownIcon 
+                                className={`h-5 w-5 text-gray-400 transition-transform ${
+                                  isDefaultModelDropdownOpen ? 'rotate-180' : ''
+                                }`} 
+                              />
+                            </button>
+                            
+                            {isDefaultModelDropdownOpen && (
+                              <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                                {availableModels.map((model) => (
+                                  <button
+                                    key={model.id}
+                                    onClick={() => handleSetDefaultModel(model.id)}
+                                    className={`w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50 transition-colors ${
+                                      selectedDefaultModel === model.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                                    }`}
+                                  >
+                                    <div className="flex-shrink-0">
+                                      {getProviderIcon(model.provider, model.name)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium text-gray-900 truncate">
+                                        {model.name}
+                                      </div>
+                                      <div className="text-sm text-gray-500 truncate">
+                                        {model.description}
+                                      </div>
+                                      {model.costPer1kTokens && (
+                                        <div className="text-xs text-green-600 mt-1">
+                                          ${(model.costPer1kTokens * 1000).toFixed(2)} per 1M tokens
+                                        </div>
+                                      )}
+                                    </div>
+                                    {selectedDefaultModel === model.id && (
+                                      <CheckIcon className="h-4 w-4 text-blue-500" />
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          
+                          {selectedDefaultModel && (
+                            <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-xl">
+                              <div className="flex items-center gap-2 text-green-700">
+                                <CheckIcon className="h-4 w-4" />
+                                <span className="text-sm font-medium">
+                                  {defaultModelSaved ? "Default model updated!" : "Default model set"}
+                                </span>
+                              </div>
+                              <button
+                                onClick={handleClearDefaultModel}
+                                className="text-green-600 hover:text-green-700 text-sm underline"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          )}
+                          
+                          <p className="text-xs text-gray-500">
+                            Only models with API keys are available for selection. When no default is set, the cheapest available model will be used automatically.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <BotIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                          <h3 className="font-medium text-gray-900 mb-2">No Models Available</h3>
+                          <p className="text-sm text-gray-500 mb-4">
+                            Add API keys above to enable model selection
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* About Section */}
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
+                    <div className="p-6">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">About</h3>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                        lll.chat - Built with Next.js, tRPC, Convex, and TypeScript
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </main>
+          </div>
+        );
+      case 'account':
+        return (
+          <div 
+            className="flex-1 overflow-y-auto"
+            style={{ 
+              marginLeft: sidebarCollapsed ? '60px' : `${sidebarWidth}px`,
+              transition: 'margin-left 0.2s ease-in-out'
+            }}
+          >
+            <div className="min-h-screen bg-gray-50">
+              <main className="flex-1 overflow-y-auto">
+                <div className="max-w-4xl mx-auto px-6 py-8">
+                  <div className="mb-8">
+                    <div className="flex items-center gap-4 mb-6">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={navigateToWelcome}
+                        className="rounded-full hover:bg-gray-100 p-2"
+                      >
+                        <ArrowLeftIcon className="h-4 w-4" />
+                      </Button>
+                      <div className="flex-1">
+                        <h1 className="text-2xl font-semibold text-gray-900">Account Settings</h1>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Manage your account settings and preferences
+                        </p>
+                      </div>
+                      <SignOutButton>
+                        <Button variant="outline" size="sm" className="flex items-center gap-2">
+                          <LogOutIcon className="h-4 w-4" />
+                          Sign Out
+                        </Button>
+                      </SignOutButton>
+                    </div>
+                  </div>
+
+                  <div className="w-full">
+                    <UserProfile 
+                      routing="hash"
+                      appearance={{
+                        elements: {
+                          rootBox: "w-full shadow-none border border-gray-200 rounded-lg bg-white",
+                          card: "shadow-none border-0 bg-transparent p-0",
+                          cardBox: "shadow-none",
+                          main: "shadow-none",
+                          navbar: "hidden",
+                          navbarButton: "text-gray-700 hover:text-gray-900",
+                          navbarButtonIcon: "text-gray-500",
+                          headerTitle: "text-xl font-semibold text-gray-900",
+                          headerSubtitle: "text-sm text-gray-500",
+                          socialButtonsBlockButton: "border border-gray-300 hover:bg-gray-50 bg-white text-gray-700",
+                          formButtonPrimary: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-4 rounded-md transition-colors",
+                          formFieldInput: "border-gray-300 focus:border-gray-500 focus:ring-gray-500 bg-white",
+                          identityPreviewEditButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                          profileSectionPrimaryButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                          badge: "bg-gray-100 text-gray-800",
+                          avatarImageActions: "bg-white border border-gray-300 rounded-lg",
+                          avatarImageActionsUpload: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-md",
+                          profileSection: "bg-white rounded-lg border border-gray-200 p-6 mb-6 -ml-2 mr-6 mt-6",
+                          profileSectionContent: "space-y-4",
+                          button: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                          buttonPrimary: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                          modalCloseButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                          fileDropAreaButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                          fileDropAreaButtonPrimary: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                        },
+                        variables: {
+                          colorPrimary: "#6B7280",
+                          colorText: "#374151", 
+                          colorTextSecondary: "#6B7280",
+                          colorBackground: "transparent",
+                          colorInputBackground: "#FFFFFF",
+                          colorInputText: "#374151",
+                          borderRadius: "0.5rem",
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </main>
+            </div>
+          </div>
+        );
+      default: // welcome
+        if (user && selectedModel) {
+          return (
+            <ChatWindow 
+              threadId={null}
+              onThreadCreate={handleThreadCreate}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+              sidebarCollapsed={sidebarCollapsed}
+              sidebarWidth={sidebarWidth}
+            />
+          );
+        }
+        // Show loading state instead of null to prevent flashing
+    return (
+          <div 
+            className="flex-1 flex items-center justify-center"
+            style={{ 
+              marginLeft: sidebarCollapsed ? '60px' : `${sidebarWidth}px`,
+              transition: 'margin-left 0.2s ease-in-out'
+            }}
+          >
+            <LoadingDots text="Loading" size="lg" className="text-gray-500" />
+      </div>
+    );
+  }
+  };
+
+  // For authenticated users, we'll render the SPA directly instead of redirecting
+
   if (!isLoaded) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading...</div>
+      <>
+        <Head>
+          <title>lll.chat - High-Performance AI Chat</title>
+          <meta name="description" content="Experience lightning-fast AI conversations with lll.chat's optimized chat platform" />
+          <link rel="icon" href="/favicon.ico" sizes="any" />
+          <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+          <link rel="manifest" href="/site.webmanifest" />
+        </Head>
+        
+        {/* Simple loading skeleton with main layout shapes */}
+        <main className="h-screen flex">
+          {/* Sidebar skeleton */}
+          <div 
+            className="bg-white border-r border-gray-200 flex flex-col"
+            style={{ width: '288px' }}
+          >
+            {/* Header area */}
+            <div className="p-4 border-b border-gray-200">
+              <div className="h-6 bg-gray-200 rounded animate-pulse mb-3"></div>
+              <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            
+            {/* Content area */}
+            <div className="flex-1 p-4 space-y-3">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="h-10 bg-gray-200 rounded animate-pulse"></div>
+              ))}
+            </div>
+            
+            {/* Bottom area */}
+            <div className="border-t border-gray-200 p-4">
+              <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+          
+          {/* Main content skeleton */}
+          <div className="flex-1 flex flex-col bg-gray-50">
+            {/* Content area */}
+            <div className="flex-1 flex items-center justify-center p-6">
+              <div className="text-center space-y-6 w-full max-w-4xl">
+                {/* Title area */}
+                <div className="space-y-3">
+                  <div className="h-8 bg-gray-200 rounded mx-auto w-80 animate-pulse"></div>
+                  <div className="h-5 bg-gray-200 rounded mx-auto w-96 animate-pulse"></div>
+                </div>
+                
+                {/* Cards grid */}
+                <div className="grid grid-cols-2 gap-4 mt-8">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-24 bg-white border border-gray-200 rounded-xl animate-pulse"></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            {/* Input area */}
+            <div className="border-t border-gray-200 bg-white p-6">
+              <div className="max-w-4xl mx-auto">
+                <div className="h-12 bg-gray-200 rounded-xl animate-pulse"></div>
+              </div>
+            </div>
       </div>
+        </main>
+      </>
     );
   }
 
   if (!user) {
     return (
-      <PageTransition>
+      <>
         <Head>
           <title>lll.chat - High-Performance AI Chat</title>
           <meta name="description" content="Experience lightning-fast AI conversations with lll.chat's optimized chat platform" />
@@ -266,74 +1006,80 @@ const Home: NextPage = () => {
             </div>
           </main>
         </div>
-      </PageTransition>
+      </>
     );
   }
 
-  // For authenticated users, don't render until we have a valid selectedModel
+  // For authenticated users, show sidebar layout even while loading selectedModel
   if (!selectedModel) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
-  }
-
-  const handleToggleCollapse = () => {
-    const newCollapsed = !sidebarCollapsed;
-    setSidebarCollapsed(newCollapsed);
-    // Immediately update width to prevent lag - chat window moves in sync with sidebar
-    setSidebarWidth(newCollapsed ? 0 : 288);
-  };
-
-  const handleThreadSelect = (threadId: string) => {
-    // If selecting a different thread, navigate to it
-    if (threadId !== currentThreadId) {
-      router.push(`/chat/${threadId}`);
-    }
-  };
-
-  const handleThreadCreate = (threadId: string) => {
-    // If we're currently on the welcome page (no currentThreadId), this is the first message
-    // Update both the state and URL to transition to chat mode
-    if (!currentThreadId) {
-      setCurrentThreadId(threadId);
-      // Update URL so refresh works properly
-      router.push(`/chat/${threadId}`, undefined, { shallow: true });
-    } else {
-      // For new threads created from within an existing chat, navigate to them
-      router.push(`/chat/${threadId}`);
-    }
-  };
-
   return (
-    <PageTransition>
+      <>
       <Head>
         <title>lll.chat</title>
         <meta name="description" content="lll.chat - High-performance AI chat application" />
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="manifest" href="/site.webmanifest" />
+          <link rel="icon" href="/favicon.ico" sizes="any" />
+          <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+          <link rel="manifest" href="/site.webmanifest" />
       </Head>
-      <main className="h-screen">
+        <main className="h-screen flex">
         <Sidebar 
-          currentThreadId={currentThreadId}
+            currentThreadId={currentThreadId}
           onThreadSelect={handleThreadSelect}
+            onNewChat={handleNewChat}
+            onNavigateToSettings={navigateToSettings}
+            onNavigateToAccount={navigateToAccount}
           collapsed={sidebarCollapsed}
-          onToggleCollapse={handleToggleCollapse}
+            onToggleCollapse={toggleSidebar}
           onWidthChange={setSidebarWidth}
         />
-        <ChatWindow 
-          threadId={currentThreadId}
-          onThreadCreate={handleThreadCreate}
-          selectedModel={selectedModel}
-          onModelChange={setSelectedModel}
-          sidebarCollapsed={sidebarCollapsed}
-          sidebarWidth={sidebarWidth}
-        />
+          <div className="flex-1 flex items-center justify-center">
+            <LoadingDots text="Loading" size="lg" />
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  // Only render authenticated content when selectedModel is available
+  if (user && selectedModel) {
+    return (
+      <>
+        <Head>
+          <title>{getPageTitle()}</title>
+          <meta name="description" content="lll.chat - High-performance AI chat application" />
+          <link rel="icon" href="/favicon.ico" sizes="any" />
+          <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+          <link rel="manifest" href="/site.webmanifest" />
+        </Head>
+        <main className="h-screen flex">
+          {/* Persistent Sidebar - NEVER unmounts */}
+          <Sidebar 
+            currentThreadId={currentThreadId}
+            onThreadSelect={handleThreadSelect}
+            onNewChat={handleNewChat}
+            onNavigateToSettings={navigateToSettings}
+            onNavigateToAccount={navigateToAccount}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleSidebar}
+            onWidthChange={setSidebarWidth}
+          />
+          
+          {/* Content Area - swaps based on currentView */}
+          <div className="flex-1 transition-opacity duration-200 ease-in-out">
+            {renderContent()}
+          </div>
       </main>
-    </PageTransition>
+      </>
+    );
+  }
+
+  // Fallback for any other case
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <LoadingDots text="Loading" size="lg" />
+    </div>
   );
 };
 

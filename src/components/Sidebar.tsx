@@ -8,6 +8,7 @@ import { trpc } from "@/utils/trpc";
 import { getProviderIcon } from "./ModelSelector";
 import toast from "react-hot-toast";
 import Logo from './Logo';
+import { useChatStore } from "../stores/chatStore";
 
 
 // Helper function to get provider from model name using database
@@ -28,6 +29,9 @@ const getModelNameFromId = (modelId?: string | null, models?: any[]) => {
 interface SidebarProps {
   currentThreadId: string | null;
   onThreadSelect: (threadId: string) => void;
+  onNewChat?: () => void;
+  onNavigateToSettings?: () => void;
+  onNavigateToAccount?: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onWidthChange?: (width: number) => void;
@@ -39,7 +43,7 @@ interface ContextMenu {
   y: number;
 }
 
-export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCollapse, onWidthChange }: SidebarProps) {
+export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, collapsed, onToggleCollapse, onWidthChange }: SidebarProps) {
   const router = useRouter();
   const { user } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
@@ -50,6 +54,17 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
   const [showFloatingButtons, setShowFloatingButtons] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(288); // Default 18rem = 288px
   const [isResizing, setIsResizing] = useState(false);
+  
+  const [hoverAnimationsDisabled, setHoverAnimationsDisabled] = useState(false);
+  
+  // Helper function to temporarily disable hover animations after pin/unpin actions
+  // This prevents jittery animations when threads move and mouse ends up over different thread
+  const temporarilyDisableHoverAnimations = () => {
+    setHoverAnimationsDisabled(true);
+    setTimeout(() => {
+      setHoverAnimationsDisabled(false);
+    }, 300); // Longer delay to prevent jittery animations after DOM changes
+  };
 
   const contextMenuRef = useRef<HTMLDivElement>(null);
   
@@ -96,8 +111,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
       utils.chat.getThreads.invalidate();
       
       if (currentThreadId && threads?.find(t => t.id === currentThreadId)) {
-        // If current thread was deleted, redirect to home
-        router.push("/");
+        // If current thread was deleted, redirect to app welcome
+        router.push("/app");
       }
     },
     onError: () => {
@@ -208,37 +223,27 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
   }, [sidebarWidth, collapsed, onWidthChange]);
 
   const handleNewChat = () => {
-    createThread.mutate({
-      title: "New Chat",
-      model: getDefaultModel(),
-    });
-    toast.dismiss();
-    toast.success("New conversation started");
+    if (onNewChat) {
+      onNewChat();
+    } else {
+      // Fallback to router navigation if no prop provided
+      router.push("/app");
+    }
   };
 
   const handleNewChatCollapsed = () => {
-    // Create a special mutation for collapsed state that doesn't auto-navigate
-    const createThreadCollapsed = trpc.chat.createThread.useMutation({
-      onSuccess: (newThread) => {
-        // Invalidate and refetch threads to update the UI
-        utils.chat.getThreads.invalidate();
-        // Don't call onThreadSelect when collapsed to avoid auto-expanding
-        toast.dismiss();
-        toast.success("New conversation created");
-      },
-      onError: () => {
-        toast.dismiss();
-        toast.error("Failed to create new conversation");
-      },
-    });
-
-    createThreadCollapsed.mutate({
-      title: "New Chat",
-      model: getDefaultModel(),
-    });
+    if (onNewChat) {
+      onNewChat();
+    } else {
+      // Fallback to router navigation if no prop provided
+      router.push("/app");
+    }
   };
 
   const handleDeleteThread = (threadId: string) => {
+    // Prevent multiple calls while mutation is in progress
+    if (deleteThread.isLoading) return;
+    
     deleteThread.mutate({ id: threadId });
     setContextMenu(null);
     toast.dismiss();
@@ -267,6 +272,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
     });
     
     setContextMenu(null);
+    temporarilyDisableHoverAnimations(); // Prevent jittery animations when threads reorder
   };
 
   const handleRenameStart = (threadId: string, currentTitle: string) => {
@@ -323,6 +329,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
     const provider = getProviderFromModel(thread.model, models);
     const modelName = getModelNameFromId(thread.model, models);
     const isEditing = editingThread === thread.id;
+    const [hasAnimated, setHasAnimated] = useState(false);
     
     return (
       <div
@@ -331,6 +338,22 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
         }`}
         onClick={() => !isEditing && onThreadSelect(thread.id)}
         onContextMenu={(e: React.MouseEvent) => handleRightClick(e, thread.id)}
+        onMouseEnter={() => {
+          if (!hasAnimated && !hoverAnimationsDisabled) {
+            setHasAnimated(true);
+          }
+        }}
+        onMouseLeave={() => {
+          if (!hoverAnimationsDisabled) {
+            setHasAnimated(false);
+          }
+        }}
+        onMouseMove={() => {
+          // Re-enable hover animations on actual mouse movement
+          if (hoverAnimationsDisabled) {
+            setHoverAnimationsDisabled(false);
+          }
+        }}
       >
         <div className={`flex-shrink-0 ${collapsed ? "h-5 w-5" : "h-4 w-4"} flex items-center justify-center -mr-1`}>
           {getProviderIcon(provider, modelName)}
@@ -381,7 +404,9 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
             
             {/* Hover Actions - Absolutely positioned to not take up layout space */}
             {!isEditing && (
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-75">
+              <div className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 transition-all duration-75 ${
+                hasAnimated ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'
+              }`}>
                 <Button
                   onClick={(e) => {
                     e.preventDefault();
@@ -407,7 +432,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
                   }}
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm border border-gray-300/60 hover:bg-red-200 hover:text-red-600 hover:border-red-300"
+                  disabled={deleteThread.isLoading}
+                  className={`h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm border border-gray-300/60 hover:bg-red-200 hover:text-red-600 hover:border-red-300 ${deleteThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title="Delete"
                 >
                   <TrashIcon className="h-3 w-3" />
@@ -431,7 +457,6 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
             onClick={handleNewChatCollapsed}
             size="sm"
             variant="ghost"
-            disabled={createThread.isLoading}
             title="New Chat"
             className="h-8 w-8 p-0 bg-white border border-gray-200 shadow-md hover:bg-gray-50 rounded-lg transition-all duration-300 ease-in-out"
           >
@@ -464,7 +489,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
             </div>
             <div className="flex gap-2">
               <Button
-                onClick={() => router.push("/settings")}
+                onClick={onNavigateToSettings}
                 size="sm"
                 variant="ghost"
                 title="Settings"
@@ -476,7 +501,6 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
                 onClick={handleNewChat}
                 size="sm"
                 variant="ghost"
-                disabled={createThread.isLoading}
                 title="New Chat"
                 className="h-8 w-8 p-0 hover:bg-gray-200"
               >
@@ -510,7 +534,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
           </div>
 
           {/* Thread List */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto hidden-scrollbar">
             <div className="px-3 py-2">
               {/* Pinned Threads Section */}
               {sortedPinnedThreads.length > 0 && (
@@ -552,9 +576,9 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
           <div className="border-t border-gray-200 p-3">
             <div className="flex items-center justify-between">
               <Button
-                onClick={() => router.push("/account")}
+                onClick={onNavigateToAccount}
                 variant="ghost"
-                className="flex-1 justify-start text-left h-10 px-3 hover:bg-gray-200 transition-colors"
+                className="w-full justify-start text-left h-10 px-3 hover:bg-gray-200 transition-colors"
               >
                 <UserIcon className="h-4 w-4 mr-3" />
                 <span className="text-sm font-medium">
@@ -595,14 +619,16 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
           </button>
           <button
             onClick={() => handlePinThread(contextMenu.threadId)}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            disabled={updateThread.isLoading}
+            className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <PinIcon className="h-3 w-3" />
             {(threads?.find(t => t.id === contextMenu.threadId) as any)?.pinned ? "Unpin" : "Pin"}
           </button>
           <button
             onClick={() => handleDeleteThread(contextMenu.threadId)}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-red-50 hover:text-red-600 flex items-center gap-2"
+            disabled={deleteThread.isLoading}
+            className={`w-full px-3 py-2 text-left text-sm hover:bg-red-50 hover:text-red-600 flex items-center gap-2 ${deleteThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <TrashIcon className="h-3 w-3" />
             Delete

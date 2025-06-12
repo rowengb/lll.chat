@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { SendIcon, CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, Waves, PenToolIcon, CodeIcon, BrainIcon, LightbulbIcon, BarChartIcon, ChefHatIcon, ZapIcon, BotIcon, ShieldIcon } from "lucide-react";
+import { ArrowUpIcon, CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, Waves, PenToolIcon, CodeIcon, BrainIcon, LightbulbIcon, BarChartIcon, ChefHatIcon, ZapIcon, BotIcon, ShieldIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/utils/trpc";
 import ReactMarkdown from 'react-markdown';
@@ -11,6 +11,7 @@ import Logo from './Logo';
 import { useChatStore } from "../stores/chatStore";
 import { CustomScrollbar } from './CustomScrollbar';
 import { ActionButton } from './ActionButton';
+import { CodeBlock } from './CodeBlock';
 
 // Shared layout CSS for perfect alignment
 const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
@@ -1013,10 +1014,10 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                         <Button 
                           type="submit" 
                           disabled={!input.trim() || isLoading}
-                          className="rounded-xl h-12 w-12 bg-black hover:bg-gray-800 shadow-sm transition-all"
+                          className="rounded-xl h-12 w-12 bg-blue-500 hover:bg-blue-600 shadow-sm transition-all"
                           size="sm"
                         >
-                          <SendIcon className="h-4 w-4" />
+                          <ArrowUpIcon className="h-6 w-6" strokeWidth={1.8} strokeLinecap="square" />
                         </Button>
                       </div>
                       <div className="border-t border-gray-100 mt-2 pt-2 flex items-center justify-between">
@@ -1132,27 +1133,31 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                                 
                                 return isInline ? (
                                   <code 
-                                    className="bg-gray-800 text-gray-100 px-2 py-1 rounded text-xs font-mono" 
+                                    className="text-gray-100 px-2 py-1 rounded text-xs font-mono" 
+                                    style={{ backgroundColor: '#0C1117' }}
                                     {...props}
                                   >
                                     {children}
                                   </code>
-                                ) : (
-                                  <code 
-                                    className={`${className} block bg-gray-800 text-gray-100 p-2 rounded-xl overflow-x-auto text-xs`} 
-                                    {...props}
+                                ) : null; // Block code will be handled by pre
+                              },
+                              // Style pre blocks with copy functionality
+                              pre: ({ node, children, ...props }) => {
+                                // Extract language from the code element
+                                const codeElement = children as any;
+                                const className = codeElement?.props?.className || '';
+                                const match = /language-(\w+)/.exec(className);
+                                const language = match ? match[1] : undefined;
+                                
+                                return (
+                                  <CodeBlock 
+                                    className={className}
+                                    language={language}
                                   >
-                                    {children}
-                                  </code>
+                                    {codeElement?.props?.children || children}
+                                  </CodeBlock>
                                 );
                               },
-                              // Style pre blocks
-                              pre: ({ node, ...props }) => (
-                                <pre 
-                                  className="bg-gray-800 text-gray-100 p-2 rounded-xl overflow-x-auto my-3 text-xs"
-                                  {...props}
-                                />
-                              ),
                               // Style lists
                               ul: ({ node, ...props }) => (
                                 <ul 
@@ -1322,10 +1327,10 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                   <Button 
                     type="submit" 
                     disabled={!input.trim() || isLoading}
-                    className="rounded-xl h-12 w-12 bg-black hover:bg-gray-800 shadow-sm transition-all"
+                    className="rounded-xl h-12 w-12 bg-blue-500 hover:bg-blue-600 shadow-sm transition-all"
                     size="sm"
                   >
-                    <SendIcon className="h-4 w-4" />
+                    <ArrowUpIcon className="h-6 w-6" strokeWidth={1.8} strokeLinecap="square" />
                   </Button>
                 </div>
                 <div className="border-t border-gray-100 mt-2 pt-2 flex items-center justify-between">

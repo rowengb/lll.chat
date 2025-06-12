@@ -28,9 +28,7 @@ const MyApp: AppType = ({
     >
       <div className="h-full min-h-screen bg-gray-50">
         <ConvexClientProvider>
-          <AnimatePresence mode="wait" initial={false}>
-            <Component {...pageProps} key={getPageKey()} />
-          </AnimatePresence>
+          <Component {...pageProps} />
           <Toaster
             position="bottom-right"
             reverseOrder={false}
