@@ -160,6 +160,8 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
   // Fetch models from database
@@ -185,15 +187,58 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
     return !hasApiKey(provider);
   };
 
-  // Filter models based on search query
-  const filteredModels = allModels.filter((model: ModelData) => 
-    model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    model.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    model.provider.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Define filter categories based on the image
+  const filterCategories = [
+    { id: 'fast', name: 'Fast', icon: ZapIcon, color: 'bg-yellow-100 text-yellow-600' },
+    { id: 'vision', name: 'Vision', icon: EyeIcon, color: 'bg-green-100 text-green-600' },
+    { id: 'web', name: 'Search', icon: GlobeIcon, color: 'bg-blue-100 text-blue-600' },
+    { id: 'documents', name: 'PDFs', icon: FileTextIcon, color: 'bg-purple-100 text-purple-600' },
+    { id: 'reasoning', name: 'Reasoning', icon: BrainIcon, color: 'bg-orange-100 text-orange-600' },
+    { id: 'experimental', name: 'Effort Control', icon: FlaskConical, color: 'bg-yellow-100 text-yellow-600' },
+    { id: 'image-generation', name: 'Image Generation', icon: SparklesIcon, color: 'bg-pink-100 text-pink-600' },
+  ];
+
+  // Function to check if model matches filter criteria
+  const matchesFilters = (model: ModelData) => {
+    if (selectedFilters.length === 0) return true;
+    
+    // Special handling for "fast" filter - check if model is in favorites (typically faster models)
+    if (selectedFilters.includes('fast')) {
+      if (model.isFavorite) return true;
+    }
+    
+    // Check if model has any of the selected capabilities
+    return selectedFilters.some(filter => {
+      if (filter === 'fast') return model.isFavorite; // Fast = favorites
+      return model.capabilities.includes(filter);
+    });
+  };
+
+  // Filter models based on search query and selected filters
+  const filteredModels = allModels.filter((model: ModelData) => {
+    const matchesSearch = model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      model.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      model.provider.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesSearch && matchesFilters(model);
+  });
 
   // Show top models or all based on showAll state
   const displayedModels = showAll ? filteredModels : filteredModels.slice(0, 7);
+
+  // Toggle filter selection
+  const toggleFilter = (filterId: string) => {
+    setSelectedFilters(prev => 
+      prev.includes(filterId) 
+        ? prev.filter(id => id !== filterId)
+        : [...prev, filterId]
+    );
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedFilters([]);
+  };
 
   useEffect(() => {
     // Close dropdown when clicking outside
@@ -202,6 +247,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
         setIsOpen(false);
         setSearchQuery("");
         setShowAll(false);
+        setShowFilters(false);
       }
     };
 
@@ -242,7 +288,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
       </Button>
 
       {isOpen && (
-        <div className={`absolute bottom-full left-0 z-50 mb-2 rounded-2xl border border-gray-200 bg-white shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${showAll ? 'w-[600px]' : 'w-[420px]'}`}>
+        <div className={`absolute bottom-full left-0 z-50 mb-2 rounded-2xl border border-gray-200 bg-white shadow-2xl transition-all duration-300 ease-in-out ${showAll ? 'w-[600px]' : 'w-[420px]'}`}>
           {/* Fixed Search Bar */}
           <div className="flex-shrink-0 p-2 border-b border-gray-100 rounded-t-2xl bg-white">
             <div className="relative">
@@ -259,97 +305,101 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
 
           {showAll ? (
             // Grid View - Show All
-            <div className="flex flex-col animate-in fade-in duration-300" style={{height: '850px'}}>
+            <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{height: '850px'}}>
               {/* Scrollable Content Area */}
               <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent" style={{scrollbarGutter: 'stable'}}>
                 {/* Favorites Section */}
                 <div className="p-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <StarIcon className="h-4 w-4 text-gray-600" />
-                    <h3 className="font-medium text-gray-900">Favorites</h3>
-                  </div>
+                  <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                    <StarIcon className="h-4 w-4 text-yellow-500" />
+                    Favorites
+                  </h3>
                   <div className="grid grid-cols-4 gap-3">
-                    {favoriteModels.filter((model: ModelData) => 
-                      model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      model.description.toLowerCase().includes(searchQuery.toLowerCase())
-                    ).map((model: ModelData) => {
-                      const disabled = isModelDisabled(model.provider);
-                      return (
-                      <button
-                        key={model.id}
-                        onClick={() => {
-                          if (!disabled) {
-                            onModelChange(model.id);
-                            setIsOpen(false);
-                            setSearchQuery("");
-                            setShowAll(false);
-                          }
-                        }}
-                        disabled={disabled}
-                        className={`relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
-                          disabled 
-                            ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' 
-                            : selectedModel === model.id 
-                              ? 'border-blue-500 bg-blue-50 hover:border-blue-200 hover:bg-blue-50' 
-                              : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50'
-                        }`}
-                      >
-                        <div className="flex flex-col items-center gap-2 justify-between h-full">
-                          <div className="flex flex-col items-center gap-2">
-                            <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl text-lg font-medium">
-                              {getProviderIcon(model.provider, model.name)}
-                            </div>
-                            <div className="text-center">
-                              {model.displayNameTop && model.displayNameBottom ? (
-                                <>
-                                  <div className="font-medium text-sm text-gray-900">{model.displayNameTop}</div>
-                                  <div className="font-medium text-sm text-gray-900">{model.displayNameBottom}</div>
-                                </>
-                              ) : (
-                                <div className="font-medium text-sm text-gray-900">{model.name}</div>
-                              )}
-                              {model.subtitle && (
-                                <div className="text-xs text-gray-500 mt-0.5">
-                                  {model.subtitle}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap justify-center gap-1 min-h-[32px] items-center">
-                            {model.capabilities.filter(cap => cap !== 'experimental').slice(0, 4).map((capability: string, index: number) => (
-                              <div
-                                key={index}
-                                className={`p-1 rounded-md ${getCapabilityColor(capability)}`}
-                                title={capability}
-                              >
-                                {getCapabilityIcon(capability)}
+                    {filteredModels.filter(model => model.isFavorite).length === 0 ? (
+                      <div className="col-span-4 flex flex-col items-center justify-center py-8 text-center">
+                        <StarIcon className="h-8 w-8 text-gray-300 mb-2" />
+                        <p className="text-sm text-gray-500">No favorite models match your filters</p>
+                      </div>
+                    ) : (
+                      filteredModels.filter(model => model.isFavorite).map((model: ModelData) => {
+                        const disabled = isModelDisabled(model.provider);
+                        return (
+                        <button
+                          key={model.id}
+                          onClick={() => {
+                            if (!disabled) {
+                              onModelChange(model.id);
+                              setIsOpen(false);
+                              setSearchQuery("");
+                              setShowAll(false);
+                            }
+                          }}
+                          disabled={disabled}
+                          className={`relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
+                            disabled 
+                              ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' 
+                              : selectedModel === model.id 
+                                ? 'border-blue-500 bg-blue-50 hover:border-blue-200 hover:bg-blue-50' 
+                                : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50'
+                          }`}
+                        >
+                          <div className="flex flex-col items-center gap-2 justify-between h-full">
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl text-lg font-medium">
+                                {getProviderIcon(model.provider, model.name)}
                               </div>
-                            ))}
+                              <div className="text-center">
+                                {model.displayNameTop && model.displayNameBottom ? (
+                                  <>
+                                    <div className="font-medium text-sm text-gray-900">{model.displayNameTop}</div>
+                                    <div className="font-medium text-sm text-gray-900">{model.displayNameBottom}</div>
+                                  </>
+                                ) : (
+                                  <div className="font-medium text-sm text-gray-900">{model.name}</div>
+                                )}
+                                {model.subtitle && (
+                                  <div className="text-xs text-gray-500 mt-0.5">
+                                    {model.subtitle}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap justify-center gap-1 min-h-[32px] items-center">
+                              {model.capabilities.filter(cap => cap !== 'experimental').slice(0, 4).map((capability: string, index: number) => (
+                                <div
+                                  key={index}
+                                  className={`p-1 rounded-md ${getCapabilityColor(capability)}`}
+                                  title={capability}
+                                >
+                                  {getCapabilityIcon(capability)}
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                        {model.capabilities.includes('experimental') && (
-                          <div className="absolute top-2 left-2" title="Experimental">
-                            <FlaskConical className="h-4 w-4 text-gray-400" />
-                          </div>
-                        )}
-                        {selectedModel === model.id && (
-                          <CheckIcon className="absolute top-2 right-2 h-4 w-4 text-blue-500" />
-                        )}
-                        {(model.provider === 'anthropic' || model.provider === 'openai') && !disabled && (
-                          <div className="absolute top-2 right-2">
+                          {model.capabilities.includes('experimental') && (
+                            <div className="absolute top-2 left-2" title="Experimental">
+                              <FlaskConical className="h-4 w-4 text-gray-400" />
+                            </div>
+                          )}
+                          {selectedModel === model.id && (
+                            <CheckIcon className="absolute top-2 right-2 h-4 w-4 text-blue-500" />
+                          )}
+                          {(model.provider === 'anthropic' || model.provider === 'openai') && !disabled && (
+                            <div className="absolute top-2 right-2">
                                                           <span className="bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded flex items-center">
                                 <ZapIcon className="h-3 w-3" />
                               </span>
-                          </div>
-                        )}
-                        {disabled && (
-                          <div className="absolute top-2 right-2">
-                            <KeyIcon className="h-4 w-4 text-gray-400" />
-                          </div>
-                        )}
-                      </button>
-                      );
-                    })}
+                            </div>
+                          )}
+                          {disabled && (
+                            <div className="absolute top-2 right-2">
+                              <KeyIcon className="h-4 w-4 text-gray-400" />
+                            </div>
+                          )}
+                        </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
 
@@ -357,80 +407,84 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                 <div className="p-4 border-t border-gray-100">
                   <h3 className="font-medium text-gray-900 mb-4">Others</h3>
                   <div className="grid grid-cols-4 gap-3">
-                    {otherModels.filter((model: ModelData) => 
-                      model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      model.description.toLowerCase().includes(searchQuery.toLowerCase())
-                    ).map((model: ModelData) => {
-                      const disabled = isModelDisabled(model.provider);
-                      return (
-                      <button
-                        key={model.id}
-                        onClick={() => {
-                          if (!disabled) {
-                            onModelChange(model.id);
-                            setIsOpen(false);
-                            setSearchQuery("");
-                            setShowAll(false);
-                          }
-                        }}
-                        disabled={disabled}
-                        className={`relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
-                          disabled 
-                            ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' 
-                            : selectedModel === model.id 
-                              ? 'border-blue-500 bg-blue-50 hover:border-blue-200 hover:bg-blue-50' 
-                              : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50'
-                        }`}
-                      >
-                        <div className="flex flex-col items-center gap-2 justify-between h-full">
-                          <div className="flex flex-col items-center gap-2">
-                            <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl text-lg font-medium">
-                              {getProviderIcon(model.provider, model.name)}
-                            </div>
-                            <div className="text-center">
-                              {model.displayNameTop && model.displayNameBottom ? (
-                                <>
-                                  <div className="font-medium text-sm text-gray-900">{model.displayNameTop}</div>
-                                  <div className="font-medium text-sm text-gray-900">{model.displayNameBottom}</div>
-                                </>
-                              ) : (
-                                <div className="font-medium text-sm text-gray-900">{model.name}</div>
-                              )}
-                              {model.subtitle && (
-                                <div className="text-xs text-gray-500 mt-0.5">
-                                  {model.subtitle}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex flex-wrap justify-center gap-1 min-h-[32px] items-center">
-                            {model.capabilities.filter(cap => cap !== 'experimental').slice(0, 4).map((capability: string, index: number) => (
-                              <div
-                                key={index}
-                                className={`p-1 rounded-md ${getCapabilityColor(capability)}`}
-                                title={capability}
-                              >
-                                {getCapabilityIcon(capability)}
+                    {filteredModels.filter(model => !model.isFavorite).length === 0 ? (
+                      <div className="col-span-4 flex flex-col items-center justify-center py-8 text-center">
+                        <FilterIcon className="h-8 w-8 text-gray-300 mb-2" />
+                        <p className="text-sm text-gray-500">No other models match your filters</p>
+                      </div>
+                    ) : (
+                      filteredModels.filter(model => !model.isFavorite).map((model: ModelData) => {
+                        const disabled = isModelDisabled(model.provider);
+                        return (
+                        <button
+                          key={model.id}
+                          onClick={() => {
+                            if (!disabled) {
+                              onModelChange(model.id);
+                              setIsOpen(false);
+                              setSearchQuery("");
+                              setShowAll(false);
+                            }
+                          }}
+                          disabled={disabled}
+                          className={`relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
+                            disabled 
+                              ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' 
+                              : selectedModel === model.id 
+                                ? 'border-blue-500 bg-blue-50 hover:border-blue-200 hover:bg-blue-50' 
+                                : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50'
+                          }`}
+                        >
+                          <div className="flex flex-col items-center gap-2 justify-between h-full">
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl text-lg font-medium">
+                                {getProviderIcon(model.provider, model.name)}
                               </div>
-                            ))}
+                              <div className="text-center">
+                                {model.displayNameTop && model.displayNameBottom ? (
+                                  <>
+                                    <div className="font-medium text-sm text-gray-900">{model.displayNameTop}</div>
+                                    <div className="font-medium text-sm text-gray-900">{model.displayNameBottom}</div>
+                                  </>
+                                ) : (
+                                  <div className="font-medium text-sm text-gray-900">{model.name}</div>
+                                )}
+                                {model.subtitle && (
+                                  <div className="text-xs text-gray-500 mt-0.5">
+                                    {model.subtitle}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap justify-center gap-1 min-h-[32px] items-center">
+                              {model.capabilities.filter(cap => cap !== 'experimental').slice(0, 4).map((capability: string, index: number) => (
+                                <div
+                                  key={index}
+                                  className={`p-1 rounded-md ${getCapabilityColor(capability)}`}
+                                  title={capability}
+                                >
+                                  {getCapabilityIcon(capability)}
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                        {model.capabilities.includes('experimental') && (
-                          <div className="absolute top-2 left-2" title="Experimental">
-                            <FlaskConical className="h-4 w-4 text-gray-400" />
-                          </div>
-                        )}
-                        {selectedModel === model.id && (
-                          <CheckIcon className="absolute top-2 right-2 h-4 w-4 text-blue-500" />
-                        )}
-                        {disabled && (
-                          <div className="absolute top-2 right-2">
-                            <KeyIcon className="h-4 w-4 text-gray-400" />
-                          </div>
-                        )}
-                      </button>
-                      );
-                    })}
+                          {model.capabilities.includes('experimental') && (
+                            <div className="absolute top-2 left-2" title="Experimental">
+                              <FlaskConical className="h-4 w-4 text-gray-400" />
+                            </div>
+                          )}
+                          {selectedModel === model.id && (
+                            <CheckIcon className="absolute top-2 right-2 h-4 w-4 text-blue-500" />
+                          )}
+                          {disabled && (
+                            <div className="absolute top-2 right-2">
+                              <KeyIcon className="h-4 w-4 text-gray-400" />
+                            </div>
+                          )}
+                        </button>
+                        );
+                      })
+                    )}
                   </div>
                 </div>
               </div>
@@ -446,96 +500,171 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                     <StarIcon className="h-4 w-4" />
                     Favorites
                   </button>
-                  <button className="p-1.5 rounded-lg hover:bg-gray-100">
-                    <FilterIcon className="h-4 w-4 text-gray-600" />
-                  </button>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        showFilters || selectedFilters.length > 0 
+                          ? 'bg-blue-100 text-blue-600' 
+                          : 'hover:bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      <FilterIcon className="h-4 w-4" />
+                      {selectedFilters.length > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                          {selectedFilters.length}
+                        </span>
+                      )}
+                    </button>
+                    
+                    {showFilters && (
+                      <div className="fixed bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-48 z-[100] animate-in fade-in duration-300"
+                           style={{
+                             bottom: '60px',
+                             left: showAll ? '630px' : '450px',
+                             transition: 'left 300ms ease-in-out'
+                           }}>
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-base font-medium text-gray-900">Filters</h3>
+                          {selectedFilters.length > 0 && (
+                            <button
+                              onClick={clearFilters}
+                              className="text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 gap-1">
+                          {filterCategories.map((category) => {
+                            const Icon = category.icon;
+                            const isSelected = selectedFilters.includes(category.id);
+                            return (
+                              <button
+                                key={category.id}
+                                onClick={() => toggleFilter(category.id)}
+                                className={`flex items-center gap-2 p-1.5 rounded text-left transition-colors ${
+                                  isSelected 
+                                    ? 'bg-blue-50 border border-blue-200' 
+                                    : 'hover:bg-gray-50 border border-transparent'
+                                }`}
+                              >
+                                <div className={`p-1 rounded ${category.color}`}>
+                                  <Icon className="h-4 w-4" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-900">
+                                  {category.name}
+                                </span>
+                                {isSelected && (
+                                  <CheckIcon className="h-4 w-4 text-blue-600 ml-auto" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           ) : (
             // List View - Default
-            <div className="flex flex-col animate-in fade-in duration-300" style={{height: '450px'}}>
+            <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{height: '450px'}}>
               {/* Scrollable Content Area */}
               <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent" style={{scrollbarGutter: 'stable'}}>
                 <div className="p-2">
-                  {displayedModels.map((model: ModelData) => {
-                    const disabled = isModelDisabled(model.provider);
-                    return (
-                    <button
-                      key={model.id}
-                      onClick={() => {
-                        if (!disabled) {
-                          onModelChange(model.id);
-                          setIsOpen(false);
-                          setSearchQuery("");
-                          setShowAll(false);
-                        }
-                      }}
-                      disabled={disabled}
-                      className={`flex w-full items-center justify-between px-3 py-3 text-left rounded-lg transition-colors group ${
-                        disabled 
-                          ? 'opacity-50 cursor-not-allowed bg-gray-50' 
-                          : 'hover:bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="relative flex items-center justify-center w-8 h-8 bg-gray-100 rounded-lg text-sm font-medium text-gray-700">
-                          {getProviderIcon(model.provider, model.name)}
-                          {model.capabilities.includes('experimental') && (
-                            <div className="absolute -top-1 -left-1" title="Experimental">
-                              <FlaskConical className="h-3 w-3 text-gray-400" />
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="flex flex-col flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-900 text-sm">{model.name}</span>
-                            {model.subtitle && (
-                              <span className="text-xs text-gray-500">
-                                {model.subtitle}
-                              </span>
-                            )}  
-                            {model.provider === 'openai' && model.name.includes('GPT') && (
-                              <span className="bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-md flex items-center">
-                                <ZapIcon className="h-3 w-3" />
-                            </span>
+                  {displayedModels.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <FilterIcon className="h-8 w-8 text-gray-300 mb-2" />
+                      <p className="text-sm text-gray-500 mb-1">No models match your filters</p>
+                      <button
+                        onClick={clearFilters}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        Clear filters
+                      </button>
+                    </div>
+                  ) : (
+                    displayedModels.map((model: ModelData) => {
+                      const disabled = isModelDisabled(model.provider);
+                      return (
+                      <button
+                        key={model.id}
+                        onClick={() => {
+                          if (!disabled) {
+                            onModelChange(model.id);
+                            setIsOpen(false);
+                            setSearchQuery("");
+                            setShowAll(false);
+                          }
+                        }}
+                        disabled={disabled}
+                        className={`flex w-full items-center justify-between px-3 py-3 text-left rounded-lg transition-colors group ${
+                          disabled 
+                            ? 'opacity-50 cursor-not-allowed bg-gray-50' 
+                            : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="relative flex items-center justify-center w-8 h-8 bg-gray-100 rounded-lg text-sm font-medium text-gray-700">
+                            {getProviderIcon(model.provider, model.name)}
+                            {model.capabilities.includes('experimental') && (
+                              <div className="absolute -top-1 -left-1" title="Experimental">
+                                <FlaskConical className="h-3 w-3 text-gray-400" />
+                              </div>
                             )}
+                          </div>
+                          
+                          <div className="flex flex-col flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900 text-sm">{model.name}</span>
+                              {model.subtitle && (
+                                <span className="text-xs text-gray-500">
+                                  {model.subtitle}
+                                </span>
+                              )}  
+                              {model.provider === 'openai' && model.name.includes('GPT') && (
+                                <span className="bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-md flex items-center">
+                                  <ZapIcon className="h-3 w-3" />
+                              </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            {model.capabilities.filter(cap => cap !== 'experimental').map((capability: string, index: number) => (
+                              <div
+                                key={index}
+                                className={`p-1 rounded-md ${getCapabilityColor(capability)}`}
+                                title={capability}
+                              >
+                                {getCapabilityIcon(capability)}
+                              </div>
+                            ))}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1">
-                          {model.capabilities.filter(cap => cap !== 'experimental').map((capability: string, index: number) => (
-                            <div
-                              key={index}
-                              className={`p-1 rounded-md ${getCapabilityColor(capability)}`}
-                              title={capability}
-                            >
-                              {getCapabilityIcon(capability)}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {selectedModel === model.id && (
-                        <CheckIcon className="h-4 w-4 text-blue-500 ml-2" />
-                      )}
-                      
-                      {disabled && (
-                        <div className="flex items-center gap-1 ml-2">
-                          <KeyIcon className="h-4 w-4 text-gray-400" />
-                        </div>
-                      )}
-                    </button>
-                    );
-                  })}
+                        {selectedModel === model.id && (
+                          <CheckIcon className="h-4 w-4 text-blue-500 ml-2" />
+                        )}
+                        
+                        {disabled && (
+                          <div className="flex items-center gap-1 ml-2">
+                            <KeyIcon className="h-4 w-4 text-gray-400" />
+                          </div>
+                        )}
+                      </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
 
               {/* Fixed Bottom Bar */}
-              {!showAll && filteredModels.length > 7 && (
-                <div className="flex-shrink-0 bg-white border-t border-gray-100 p-2 rounded-b-2xl">
-                  <div className="flex items-center justify-between">
+              <div className="flex-shrink-0 bg-white border-t border-gray-100 p-2 rounded-b-2xl">
+                <div className="flex items-center justify-between">
+                  {!showAll && filteredModels.length > 7 ? (
                     <button
                       onClick={() => setShowAll(true)}
                       className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
@@ -543,12 +672,76 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                       <ChevronUpIcon className="h-4 w-4" />
                       Show all
                     </button>
-                    <button className="p-1.5 rounded-lg hover:bg-gray-100">
-                      <FilterIcon className="h-4 w-4 text-gray-600" />
+                  ) : (
+                    <div></div>
+                  )}
+                  <div className="relative">
+                    <button 
+                      onClick={() => setShowFilters(!showFilters)}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        showFilters || selectedFilters.length > 0 
+                          ? 'bg-blue-100 text-blue-600' 
+                          : 'hover:bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      <FilterIcon className="h-4 w-4" />
+                      {selectedFilters.length > 0 && (
+                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                          {selectedFilters.length}
+                        </span>
+                      )}
                     </button>
+                    
+                    {showFilters && (
+                      <div className="fixed bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-48 z-[100] animate-in fade-in duration-300"
+                           style={{
+                             bottom: '60px',
+                             left: showAll ? '630px' : '450px',
+                             transition: 'left 300ms ease-in-out'
+                           }}>
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="text-base font-medium text-gray-900">Filters</h3>
+                          {selectedFilters.length > 0 && (
+                            <button
+                              onClick={clearFilters}
+                              className="text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 gap-1">
+                          {filterCategories.map((category) => {
+                            const Icon = category.icon;
+                            const isSelected = selectedFilters.includes(category.id);
+                            return (
+                              <button
+                                key={category.id}
+                                onClick={() => toggleFilter(category.id)}
+                                className={`flex items-center gap-2 p-1.5 rounded text-left transition-colors ${
+                                  isSelected 
+                                    ? 'bg-blue-50 border border-blue-200' 
+                                    : 'hover:bg-gray-50 border border-transparent'
+                                }`}
+                              >
+                                <div className={`p-1 rounded ${category.color}`}>
+                                  <Icon className="h-4 w-4" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-900">
+                                  {category.name}
+                                </span>
+                                {isSelected && (
+                                  <CheckIcon className="h-4 w-4 text-blue-600 ml-auto" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
