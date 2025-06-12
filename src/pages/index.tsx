@@ -1023,16 +1023,18 @@ const Home: NextPage = () => {
           <link rel="manifest" href="/site.webmanifest" />
       </Head>
         <main className="h-screen flex">
-        <Sidebar 
-            currentThreadId={currentThreadId}
-          onThreadSelect={handleThreadSelect}
-            onNewChat={handleNewChat}
-            onNavigateToSettings={navigateToSettings}
-            onNavigateToAccount={navigateToAccount}
-          collapsed={sidebarCollapsed}
-            onToggleCollapse={toggleSidebar}
-          onWidthChange={setSidebarWidth}
-        />
+        {currentView !== 'settings' && currentView !== 'account' && (
+          <Sidebar 
+              currentThreadId={currentThreadId}
+            onThreadSelect={handleThreadSelect}
+              onNewChat={handleNewChat}
+              onNavigateToSettings={navigateToSettings}
+              onNavigateToAccount={navigateToAccount}
+            collapsed={sidebarCollapsed}
+              onToggleCollapse={toggleSidebar}
+            onWidthChange={setSidebarWidth}
+          />
+        )}
           <div className="flex-1 flex items-center justify-center">
             <LoadingDots text="Loading" size="lg" />
           </div>
@@ -1054,17 +1056,19 @@ const Home: NextPage = () => {
           <link rel="manifest" href="/site.webmanifest" />
         </Head>
         <main className="h-screen flex">
-          {/* Persistent Sidebar - NEVER unmounts */}
-          <Sidebar 
-            currentThreadId={currentThreadId}
-            onThreadSelect={handleThreadSelect}
-            onNewChat={handleNewChat}
-            onNavigateToSettings={navigateToSettings}
-            onNavigateToAccount={navigateToAccount}
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={toggleSidebar}
-            onWidthChange={setSidebarWidth}
-          />
+          {/* Conditional Sidebar - Hidden on settings and account pages */}
+          {currentView !== 'settings' && currentView !== 'account' && (
+            <Sidebar 
+              currentThreadId={currentThreadId}
+              onThreadSelect={handleThreadSelect}
+              onNewChat={handleNewChat}
+              onNavigateToSettings={navigateToSettings}
+              onNavigateToAccount={navigateToAccount}
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={toggleSidebar}
+              onWidthChange={setSidebarWidth}
+            />
+          )}
           
           {/* Content Area - swaps based on currentView */}
           <div className="flex-1 transition-opacity duration-200 ease-in-out">
