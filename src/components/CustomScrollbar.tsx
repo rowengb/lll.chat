@@ -31,7 +31,7 @@ export function CustomScrollbar({ children, className = '', style = {}, onRef }:
     
     // Debug logging (remove in production)
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[CustomScrollbar] Content: ${contentHeight}px, Container: ${containerHeight}px, Needs scrollbar: ${needsScrollbar}`);
+      console.log(`[CustomScrollbar] Content: ${contentHeight}px, Container: ${containerHeight}px, Needs scrollbar: ${needsScrollbar}, Current showing: ${showScrollbar}`);
     }
     
     setShowScrollbar(needsScrollbar);
@@ -134,14 +134,45 @@ export function CustomScrollbar({ children, className = '', style = {}, onRef }:
     const resizeObserver = new ResizeObserver(updateScrollbar);
     resizeObserver.observe(content);
     
+    // Also observe the container for layout changes
+    const containerResizeObserver = new ResizeObserver(updateScrollbar);
+    if (containerRef.current) {
+      containerResizeObserver.observe(containerRef.current);
+    }
+    
+    // Watch for content changes (DOM mutations)
+    const mutationObserver = new MutationObserver(() => {
+      // Use requestAnimationFrame to ensure layout is complete
+      requestAnimationFrame(updateScrollbar);
+    });
+    
+    mutationObserver.observe(content, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class']
+    });
+    
     return () => {
       content.removeEventListener('scroll', handleScroll);
       resizeObserver.disconnect();
+      containerResizeObserver.disconnect();
+      mutationObserver.disconnect();
       if (onRef) {
         onRef(null);
       }
     };
   }, [onRef]);
+
+  // Add effect to update scrollbar when children change
+  useEffect(() => {
+    // Use a small delay to ensure DOM has updated
+    const timeoutId = setTimeout(() => {
+      updateScrollbar();
+    }, 10);
+    
+    return () => clearTimeout(timeoutId);
+  }, [children]);
 
   return (
     <div 
