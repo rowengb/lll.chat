@@ -85,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Failed to get or create user' });
   }
 
-  const { messages, model = 'gpt-4o' } = req.body;
+  const { messages, model = 'gpt-4o', threadId } = req.body;
   console.log(`📝 [LLL.CHAT] Parsed request: model=${model}, messages count=${messages?.length || 0}`);
   
   // Ensure we're using the fastest model
@@ -104,9 +104,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Messages array is required' });
   }
 
-  // Set headers for Server-Sent Events
+  // Set headers for Server-Sent Events (T3.chat style)
   res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
+    'Content-Type': 'text/plain; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
     'Connection': 'keep-alive',
     'Access-Control-Allow-Origin': '*',
@@ -122,7 +122,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (!apiKey) {
       console.log(`⚠️  [LLL.CHAT] No API key found for ${modelData.provider}`);
-      res.write(`data: ${JSON.stringify({ error: `No API key found for ${modelData.provider}. Please add one in Settings.` })}\n\n`);
+      res.write(`f:{"error":"No API key found for ${modelData.provider}. Please add one in Settings."}\n`);
       res.end();
       return;
     }
@@ -155,6 +155,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
     let streamStartTime = Date.now();
 
+    // Generate a message ID for this response
+    const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Send initial metadata (T3.chat style)
+    res.write(`f:{"messageId":"${messageId}"}\n`);
+
     // Stream the response - handle both old string format and new StreamChunk format
     const isStreamChunk = (chunk: any): chunk is import('@/server/ai/client').StreamChunk => {
       return chunk && typeof chunk === 'object' && 'content' in chunk;
@@ -180,7 +186,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           console.log(`📦 [LLL.CHAT] Chunk ${chunkCount}: "${content}" (${content.length} chars)`);
         }
 
-        res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        // Send content in T3.chat format: 0:"content"
+        res.write(`0:${JSON.stringify(content)}\n`);
       }
 
       // Update token statistics
@@ -212,12 +219,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`📊 [LLL.CHAT] Total: ${chunkCount} chunks, ${fullResponse.length} characters`);
     console.log(`⏱️  [LLL.CHAT] Total request time: ${streamComplete - requestStart}ms`);
     
-    res.write(`data: [DONE]\n\n`);
+    // Send completion signal (T3.chat style) - don't include full content to avoid parsing issues
+    res.write(`d:{"type":"done","length":${fullResponse.length}}\n`);
     res.end();
     
   } catch (error) {
     console.error('❌ [LLL.CHAT] Streaming error:', error);
-    res.write(`data: ${JSON.stringify({ error: 'Failed to generate response' })}\n\n`);
+    res.write(`f:{"error":"Failed to generate response"}\n`);
     res.end();
   }
 } 

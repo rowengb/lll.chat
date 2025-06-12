@@ -8,6 +8,7 @@ import rehypeHighlight from 'rehype-highlight';
 import { ModelSelector, getProviderIcon } from "./ModelSelector";
 import toast from "react-hot-toast";
 import Logo from './Logo';
+import { useChatStore } from "../stores/chatStore";
 
 // Shared layout CSS for perfect alignment
 const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
@@ -37,8 +38,6 @@ interface Message {
 
 export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth }: ChatWindowProps) {
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
@@ -46,10 +45,28 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   
+  // Use global chat store instead of local state
+  const { 
+    getMessages, 
+    setMessages, 
+    addMessage, 
+    updateStreamingMessage, 
+    isStreaming, 
+    setStreaming,
+    isLoading,
+    setLoading
+  } = useChatStore();
+  
+  // Get messages for current thread from global store
+  const localMessages = threadId ? getMessages(threadId) : [];
+  
+  // Ref to track streaming state and prevent race conditions
+  const isStreamingRef = useRef(false);
+  
   const { data: serverMessages, refetch: refetchMessages } = trpc.chat.getMessages.useQuery(
-    { threadId: threadId! },
+    { threadId: threadId || "" },
     { 
-      enabled: !!threadId,
+      enabled: !!threadId && typeof threadId === "string",
       refetchOnWindowFocus: false,
       retry: false
     }
@@ -65,16 +82,38 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   // Add threads query to trigger sidebar refresh when titles change
   const { refetch: refetchThreads } = trpc.chat.getThreads.useQuery();
 
-  // Update local messages when server messages change
+  // T3.chat style: Show welcome elements dynamically based on input content
+  const showWelcomeElements = !threadId && input.trim() === "";
+
+  // Handle input changes - just update input, welcome visibility is reactive
+  const handleInputChange = (value: string) => {
+    setInput(value);
+  };
+
+  // Robust server message sync with streaming protection
   useEffect(() => {
+    // Don't sync during loading/streaming
+    if (isLoading || isStreamingRef.current || !threadId) return;
+    
     if (serverMessages) {
-      setLocalMessages(serverMessages.map(msg => ({ 
-        ...msg, 
-        createdAt: new Date(msg._creationTime),
-        isOptimistic: false 
-      })));
+      // Only sync if we're not currently streaming
+      if (!isStreamingRef.current) {
+        const currentMessages = getMessages(threadId);
+        // If we have optimistic messages, don't sync
+        const hasOptimistic = currentMessages.some(msg => msg.isOptimistic);
+        if (!hasOptimistic) {
+          // Convert server messages
+          const serverMsgs = serverMessages.map(msg => ({ 
+            ...msg, 
+            createdAt: new Date(msg._creationTime),
+            isOptimistic: false 
+          }));
+          
+          setMessages(threadId, serverMsgs);
+        }
+      }
     }
-  }, [serverMessages]);
+  }, [serverMessages, threadId, isLoading, getMessages, setMessages]);
 
   // Detect scrollbar width and compensate chatbox position
   useEffect(() => {
@@ -137,29 +176,9 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   });
 
   const updateThreadMetadata = trpc.chat.updateThreadMetadata.useMutation();
-
   const generateTitle = trpc.chat.generateTitle.useMutation();
-
-  const sendMessage = trpc.chat.sendMessage.useMutation({
-    onSuccess: () => {
-      refetchMessages();
-      setIsLoading(false);
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-    },
-  });
-
-  const saveStreamedMessage = trpc.chat.saveStreamedMessage.useMutation({
-    onSuccess: () => {
-      refetchMessages();
-      setIsLoading(false);
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
-    },
-  });
-
+  const sendMessage = trpc.chat.sendMessage.useMutation();
+  const saveStreamedMessage = trpc.chat.saveStreamedMessage.useMutation();
   const deleteMessage = trpc.chat.deleteMessage.useMutation();
   const deleteMessagesFromPoint = trpc.chat.deleteMessagesFromPoint.useMutation();
   const saveAssistantMessage = trpc.chat.saveAssistantMessage.useMutation();
@@ -180,134 +199,40 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     }
   };
 
-  const handleBranchOff = async (messageId: string) => {
+  const handleRetryMessage = async (messageId: string, isUserMessage: boolean) => {
+    if (!threadId) return;
+
     try {
-      // Find the message and get all messages up to this point
-      const messageIndex = localMessages.findIndex(msg => msg.id === messageId);
-      if (messageIndex === -1) return;
-
-      const messagesUpToPoint = localMessages.slice(0, messageIndex + 1).filter(msg => !msg.isOptimistic);
+      setLoading(threadId, true);
       
-      // Create a new thread with these messages
-      const newThread = await createThread.mutateAsync({
-        title: `Branch from ${threadId?.slice(0, 8)}`,
-        model: selectedModel,
-      });
-
-      // Group messages into user-assistant pairs and save them
-      const messagePairs: Array<{user: Message, assistant?: Message}> = [];
-      
-      for (let i = 0; i < messagesUpToPoint.length; i++) {
-        const message = messagesUpToPoint[i];
-        if (message && message.role === "user") {
-          const nextMessage = messagesUpToPoint[i + 1];
-          const assistantMessage = nextMessage && nextMessage.role === "assistant" ? nextMessage : undefined;
-          messagePairs.push({ user: message, assistant: assistantMessage });
-          if (assistantMessage) i++; // Skip the assistant message we just processed
-        }
-      }
-
-      // Save each user-assistant pair
-      for (const pair of messagePairs) {
-        if (pair.assistant) {
-          // Save complete user-assistant pair
-          await saveStreamedMessage.mutateAsync({
-            threadId: newThread.id,
-            userContent: pair.user.content,
-            assistantContent: pair.assistant.content,
-            model: pair.assistant.model || selectedModel,
-          });
-        } else {
-          // Just a user message without response - send it to get a new response
-          await sendMessage.mutateAsync({
-            threadId: newThread.id,
-            content: pair.user.content,
-            model: selectedModel,
-          });
-        }
-      }
-
-      // Refresh the threads list to show the new branch immediately
-      await refetchThreads();
-      
-      // Navigate to the new thread
-      onThreadCreate(newThread.id);
-      toast.dismiss();
-      toast.success("Created conversation branch with full context");
-    } catch (error) {
-      console.error("Failed to branch off:", error);
-              toast.dismiss();
-        toast.error("Failed to create branch");
-    }
-  };
-
-    const handleRetryMessage = async (messageId: string, isUserMessage: boolean) => {
-    try {
-      const messageIndex = localMessages.findIndex(msg => msg.id === messageId);
+      // Find the message index
+      const currentMessages = getMessages(threadId);
+      const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
       if (messageIndex === -1) return;
 
       if (isUserMessage) {
-        // For user messages, find the AI response that followed and delete it from DB, then regenerate
-        const userMessage = localMessages[messageIndex];
-        const nextMessageIndex = messageIndex + 1;
-        const nextMessage = localMessages[nextMessageIndex];
+        // For user messages, remove all messages after this one and resend
+        const messagesToKeep = currentMessages.slice(0, messageIndex + 1);
+        setMessages(threadId, messagesToKeep);
         
+        const userMessage = currentMessages[messageIndex];
         if (userMessage) {
-          // Use the AI model from the response that followed, or fallback to selectedModel
-          const modelToUse = (nextMessage?.role === "assistant" && nextMessage.model) ? nextMessage.model : selectedModel;
-          
-          // Delete the AI response and any messages after it from database
-          if (nextMessage && !nextMessage.isOptimistic && threadId) {
-            await deleteMessagesFromPoint.mutateAsync({
-              threadId,
-              fromMessageId: nextMessage.id,
-            });
-          }
-          
-          // Remove from local state too (keep the user message)
-          setLocalMessages(prev => prev.slice(0, messageIndex + 1));
-          setIsLoading(true);
-          
-          if (threadId) {
-            // Generate new AI response for the existing user message
-            await streamResponseWithModel(threadId, userMessage.content, modelToUse);
-          }
+          await streamResponse(threadId, userMessage.content);
         }
       } else {
-        // For assistant messages, delete from DB and regenerate without creating new user message
-        const assistantMessage = localMessages[messageIndex];
-        const userMessageIndex = messageIndex - 1;
+        // For assistant messages, remove this message and all after it, then resend the last user message
+        const messagesToKeep = currentMessages.slice(0, messageIndex);
+        setMessages(threadId, messagesToKeep);
         
-        if (userMessageIndex >= 0 && localMessages[userMessageIndex]?.role === "user") {
-          const userMessage = localMessages[userMessageIndex];
-          
-          // Use the AI model that generated this response
-          const modelToUse = assistantMessage?.model || selectedModel;
-          
-          // Delete the assistant message and any messages after it from database
-          if (assistantMessage && !assistantMessage.isOptimistic && threadId) {
-            await deleteMessagesFromPoint.mutateAsync({
-              threadId,
-              fromMessageId: assistantMessage.id,
-            });
-          }
-          
-          // Remove from local state
-          setLocalMessages(prev => prev.slice(0, messageIndex));
-          setIsLoading(true);
-          
-          if (userMessage && threadId) {
-            // Directly stream the response without creating a new user message
-            await streamResponseWithModel(threadId, userMessage.content, modelToUse);
-          }
+        // Find the last user message to resend
+        const lastUserMessage = messagesToKeep.reverse().find(msg => msg.role === "user");
+        if (lastUserMessage) {
+          await streamResponse(threadId, lastUserMessage.content);
         }
       }
-      toast.dismiss();
-      toast.success("Message retried");
     } catch (error) {
-      console.error("Failed to retry message:", error);
-      toast.dismiss();
-      toast.error("Failed to retry message");
+      console.error("Error retrying message:", error);
+      setLoading(null, false);
     }
   };
 
@@ -321,10 +246,11 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
 
   const handleSaveEdit = async (messageId: string) => {
     try {
-      if (!editingContent.trim()) return;
+      if (!editingContent.trim() || !threadId) return;
 
       // Find the original message
-      const originalMessage = localMessages.find(msg => msg.id === messageId);
+      const currentMessages = getMessages(threadId);
+      const originalMessage = currentMessages.find(msg => msg.id === messageId);
       if (!originalMessage) return;
 
       // Check if the content has actually changed
@@ -336,7 +262,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       }
 
       // Content has changed - delete original and everything after it from database
-      if (!originalMessage.isOptimistic && threadId) {
+      if (!originalMessage.isOptimistic) {
         await deleteMessagesFromPoint.mutateAsync({
           threadId,
           fromMessageId: originalMessage.id,
@@ -344,10 +270,11 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       }
 
       // Find the message index to remove from local state
-      const messageIndex = localMessages.findIndex(msg => msg.id === messageId);
+      const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
       if (messageIndex !== -1) {
         // Remove all messages from the edited one forward in local state
-        setLocalMessages(prev => prev.slice(0, messageIndex));
+        const messagesToKeep = currentMessages.slice(0, messageIndex);
+        setMessages(threadId, messagesToKeep);
       }
 
              // Create new user message with edited content and get AI response
@@ -361,8 +288,8 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
            isOptimistic: true,
          };
          
-         setLocalMessages(prev => [...prev, optimisticUserMessage]);
-         setIsLoading(true);
+         addMessage(threadId, optimisticUserMessage);
+         setLoading(threadId, true);
          
          // Stream the AI response (this will save both user and assistant messages)
          await streamResponse(threadId, editingContent.trim());
@@ -386,65 +313,59 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
 
   // Helper function to send a message programmatically and get AI response
   const sendMessageProgrammatically = async (content: string) => {
-    if (!threadId || !content.trim()) return;
+    if (!threadId) return;
 
-    const messageId = `temp-${Date.now()}`;
-    const optimisticMessage: Message = {
-      id: messageId,
-      content: content.trim(),
-      role: "user",
-      createdAt: new Date(),
-      isOptimistic: true,
-    };
-
-    setLocalMessages(prev => [...prev, optimisticMessage]);
-    setIsLoading(true);
-
+    let optimisticUserMessage: Message | undefined;
     try {
-      await sendMessage.mutateAsync({
-        threadId,
-        content: content.trim(),
-        model: selectedModel,
+      setLoading(threadId, true);
+      addMessage(threadId, optimisticUserMessage = {
+        id: `temp-user-${Date.now()}`,
+        content,
+        role: "user",
+        createdAt: new Date(),
+        isOptimistic: true,
       });
-      
-      // After saving user message, stream the AI response
-      await streamResponse(threadId, content.trim());
+
+      // Stream the response
+      await streamResponse(threadId, content);
     } catch (error) {
-      console.error("Failed to send message:", error);
-      // Remove the optimistic message on error
-      setLocalMessages(prev => prev.filter(msg => msg.id !== messageId));
-      setIsLoading(false);
+      console.error("Error sending message programmatically:", error);
+      // Remove optimistic message on error
+      if (optimisticUserMessage) {
+        const currentMessages = getMessages(threadId);
+        const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticUserMessage!.id);
+        setMessages(threadId, filteredMessages);
+      }
+      setLoading(null, false);
     }
   };
 
   // Helper function to send a message programmatically with a specific model
   const sendMessageProgrammaticallyWithModel = async (content: string, model: string) => {
-    if (!threadId || !content.trim()) return;
+    if (!threadId) return;
 
-    const messageId = `temp-${Date.now()}`;
-    const optimisticMessage: Message = {
-      id: messageId,
-      content: content.trim(),
-      role: "user",
-      createdAt: new Date(),
-      isOptimistic: true,
-    };
-
-    setLocalMessages(prev => [...prev, optimisticMessage]);
-    setIsLoading(true);
-
+    let optimisticMessage: Message | undefined;
     try {
-      await sendMessage.mutateAsync({
-        threadId,
-        content: content.trim(),
-        model: model,
+      setLoading(threadId, true);
+      addMessage(threadId, optimisticMessage = {
+        id: `temp-user-${Date.now()}`,
+        content,
+        role: "user",
+        createdAt: new Date(),
+        isOptimistic: true,
       });
+
+      // Stream the response with the specified model
+      await streamResponseWithModel(threadId, content, model);
     } catch (error) {
-      console.error("Failed to send message:", error);
-      // Remove the optimistic message on error
-      setLocalMessages(prev => prev.filter(msg => msg.id !== messageId));
-    } finally {
-      setIsLoading(false);
+      console.error("Error sending message programmatically with model:", error);
+      // Remove optimistic message on error
+      if (optimisticMessage) {
+        const currentMessages = getMessages(threadId);
+        const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticMessage!.id);
+        setMessages(threadId, filteredMessages);
+      }
+      setLoading(null, false);
     }
   };
 
@@ -488,56 +409,71 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
 
     const messageContent = input.trim();
     setInput("");
-    setIsLoading(true);
-
-    // Create optimistic user message
-    const optimisticUserMessage: Message = {
-      id: `temp-${Date.now()}`,
-      content: messageContent,
-      role: "user",
-      createdAt: new Date(),
-      isOptimistic: true,
-    };
-
-    // Add optimistic user message immediately
-    setLocalMessages(prev => [...prev, optimisticUserMessage]);
 
     try {
-      let currentThreadId = threadId;
-
-      if (!currentThreadId) {
-        // Create new thread first (default to first favorite model for new chats)
+      if (!threadId) {
+        // Create thread and stream immediately - smooth T3.chat style flow
+        console.log(`[SUBMIT] Creating new thread and streaming message: "${messageContent.slice(0, 30)}..."`);
         const defaultModel = getDefaultModel();
         const newThread = await createThread.mutateAsync({
           title: messageContent.slice(0, 50),
           model: defaultModel,
         });
-        currentThreadId = newThread.id;
-        // Reset model selector to default for the new chat
         onModelChange(defaultModel);
         
-        // Update the optimistic message with the real thread ID
-        setLocalMessages(prev => 
-          prev.map(msg => 
-            msg.id === optimisticUserMessage.id 
-              ? { ...msg, threadId: currentThreadId! }
-              : msg
-          )
-        );
-      }
+        // Start streaming setup BEFORE URL change to prevent clearing messages
+        setLoading(newThread.id, true);
+        isStreamingRef.current = true; // Protect from useEffect clearing messages
+        
+        // Create optimistic user message FIRST
+        const optimisticUserMessage: Message = {
+          id: `temp-user-${Date.now()}`,
+          content: messageContent,
+          role: "user",
+          createdAt: new Date(),
+          isOptimistic: true,
+        };
 
-      // Start streaming response
-              await streamResponse(currentThreadId, messageContent);
+        // Add optimistic user message BEFORE URL change
+        addMessage(newThread.id, optimisticUserMessage);
+        
+        // NOW change URL (after optimistic message is set)
+        onThreadCreate(newThread.id);
+
+        // Start streaming response on the new thread
+        await streamResponse(newThread.id, messageContent);
+        
+        // Refresh sidebar to show the new thread
+        await refetchThreads();
+      } else {
+        // We're already on a thread page - stream immediately
+        setLoading(threadId, true);
+        
+        // Create optimistic user message
+        const optimisticUserMessage: Message = {
+          id: `temp-user-${Date.now()}`,
+          content: messageContent,
+          role: "user",
+          createdAt: new Date(),
+          isOptimistic: true,
+        };
+
+        // Add optimistic user message
+        addMessage(threadId, optimisticUserMessage);
+
+        // Start streaming response
+        await streamResponse(threadId, messageContent);
+      }
       
     } catch (error) {
       console.error("Error sending message:", error);
-      // Remove optimistic message on error
-      setLocalMessages(prev => prev.filter(msg => msg.id !== optimisticUserMessage.id));
-      setIsLoading(false);
+      setLoading(null, false);
     }
   };
 
   const streamResponse = async (threadId: string, content: string) => {
+    console.log(`[STREAM] Starting stream for thread: ${threadId}`);
+    
     // Create optimistic assistant message for streaming
     const optimisticAssistantMessage: Message = {
       id: `temp-assistant-${Date.now()}`,
@@ -547,16 +483,23 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       isOptimistic: true,
     };
 
-    setLocalMessages(prev => [...prev, optimisticAssistantMessage]);
+    addMessage(threadId, optimisticAssistantMessage);
+    
+    // Mark as streaming to prevent server sync interference
+    isStreamingRef.current = true;
+    setStreaming(threadId, true);
 
     try {
-      // Get conversation history for streaming
-      const messages = localMessages
-        .filter(msg => !msg.isOptimistic) // Don't include optimistic messages
+      // Get conversation history for streaming (exclude optimistic messages)
+      const currentMessages = getMessages(threadId);
+      const messages = currentMessages
+        .filter(msg => !msg.isOptimistic)
         .map(msg => ({ role: msg.role, content: msg.content }));
       
       // Add the new user message
       messages.push({ role: "user", content });
+
+      console.log(`[STREAM] Sending request with ${messages.length} messages`);
 
       // Create streaming request
       const response = await fetch("/api/chat/stream", {
@@ -567,6 +510,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         body: JSON.stringify({
           messages,
           model: selectedModel,
+          threadId,
         }),
       });
 
@@ -574,7 +518,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Read the streaming response
+      // Read the streaming response (T3.chat style)
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error("No response body");
@@ -582,23 +526,64 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
 
       const decoder = new TextDecoder();
       let fullContent = "";
+      let messageId = "";
+
+      console.log(`[STREAM] Starting to read stream...`);
 
       try {
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            console.log(`[STREAM] Stream completed`);
+            break;
+          }
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n').filter(line => line.trim());
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              
-              if (data === '[DONE]') {
-                // Stream complete - save to DB
+            console.log(`[STREAM] Processing line: ${line.substring(0, 100)}...`);
+            
+            // Handle T3.chat format: f:metadata, 0:content, d:done
+            if (line.startsWith('f:')) {
+              // Metadata (message ID, etc.)
+              try {
+                const metadata = JSON.parse(line.slice(2));
+                if (metadata.messageId) {
+                  messageId = metadata.messageId;
+                  console.log(`[STREAM] Got message ID: ${messageId}`);
+                }
+                if (metadata.error) {
+                  throw new Error(metadata.error);
+                }
+              } catch (e) {
+                console.error('[STREAM] Failed to parse metadata:', e);
+              }
+            } else if (line.startsWith('0:')) {
+              // Content chunk
+              try {
+                const contentChunk = JSON.parse(line.slice(2));
+                fullContent += contentChunk;
                 
-                // Save the complete streamed message to database
+                console.log(`[STREAM] Content chunk: "${contentChunk}" (total: ${fullContent.length} chars)`);
+                
+                // Hide loading animation on first content chunk (TTFB complete)
+                if (fullContent.length > 0) {
+                  setLoading(null, false);
+                }
+                
+                // Update the streaming message immediately
+                updateStreamingMessage(threadId, optimisticAssistantMessage.id, fullContent);
+              } catch (e) {
+                console.error('[STREAM] Failed to parse content chunk:', e);
+              }
+            } else if (line.startsWith('d:')) {
+              // Done signal
+              try {
+                const doneData = JSON.parse(line.slice(2));
+                console.log(`[STREAM] Stream done, final content length: ${fullContent.length}, server reported: ${doneData.length || 'unknown'}`);
+                
+                // Stream complete - save to DB and clean up
                 await saveStreamedMessage.mutateAsync({
                   threadId,
                   userContent: content,
@@ -606,17 +591,17 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                   model: selectedModel,
                 });
 
-                // Update thread metadata with the current model
+                // Update thread metadata
                 if (threadId) {
                   await updateThreadMetadata.mutateAsync({
                     threadId,
                     lastModel: selectedModel,
-                    // TODO: Add cost and token calculation here
                   });
                 }
 
-                // Generate title for new conversations (if this is the first user message)
-                const isFirstMessage = localMessages.filter(msg => !msg.isOptimistic && msg.role === "user").length === 0;
+                // Generate title for new conversations
+                const currentMessages = getMessages(threadId);
+                const isFirstMessage = currentMessages.filter(msg => !msg.isOptimistic && msg.role === "user").length === 0;
                 if (isFirstMessage) {
                   try {
                     const titleResult = await generateTitle.mutateAsync({
@@ -624,44 +609,32 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                       firstMessage: content,
                     });
                     if (titleResult.success) {
-                      console.log("Generated title:", titleResult.title);
-                      // The title is automatically updated in the database
-                      // Refresh the threads list so the sidebar shows the new title
                       await refetchThreads();
                     }
                   } catch (error) {
                     console.error("Failed to generate title:", error);
-                    // Don't block the conversation flow if title generation fails
                   }
                 }
                 
-                // Remove the optimistic message and refresh to sync with server
-                setLocalMessages(prev => prev.filter(msg => msg.id !== optimisticAssistantMessage.id));
-                await refetchMessages();
-                return;
-              }
-
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.content) {
-                  fullContent += parsed.content;
-                  
-                  // Hide loading as soon as we get first content
-                  if (fullContent.length > 0) {
-                    setIsLoading(false);
+                // Mark both user and assistant messages as non-optimistic and clean up other optimistic messages
+                const allMessages = getMessages(threadId);
+                const updatedMessages = allMessages.map(msg => {
+                  if (msg.id === optimisticAssistantMessage.id) {
+                    // Mark assistant message as complete with model info
+                    return { ...msg, isOptimistic: false, content: fullContent, model: selectedModel };
+                  } else if (msg.role === "user" && msg.isOptimistic) {
+                    // Mark user message as non-optimistic too
+                    return { ...msg, isOptimistic: false };
                   }
-                  
-                  // Update the streaming message immediately for real-time feel
-                  setLocalMessages(prev => 
-                    prev.map(msg => 
-                      msg.id === optimisticAssistantMessage.id 
-                        ? { ...msg, content: fullContent }
-                        : msg
-                    )
-                  );
-                }
+                  return msg;
+                }).filter(msg => !msg.isOptimistic);
+                setMessages(threadId, updatedMessages);
+                isStreamingRef.current = false; // Clear streaming flag
+                setStreaming(null, false);
+                setLoading(null, false);
+                return;
               } catch (e) {
-                // Ignore JSON parse errors
+                console.error('[STREAM] Failed to parse done signal:', e);
               }
             }
           }
@@ -671,12 +644,15 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       }
 
     } catch (error) {
-      console.error("Streaming error:", error);
+      console.error("[STREAM] Streaming error:", error);
       // Remove optimistic assistant message on error
-      setLocalMessages(prev => prev.filter(msg => msg.id !== optimisticAssistantMessage.id));
+      const currentMessages = getMessages(threadId);
+      const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticAssistantMessage.id);
+      setMessages(threadId, filteredMessages);
+      isStreamingRef.current = false; // Clear streaming flag on error
+      setStreaming(null, false);
+      setLoading(null, false); // Clear loading on error
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -690,11 +666,16 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       isOptimistic: true,
     };
 
-    setLocalMessages(prev => [...prev, optimisticAssistantMessage]);
+    addMessage(threadId, optimisticAssistantMessage);
+    
+    // Mark as streaming to prevent server sync interference
+    isStreamingRef.current = true;
+    setStreaming(threadId, true);
 
     try {
       // Get conversation history for streaming (exclude the message we're retrying)
-      const messages = localMessages
+      const currentMessages = getMessages(threadId);
+      const messages = currentMessages
         .filter(msg => !msg.isOptimistic) // Don't include optimistic messages
         .map(msg => ({ role: msg.role, content: msg.content }));
 
@@ -754,9 +735,17 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                   });
                 }
                 
-                // Remove the optimistic message and refresh to sync with server
-                setLocalMessages(prev => prev.filter(msg => msg.id !== optimisticAssistantMessage.id));
-                await refetchMessages();
+                // Mark the assistant message as non-optimistic and clean up other optimistic messages (model already set)
+                const allMessages = getMessages(threadId);
+                const updatedMessages = allMessages.map(msg => 
+                  msg.id === optimisticAssistantMessage.id 
+                    ? { ...msg, isOptimistic: false, content: fullContent, model: model }
+                    : msg
+                ).filter(msg => !msg.isOptimistic);
+                setMessages(threadId, updatedMessages);
+                isStreamingRef.current = false; // Clear streaming flag
+                setStreaming(null, false);
+                setLoading(null, false);
                 return;
               }
 
@@ -765,19 +754,13 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                 if (parsed.content) {
                   fullContent += parsed.content;
                   
-                  // Hide loading as soon as we get first content
+                  // Hide loading animation on first content chunk (TTFB complete)
                   if (fullContent.length > 0) {
-                    setIsLoading(false);
+                    setLoading(null, false);
                   }
                   
                   // Update the streaming message immediately for real-time feel
-                  setLocalMessages(prev => 
-                    prev.map(msg => 
-                      msg.id === optimisticAssistantMessage.id 
-                        ? { ...msg, content: fullContent }
-                        : msg
-                    )
-                  );
+                  updateStreamingMessage(threadId, optimisticAssistantMessage.id, fullContent);
                 }
               } catch (e) {
                 // Ignore JSON parse errors
@@ -792,13 +775,50 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     } catch (error) {
       console.error("Streaming error:", error);
       // Remove optimistic assistant message on error
-      setLocalMessages(prev => prev.filter(msg => msg.id !== optimisticAssistantMessage.id));
+      const currentMessages = getMessages(threadId);
+      const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticAssistantMessage.id);
+      setMessages(threadId, filteredMessages);
+      isStreamingRef.current = false; // Clear streaming flag on error
+      setStreaming(null, false);
+      setLoading(null, false); // Clear loading on error
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 
+  const handleBranchOff = async (messageId: string) => {
+    if (!threadId) return;
+
+    try {
+      setLoading(threadId, true);
+      
+      // Find the message index
+      const currentMessages = getMessages(threadId);
+      const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
+      if (messageIndex === -1) return;
+
+      // Create new thread with messages up to this point
+      const result = await createThread.mutateAsync({
+        title: "Branched conversation",
+      });
+
+      if (result && result.id) {
+        const newThreadId = result.id;
+        
+        // Copy messages up to the branch point
+        const messagesToCopy = currentMessages.slice(0, messageIndex);
+        setMessages(newThreadId, messagesToCopy);
+        
+        // Navigate to new thread
+        onThreadCreate(newThreadId);
+      }
+    } catch (error) {
+      console.error("Error branching conversation:", error);
+    } finally {
+      setLoading(null, false);
+    }
+  };
+
+  // Show welcome page when no thread exists (T3.chat style)
   if (!threadId) {
     const examplePrompts = [
       {
@@ -843,131 +863,145 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         className="fixed top-0 right-0 bottom-0 flex flex-col bg-white transition-all duration-500 ease-out"
         style={{ left: sidebarCollapsed ? '0px' : `${sidebarWidth}px` }}
       >
-        <div className="flex flex-1 items-start justify-center overflow-y-auto pt-56">
-          <div className="text-center max-w-4xl mx-auto px-6 py-8">
-            {/* Welcome Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-light text-gray-900 mb-4">
-                Welcome to <span className="font-bold">lll</span><span className="font-normal">.chat</span>
-              </h1>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                Start a conversation with AI. Choose from the examples below or type your own message.
-              </p>
-            </div>
+        {/* Welcome Content Area with proper scrolling container for chatbox alignment */}
+        <div className="flex-1 overflow-hidden relative">
+          <div className="h-full overflow-y-auto">
+            <div className={`${sharedGridClasses} pt-56 pb-48`}>
+              <div></div>
+              <div className="w-full">
+                <div className={sharedLayoutClasses}>
+                  {/* Welcome elements that hide/show based on input - T3.chat style */}
+                  <div className={`text-center transition-all duration-300 ${showWelcomeElements ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
+                    {/* Welcome Header */}
+                    <div className="mb-8">
+                      <h1 className="text-3xl font-light text-gray-900 mb-4">
+                        Welcome to <span className="font-bold">lll</span><span className="font-normal">.chat</span>
+                      </h1>
+                      <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                        Start a conversation with AI. Choose from the examples below or type your own message.
+                      </p>
+                    </div>
 
-            {/* Example Prompts Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-              {examplePrompts.map((example, index) => {
-                const IconComponent = example.icon;
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleExampleClick(example.prompt)}
-                    className="group text-left p-4 bg-gradient-to-br from-gray-50/80 to-gray-100/60 backdrop-blur-sm hover:from-gray-100/90 hover:to-gray-150/70 rounded-2xl border border-gray-200/60 hover:border-gray-300/80 shadow-lg shadow-gray-100/50 hover:shadow-xl hover:shadow-gray-200/60 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="text-gray-600 mt-1 group-hover:text-gray-700 transition-colors">
-                        <IconComponent className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900 mb-2 group-hover:text-black transition-colors">
-                          {example.title}
-                        </h3>
-                        <p className="text-sm text-gray-600 group-hover:text-gray-700 line-clamp-3 transition-colors">
-                          {example.prompt}
-                        </p>
+                    {/* Example Prompts Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                      {examplePrompts.map((example, index) => {
+                        const IconComponent = example.icon;
+                        return (
+                          <button
+                            key={index}
+                            onClick={() => handleExampleClick(example.prompt)}
+                            className="group text-left p-4 bg-gradient-to-br from-gray-50/80 to-gray-100/60 backdrop-blur-sm hover:from-gray-100/90 hover:to-gray-150/70 rounded-2xl border border-gray-200/60 hover:border-gray-300/80 shadow-lg shadow-gray-100/50 hover:shadow-xl hover:shadow-gray-200/60 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="text-gray-600 mt-1 group-hover:text-gray-700 transition-colors">
+                                <IconComponent className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="font-medium text-gray-900 mb-2 group-hover:text-black transition-colors">
+                                  {example.title}
+                                </h3>
+                                <p className="text-sm text-gray-600 group-hover:text-gray-700 line-clamp-3 transition-colors">
+                                  {example.prompt}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Features highlight */}
+                    <div className="bg-gradient-to-r from-gray-50/90 to-gray-100/80 backdrop-blur-sm rounded-2xl border border-gray-200/70 p-6 max-w-2xl mx-auto shadow-lg shadow-gray-100/50 backdrop-saturate-150">
+                      <div className="grid grid-cols-3 gap-6 text-center">
+                        <div>
+                          <div className="flex justify-center mb-2">
+                            <ZapIcon className="h-6 w-6 text-gray-600" />
+                          </div>
+                          <div className="text-sm font-medium text-gray-900">Lightning Fast</div>
+                          <div className="text-xs text-gray-600">Real-time streaming</div>
+                        </div>
+                        <div>
+                          <div className="flex justify-center mb-2">
+                            <BotIcon className="h-6 w-6 text-gray-600" />
+                          </div>
+                          <div className="text-sm font-medium text-gray-900">Multiple Models</div>
+                          <div className="text-xs text-gray-600">GPT, Claude, Gemini & more</div>
+                        </div>  
+                        <div>
+                          <div className="flex justify-center mb-2">
+                            <ShieldIcon className="h-6 w-6 text-gray-600" />
+                          </div>
+                          <div className="text-sm font-medium text-gray-900">BYOK & Privacy</div>
+                          <div className="text-xs text-gray-600">Your keys, your data</div>
+                        </div>
                       </div>
                     </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Features highlight */}
-            <div className="bg-gradient-to-r from-gray-50/90 to-gray-100/80 backdrop-blur-sm rounded-2xl border border-gray-200/70 p-6 max-w-2xl mx-auto shadow-lg shadow-gray-100/50 backdrop-saturate-150">
-              <div className="grid grid-cols-3 gap-6 text-center">
-                <div>
-                  <div className="flex justify-center mb-2">
-                    <ZapIcon className="h-6 w-6 text-gray-600" />
                   </div>
-                  <div className="text-sm font-medium text-gray-900">Lightning Fast</div>
-                  <div className="text-xs text-gray-600">Real-time streaming</div>
                 </div>
-                <div>
-                  <div className="flex justify-center mb-2">
-                    <BotIcon className="h-6 w-6 text-gray-600" />
+              </div>
+              <div></div>
+            </div>
+          </div>
+          
+          {/* Chatbox - Using exact same layout system as conversation view */}
+          <div className="absolute bottom-6 left-0 z-20 right-0">
+            <div className={chatboxGridClasses}>
+              <div></div>
+              <div className="w-full">
+                <div className={chatboxLayoutClasses}>
+                  <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl px-5 py-4">
+                    <form onSubmit={handleSubmit}>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <textarea
+                            ref={inputRef as any}
+                            value={input}
+                            onChange={(e) => handleInputChange(e.target.value)}
+                            placeholder="Type your message..."
+                            disabled={isLoading}
+                            className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none overflow-y-auto"
+                            style={{ 
+                              border: 'none', 
+                              outline: 'none', 
+                              boxShadow: 'none',
+                              height: '24px'
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSubmit(e as any);
+                              }
+                            }}
+                          />
+                        </div>
+                        <Button 
+                          type="submit" 
+                          disabled={!input.trim() || isLoading}
+                          className="rounded-xl h-12 w-12 bg-black hover:bg-gray-800 shadow-sm transition-all"
+                          size="sm"
+                        >
+                          <SendIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="border-t border-gray-100 mt-2 pt-2 flex items-center justify-between">
+                        <ModelSelector
+                          selectedModel={selectedModel}
+                          onModelChange={onModelChange}
+                        />
+                        <div className="text-xs text-gray-500">
+                          Press Enter to send
+                        </div>
+                      </div>
+                    </form>
                   </div>
-                  <div className="text-sm font-medium text-gray-900">Multiple Models</div>
-                  <div className="text-xs text-gray-600">GPT, Claude, Gemini & more</div>
-                </div>  
-                <div>
-                  <div className="flex justify-center mb-2">
-                    <ShieldIcon className="h-6 w-6 text-gray-600" />
-                  </div>
-                  <div className="text-sm font-medium text-gray-900">BYOK & Privacy</div>
-                  <div className="text-xs text-gray-600">Your keys, your data</div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        
-        {/* Floating Input Area */}
-        <div className="absolute bottom-0 left-0 right-0 pb-6">
-          <div className="max-w-4xl mx-auto px-6">
-            <div className="max-w-[90%] mx-auto">
-              <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl p-4">
-                <form onSubmit={handleSubmit}>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <textarea
-                        ref={inputRef as any}
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Type your message..."
-                        disabled={isLoading}
-                        className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none overflow-y-auto"
-                        style={{ 
-                          border: 'none', 
-                          outline: 'none', 
-                          boxShadow: 'none',
-                          height: '24px'
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSubmit(e as any);
-                          }
-                        }}
-                      />
-                    </div>
-                    <Button 
-                      type="submit" 
-                      disabled={!input.trim() || isLoading}
-                      className="rounded-xl h-12 w-12 bg-black hover:bg-gray-800 shadow-sm transition-all"
-                      size="sm"
-                    >
-                      <SendIcon className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="border-t border-gray-100 mt-2 pt-2 flex items-center justify-between">
-                    <ModelSelector
-                      selectedModel={selectedModel}
-                      onModelChange={onModelChange}
-                    />
-                    <div className="text-xs text-gray-500">
-                      Press Enter to send
-                    </div>
-                  </div>
-                </form>
-                          </div>
-          </div>
-          <div></div>
-        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   return (
     <div 
@@ -984,11 +1018,16 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
             <div className="w-full">
               <div className={sharedLayoutClasses} id="messages-container">
               <div className="space-y-0">
-            {localMessages?.filter(message => 
-              // Filter out empty optimistic assistant messages
-              !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
-            ).map((message: Message) => (
-              <div className="flex justify-start">
+            {(() => {
+              const filteredMessages = localMessages?.filter(message => 
+                // Filter out empty optimistic assistant messages
+                !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
+              ) || [];
+              console.log(`[RENDER] Total messages to render: ${filteredMessages.length}`);
+              return filteredMessages.map((message: Message) => {
+                console.log(`[RENDER] Rendering message: ${message.role} - "${message.content.slice(0, 50)}..." (optimistic: ${message.isOptimistic})`);
+                return (
+              <div key={message.id} className="flex justify-start">
                 <div className="w-full">
                   <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
                                           <div
@@ -998,12 +1037,8 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                           : "pt-3 pb-1"
                         } ${
                         message.role === "user"
-                          ? message.isOptimistic 
-                            ? "bg-blue-50 text-gray-900 border border-blue-500 opacity-75"
-                            : "bg-blue-50 text-gray-900 border border-blue-500 shadow-sm"
-                          : message.isOptimistic
-                            ? "text-gray-900 opacity-75"
-                            : "text-gray-900"
+                          ? "bg-blue-50 text-gray-900 border border-blue-500 shadow-sm"
+                          : "text-gray-900"
                       }`}
                     >
                       {editingMessageId === message.id ? (
@@ -1106,9 +1141,8 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                       )}
                     </div>
 
-                    {/* Message Actions */}
-                    {!message.isOptimistic && (
-                      <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3" : "mt-0"} opacity-0 group-hover:opacity-100 transition-opacity`}>
+                    {/* Message Actions - Always render to prevent layout shift */}
+                    <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3" : "mt-0"} ${message.isOptimistic ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
                         {message.role === "assistant" && (
                           <div className="flex items-center gap-1 mr-1">
                             <div className="flex items-center gap-1 text-sm text-gray-500 px-5">
@@ -1181,20 +1215,24 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                           </>
                         )}
                       </div>
-                    )}
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            });
+            })()}
             
             {isLoading && (
               <div className="flex justify-start">
                 <div className="w-full flex">
                   <div className="max-w-full rounded-2xl bg-gray-100 px-5 py-3 shadow-sm">
-                    <div className="flex items-center space-x-2">
-                      <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400"></div>
-                      <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400 animation-delay-100"></div>
-                      <div className="h-2 w-2 animate-pulse rounded-full bg-gray-400 animation-delay-200"></div>
+                    <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-1">
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500"></div>
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-100"></div>
+                        <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-200"></div>
+                      </div>
+                      <span className="text-sm text-gray-500 animate-pulse">AI is thinking...</span>
                     </div>
                   </div>
                 </div>
@@ -1222,7 +1260,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                     <textarea
                       ref={inputRef as any}
                       value={input}
-                      onChange={(e) => setInput(e.target.value)}
+                      onChange={(e) => handleInputChange(e.target.value)}
                       placeholder="Type your message..."
                       disabled={isLoading}
                       className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none overflow-y-auto"

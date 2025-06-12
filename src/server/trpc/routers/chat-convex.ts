@@ -123,6 +123,11 @@ export const chatConvexRouter = createTRPCRouter({
   getMessages: protectedProcedure
     .input(z.object({ threadId: z.string() }))
     .query(async ({ ctx, input }) => {
+      // Return empty array if threadId is empty (during transitions)
+      if (!input.threadId || input.threadId.trim() === "") {
+        return [];
+      }
+
       const messages = await convex.query(api.messages.getByThread, {
         threadId: input.threadId as Id<"threads">,
       });

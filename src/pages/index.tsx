@@ -17,6 +17,7 @@ const Home: NextPage = () => {
   const [selectedModel, setSelectedModel] = useState<string | null>(null); // Start with null to indicate loading
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(288); // Default 18rem = 288px
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
 
   // Get user's best default model
   const { data: bestDefaultModel } = trpc.userPreferences.getBestDefaultModel.useQuery(
@@ -286,11 +287,23 @@ const Home: NextPage = () => {
   };
 
   const handleThreadSelect = (threadId: string) => {
-    router.push(`/chat/${threadId}`);
+    // If selecting a different thread, navigate to it
+    if (threadId !== currentThreadId) {
+      router.push(`/chat/${threadId}`);
+    }
   };
 
   const handleThreadCreate = (threadId: string) => {
-    router.push(`/chat/${threadId}`);
+    // If we're currently on the welcome page (no currentThreadId), this is the first message
+    // Update both the state and URL to transition to chat mode
+    if (!currentThreadId) {
+      setCurrentThreadId(threadId);
+      // Update URL so refresh works properly
+      router.push(`/chat/${threadId}`, undefined, { shallow: true });
+    } else {
+      // For new threads created from within an existing chat, navigate to them
+      router.push(`/chat/${threadId}`);
+    }
   };
 
   return (
@@ -305,14 +318,14 @@ const Home: NextPage = () => {
       </Head>
       <main className="h-screen">
         <Sidebar 
-          currentThreadId={null}
+          currentThreadId={currentThreadId}
           onThreadSelect={handleThreadSelect}
           collapsed={sidebarCollapsed}
           onToggleCollapse={handleToggleCollapse}
           onWidthChange={setSidebarWidth}
         />
         <ChatWindow 
-          threadId={null}
+          threadId={currentThreadId}
           onThreadCreate={handleThreadCreate}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
