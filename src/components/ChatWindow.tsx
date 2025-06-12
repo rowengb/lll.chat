@@ -9,6 +9,7 @@ import { ModelSelector, getProviderIcon } from "./ModelSelector";
 import toast from "react-hot-toast";
 import Logo from './Logo';
 import { useChatStore } from "../stores/chatStore";
+import { CustomScrollbar } from './CustomScrollbar';
 
 // Shared layout CSS for perfect alignment
 const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
@@ -43,7 +44,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [messagesContainer, setMessagesContainer] = useState<HTMLDivElement | null>(null);
   
   // Use global chat store instead of local state
   const { 
@@ -118,8 +119,8 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   // Detect scrollbar width and compensate chatbox position
   useEffect(() => {
     const detectScrollbarWidth = () => {
-      if (messagesContainerRef.current) {
-        const element = messagesContainerRef.current;
+      if (messagesContainer) {
+        const element = messagesContainer;
         const hasScrollbar = element.scrollHeight > element.clientHeight;
         const currentScrollbarWidth = hasScrollbar ? (element.offsetWidth - element.clientWidth) : 0;
         setScrollbarWidth(currentScrollbarWidth);
@@ -130,8 +131,8 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     
     // Watch for content changes that might affect scrollbar
     const observer = new ResizeObserver(detectScrollbarWidth);
-    if (messagesContainerRef.current) {
-      observer.observe(messagesContainerRef.current);
+    if (messagesContainer) {
+      observer.observe(messagesContainer);
     }
 
     window.addEventListener('resize', detectScrollbarWidth);
@@ -140,7 +141,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       observer.disconnect();
       window.removeEventListener('resize', detectScrollbarWidth);
     };
-  }, [localMessages]);
+  }, [localMessages, messagesContainer]);
 
   // Get default model using user preferences and API key availability
   const getDefaultModel = (): string => {
@@ -949,22 +950,24 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
               <div></div>
               <div className="w-full">
                 <div className={chatboxLayoutClasses}>
-                  <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl px-5 py-4">
+                  <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl px-5 py-4 chatbox-stable">
                     <form onSubmit={handleSubmit}>
                       <div className="flex items-center gap-3">
-                        <div className="flex-1">
+                        <div className="textarea-container">
                           <textarea
                             ref={inputRef as any}
                             value={input}
                             onChange={(e) => handleInputChange(e.target.value)}
                             placeholder="Type your message..."
                             disabled={isLoading}
-                            className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none overflow-y-auto"
+                            className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none hidden-scrollbar"
                             style={{ 
                               border: 'none', 
                               outline: 'none', 
                               boxShadow: 'none',
-                              height: '24px'
+                              height: '24px',
+                              minHeight: '24px',
+                              maxHeight: '120px'
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey) {
@@ -1012,7 +1015,10 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
 
       {/* Messages + Chatbox Area */}
       <div className="flex-1 overflow-hidden relative">
-        <div ref={messagesContainerRef} className="h-full overflow-y-auto overlay-scrollbar">
+        <CustomScrollbar 
+          className="h-full"
+          onRef={setMessagesContainer}
+        >
                       <div className={`${sharedGridClasses} pt-8 pb-48`}>
             <div></div>
             <div className="w-full">
@@ -1245,30 +1251,32 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
             </div>
             <div></div>
           </div>
-        </div>
+        </CustomScrollbar>
         
         {/* Chatbox - Absolutely positioned within scrolling container */}
         <div className="absolute bottom-6 left-0 z-20" style={{ right: `${scrollbarWidth}px` }}>
           <div className={chatboxGridClasses}>
             <div></div>
             <div className="w-full">
-              <div className={chatboxLayoutClasses}>
-                <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl px-5 py-4">
-                <form onSubmit={handleSubmit}>
+                              <div className={chatboxLayoutClasses}>
+                  <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl px-5 py-4 chatbox-stable">
+                    <form onSubmit={handleSubmit}>
                 <div className="flex items-center gap-3">
-                  <div className="flex-1">
+                  <div className="textarea-container">
                     <textarea
                       ref={inputRef as any}
                       value={input}
                       onChange={(e) => handleInputChange(e.target.value)}
                       placeholder="Type your message..."
                       disabled={isLoading}
-                      className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none overflow-y-auto"
+                      className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none hidden-scrollbar"
                       style={{ 
                         border: 'none', 
                         outline: 'none', 
                         boxShadow: 'none',
-                        height: '24px'
+                        height: '24px',
+                        minHeight: '24px',
+                        maxHeight: '120px'
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {

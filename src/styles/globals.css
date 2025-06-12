@@ -139,12 +139,88 @@
   animation-delay: 200ms;
 }
 
+/* Prevent layout shifts by always reserving scrollbar space */
+.stable-scrollbar {
+  scrollbar-gutter: stable;
+}
+
+/* Force stable layout for chatbox containers */
+.chatbox-stable {
+  /* Prevent layout shifts in chatbox */
+  contain: layout;
+  will-change: auto;
+}
+
+/* Stable textarea container */
+.textarea-container {
+  /* Prevent flex item from changing size unexpectedly */
+  flex: 1 1 0%;
+  min-width: 0;
+  contain: layout;
+}
+
+/* Hide scrollbars completely */
+.hidden-scrollbar {
+  /* Hide scrollbars but keep functionality */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  overflow-y: auto;
+}
+
+.hidden-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
+}
+
+/* Custom overlay scrollbar */
+.custom-scrollbar-container {
+  position: relative;
+}
+
+.custom-scrollbar-track {
+  position: absolute;
+  right: 4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: transparent;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: auto;
+  z-index: 1000;
+}
+
+.custom-scrollbar-container:hover .custom-scrollbar-track {
+  opacity: 1;
+}
+
+.custom-scrollbar-thumb {
+  position: absolute;
+  right: 1px;
+  width: 6px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+  cursor: grab;
+  min-height: 20px;
+}
+
+.custom-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.custom-scrollbar-thumb:active {
+  background: rgba(0, 0, 0, 0.8);
+  cursor: grabbing;
+}
+
 /* Overlay scrollbar that doesn't affect layout */
 .overlay-scrollbar {
   /* Force scrollbar to overlay, not take layout space */
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
   overflow-y: overlay; /* Chrome overlay mode */
+  scrollbar-gutter: stable;
 }
 
 /* Show custom scrollbar only on webkit browsers */
