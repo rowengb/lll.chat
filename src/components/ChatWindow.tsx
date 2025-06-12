@@ -935,7 +935,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
         {/* Welcome Content Area with proper scrolling container for chatbox alignment */}
         <div className="flex-1 overflow-hidden relative">
           <div className="h-full overflow-y-auto">
-            <div className={`${sharedGridClasses} pt-56 pb-48`}>
+            <div className={`${sharedGridClasses} min-h-full flex items-center justify-center pb-32`}>
               <div></div>
               <div className="w-full">
                 <div className={sharedLayoutClasses}>

@@ -1023,7 +1023,7 @@ const Home: NextPage = () => {
           <link rel="manifest" href="/site.webmanifest" />
       </Head>
         <main className="h-screen flex">
-        {currentView !== 'settings' && currentView !== 'account' && (
+        <div className={`${currentView === 'settings' || currentView === 'account' ? 'hidden' : ''}`}>
           <Sidebar 
               currentThreadId={currentThreadId}
             onThreadSelect={handleThreadSelect}
@@ -1034,7 +1034,7 @@ const Home: NextPage = () => {
               onToggleCollapse={toggleSidebar}
             onWidthChange={setSidebarWidth}
           />
-        )}
+        </div>
           <div className="flex-1 flex items-center justify-center">
             <LoadingDots text="Loading" size="lg" />
           </div>
@@ -1056,8 +1056,8 @@ const Home: NextPage = () => {
           <link rel="manifest" href="/site.webmanifest" />
         </Head>
         <main className="h-screen flex">
-          {/* Conditional Sidebar - Hidden on settings and account pages */}
-          {currentView !== 'settings' && currentView !== 'account' && (
+          {/* Sidebar - Hidden with CSS on settings and account pages to preserve width */}
+          <div className={`${currentView === 'settings' || currentView === 'account' ? 'hidden' : ''}`}>
             <Sidebar 
               currentThreadId={currentThreadId}
               onThreadSelect={handleThreadSelect}
@@ -1068,7 +1068,7 @@ const Home: NextPage = () => {
               onToggleCollapse={toggleSidebar}
               onWidthChange={setSidebarWidth}
             />
-          )}
+          </div>
           
           {/* Content Area - swaps based on currentView */}
           <div className="flex-1 transition-opacity duration-200 ease-in-out">
