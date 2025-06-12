@@ -20,6 +20,7 @@ export default defineSchema({
     estimatedCost: v.optional(v.number()),
     totalTokens: v.optional(v.number()),
     pinned: v.boolean(),
+    branchedFromThreadId: v.optional(v.id("threads")), // Track which thread this was branched from
   }).index("by_user", ["userId"]),
 
   messages: defineTable({

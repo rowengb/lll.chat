@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { PlusIcon, MessageSquareIcon, SettingsIcon, ChevronLeftIcon, MenuIcon, SearchIcon, TrashIcon, PinIcon, MoreVerticalIcon, EditIcon, Waves, UserIcon, LogOutIcon } from "lucide-react";
+import { PlusIcon, MessageSquareIcon, SettingsIcon, ChevronLeftIcon, MenuIcon, SearchIcon, TrashIcon, PinIcon, MoreVerticalIcon, EditIcon, Waves, UserIcon, LogOutIcon, GitBranchIcon } from "lucide-react";
 import { useRouter } from "next/router";
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -332,7 +332,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
         onClick={() => !isEditing && onThreadSelect(thread.id)}
         onContextMenu={(e: React.MouseEvent) => handleRightClick(e, thread.id)}
       >
-        <div className={`flex-shrink-0 ${collapsed ? "h-5 w-5" : "h-4 w-4"} flex items-center justify-center`}>
+        <div className={`flex-shrink-0 ${collapsed ? "h-5 w-5" : "h-4 w-4"} flex items-center justify-center -mr-1`}>
           {getProviderIcon(provider, modelName)}
         </div>
         
@@ -355,10 +355,22 @@ export function Sidebar({ currentThreadId, onThreadSelect, collapsed, onToggleCo
               />
             ) : (
               <div className="flex-1 text-left relative overflow-hidden pr-0 group-hover:pr-16">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   {isPinned && <PinIcon className="h-3 w-3 text-blue-500 flex-shrink-0" />}
+                  {thread.branchedFromThreadId && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onThreadSelect(thread.branchedFromThreadId);
+                      }}
+                      className="flex-shrink-0"
+                      title="Go to original conversation"
+                    >
+                      <GitBranchIcon className="h-3.5 w-3.5 text-gray-500 hover:text-gray-800 transition-colors cursor-pointer" />
+                    </button>
+                  )}
                   <span 
-                    className="whitespace-nowrap overflow-hidden text-ellipsis flex-1"
+                    className="whitespace-nowrap overflow-hidden text-ellipsis flex-1 ml-0.5"
                     title={thread.title || `Chat ${thread.id.slice(0, 8)}`}
                   >
                     {thread.title || `Chat ${thread.id.slice(0, 8)}`}

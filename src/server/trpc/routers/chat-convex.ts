@@ -92,6 +92,7 @@ export const chatConvexRouter = createTRPCRouter({
           ...thread,
           id: thread._id,
           model: thread.lastModel || lastAssistantMessage?.model || null,
+          branchedFromThreadId: thread.branchedFromThreadId,
         };
       })
     );
@@ -103,6 +104,7 @@ export const chatConvexRouter = createTRPCRouter({
     .input(z.object({ 
       title: z.string().optional(),
       model: z.string().optional(),
+      branchedFromThreadId: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -115,6 +117,7 @@ export const chatConvexRouter = createTRPCRouter({
         userId: convexUser._id,
         title: input.title,
         lastModel: input.model,
+        branchedFromThreadId: input.branchedFromThreadId ? input.branchedFromThreadId as Id<"threads"> : undefined,
       });
 
       return { id: threadId, title: input.title, lastModel: input.model };

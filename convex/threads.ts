@@ -7,6 +7,7 @@ export const create = mutation({
     userId: v.id("users"),
     title: v.optional(v.string()),
     lastModel: v.optional(v.string()),
+    branchedFromThreadId: v.optional(v.id("threads")),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("threads", {
@@ -14,6 +15,7 @@ export const create = mutation({
       title: args.title,
       lastModel: args.lastModel,
       pinned: false,
+      branchedFromThreadId: args.branchedFromThreadId,
     });
   },
 });

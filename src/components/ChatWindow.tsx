@@ -82,7 +82,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   const { data: bestDefaultModel } = trpc.userPreferences.getBestDefaultModel.useQuery();
 
   // Add threads query to trigger sidebar refresh when titles change
-  const { refetch: refetchThreads } = trpc.chat.getThreads.useQuery();
+  const { data: threads, refetch: refetchThreads } = trpc.chat.getThreads.useQuery();
   const utils = trpc.useUtils();
 
   // T3.chat style: Show welcome elements dynamically based on input content
@@ -387,7 +387,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       textarea.style.height = 'auto';
       const scrollHeight = textarea.scrollHeight;
       const maxHeight = 128; // max-h-32 = 128px
-      const minHeight = 24; // Much slimmer default height
+      const minHeight = 20; // Even slimmer default height
       
       textarea.style.height = `${Math.min(Math.max(scrollHeight, minHeight), maxHeight)}px`;
     }
@@ -800,9 +800,15 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
       const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
       if (messageIndex === -1) return;
 
+      // Get the original thread title for better branch naming
+      const originalThread = threads?.find(t => t.id === threadId);
+      const originalTitle = originalThread?.title || "Chat";
+      const branchTitle = `${originalTitle} (Branch)`;
+      
       // Create new thread with messages up to this point
       const result = await createThread.mutateAsync({
-        title: "Branched conversation",
+        title: branchTitle,
+        branchedFromThreadId: threadId,
       });
 
       if (result && result.id) {
@@ -992,8 +998,8 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                               border: 'none', 
                               outline: 'none', 
                               boxShadow: 'none',
-                              height: '24px',
-                              minHeight: '24px',
+                              height: '20px',
+                              minHeight: '20px',
                               maxHeight: '120px'
                             }}
                             onKeyDown={(e) => {
@@ -1064,10 +1070,10 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                 <div className="w-full">
                   <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
                                           <div
-                        className={`rounded-2xl px-5 ${
+                        className={`rounded-2xl px-4 ${
                         message.role === "user" 
-                          ? "py-4" 
-                          : "pt-3 pb-1"
+                          ? "py-2" 
+                          : "pt-1 pb-1"
                         } ${
                         message.role === "user"
                           ? "bg-blue-50 text-gray-900 border border-blue-500 shadow-sm"
@@ -1175,7 +1181,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                     </div>
 
                     {/* Message Actions - Always render to prevent layout shift */}
-                    <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3" : "mt-0"} ${message.isOptimistic ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
+                    <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
                         {message.role === "assistant" && (
                           <div className="flex items-center gap-1 mr-1">
                             <div className="flex items-center gap-1 text-sm text-gray-500 px-5">
@@ -1301,8 +1307,8 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                         border: 'none', 
                         outline: 'none', 
                         boxShadow: 'none',
-                        height: '24px',
-                        minHeight: '24px',
+                        height: '20px',
+                        minHeight: '20px',
                         maxHeight: '120px'
                       }}
                       onKeyDown={(e) => {
