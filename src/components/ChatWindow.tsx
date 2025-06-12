@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ArrowUpIcon, CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, Waves, PenToolIcon, CodeIcon, BrainIcon, LightbulbIcon, BarChartIcon, ChefHatIcon, ZapIcon, BotIcon, ShieldIcon } from "lucide-react";
+import { ArrowUpIcon, CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, Waves, PenToolIcon, CodeIcon, BrainIcon, LightbulbIcon, BarChartIcon, ChefHatIcon, ZapIcon, BotIcon, ShieldIcon, PaperclipIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/utils/trpc";
 import ReactMarkdown from 'react-markdown';
@@ -14,14 +14,15 @@ import { ActionButton } from './ActionButton';
 import { CodeBlock } from './CodeBlock';
 import { FileUpload, UploadedFile } from './FileUpload';
 import { FileAttachment, FileAttachmentData } from './FileAttachment';
+import { Chatbox } from './Chatbox';
 
 // Shared layout CSS for perfect alignment
 const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
 const sharedGridClasses = "grid grid-cols-[1fr_min(900px,100%)_1fr] px-6";
 
 // Slightly wider chatbox for visual hierarchy
-const chatboxLayoutClasses = "max-w-[81%] w-full mx-auto";
-const chatboxGridClasses = "grid grid-cols-[1fr_min(800px,100%)_1fr] gap-4 px-4";
+const chatboxLayoutClasses = "max-w-[85%] w-full mx-auto";
+const chatboxGridClasses = "grid grid-cols-[1fr_min(900px,100%)_1fr] gap-4 px-4";
 
 interface ChatWindowProps {
   threadId: string | null;
@@ -322,6 +323,8 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     setEditingMessageId(null);
     setEditingContent("");
   };
+
+
 
   // Helper function to send a message programmatically and get AI response
   const sendMessageProgrammatically = async (content: string) => {
@@ -1009,81 +1012,23 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
             </div>
           </div>
           
-          {/* Chatbox - Using exact same layout system as conversation view */}
+          {/* Chatbox - Using shared component */}
           <div className="absolute bottom-6 left-0 z-20 right-0">
             <div className={chatboxGridClasses}>
               <div></div>
               <div className="w-full">
                 <div className={chatboxLayoutClasses}>
-                  <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl px-5 py-4 chatbox-stable">
-                    <form onSubmit={handleSubmit}>
-                      {/* File Upload Area */}
-                      {uploadedFiles.length > 0 && (
-                        <div className="mb-3">
-                          <FileUpload
-                            files={uploadedFiles}
-                            onFilesChange={setUploadedFiles}
-                            disabled={isLoading}
-                            maxFiles={5}
-                          />
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center gap-3">
-                        <div className="textarea-container">
-                          <textarea
-                            ref={inputRef as any}
-                            value={input}
-                            onChange={(e) => handleInputChange(e.target.value)}
-                            placeholder="Type your message..."
-                            disabled={isLoading}
-                            className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none hidden-scrollbar"
-                            style={{ 
-                              border: 'none', 
-                              outline: 'none', 
-                              boxShadow: 'none',
-                              height: '20px',
-                              minHeight: '20px',
-                              maxHeight: '120px'
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSubmit(e as any);
-                              }
-                            }}
-                          />
-                        </div>
-                        <Button 
-                          type="submit" 
-                          disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}
-                          className="rounded-xl h-12 w-12 bg-blue-500 hover:bg-blue-600 shadow-sm transition-all"
-                          size="sm"
-                        >
-                          <ArrowUpIcon className="h-6 w-6" strokeWidth={1.8} strokeLinecap="square" />
-                        </Button>
-                      </div>
-                      <div className="border-t border-gray-100 mt-2 pt-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <ModelSelector
-                            selectedModel={selectedModel}
-                            onModelChange={onModelChange}
-                          />
-                          {uploadedFiles.length === 0 && (
-                            <FileUpload
-                              files={uploadedFiles}
-                              onFilesChange={setUploadedFiles}
-                              disabled={isLoading}
-                              maxFiles={5}
-                            />
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Press Enter to send
-                        </div>
-                      </div>
-                    </form>
-                  </div>
+                  <Chatbox
+                    input={input}
+                    onInputChange={handleInputChange}
+                    onSubmit={handleSubmit}
+                    uploadedFiles={uploadedFiles}
+                    onFilesChange={setUploadedFiles}
+                    selectedModel={selectedModel}
+                    onModelChange={onModelChange}
+                    isLoading={isLoading}
+                    inputRef={inputRef}
+                  />
                 </div>
               </div>
             </div>
@@ -1354,59 +1299,23 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
           </div>
         </CustomScrollbar>
         
-        {/* Chatbox - Absolutely positioned within scrolling container */}
+        {/* Chatbox - Using shared component */}
         <div className="absolute bottom-6 left-0 z-20" style={{ right: `${scrollbarWidth}px` }}>
           <div className={chatboxGridClasses}>
             <div></div>
             <div className="w-full">
-                              <div className={chatboxLayoutClasses}>
-                  <div className="bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl px-5 py-4 chatbox-stable">
-                    <form onSubmit={handleSubmit}>
-                <div className="flex items-center gap-3">
-                  <div className="textarea-container">
-                    <textarea
-                      ref={inputRef as any}
-                      value={input}
-                      onChange={(e) => handleInputChange(e.target.value)}
-                      placeholder="Type your message..."
-                      disabled={isLoading}
-                      className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none hidden-scrollbar"
-                      style={{ 
-                        border: 'none', 
-                        outline: 'none', 
-                        boxShadow: 'none',
-                        height: '20px',
-                        minHeight: '20px',
-                        maxHeight: '120px'
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSubmit(e as any);
-                        }
-                      }}
-                    />
-                  </div>
-                  <Button 
-                    type="submit" 
-                    disabled={!input.trim() || isLoading}
-                    className="rounded-xl h-12 w-12 bg-blue-500 hover:bg-blue-600 shadow-sm transition-all"
-                    size="sm"
-                  >
-                    <ArrowUpIcon className="h-6 w-6" strokeWidth={1.8} strokeLinecap="square" />
-                  </Button>
-                </div>
-                <div className="border-t border-gray-100 mt-2 pt-2 flex items-center justify-between">
-                  <ModelSelector
-                    selectedModel={selectedModel}
-                    onModelChange={onModelChange}
-                  />
-                  <div className="text-xs text-gray-500">
-                    Press Enter to send
-                  </div>
-                </div>
-                </form>
-                </div>
+              <div className={chatboxLayoutClasses}>
+                <Chatbox
+                  input={input}
+                  onInputChange={handleInputChange}
+                  onSubmit={handleSubmit}
+                  uploadedFiles={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                  isLoading={isLoading}
+                  inputRef={inputRef}
+                />
               </div>
             </div>
           </div>
