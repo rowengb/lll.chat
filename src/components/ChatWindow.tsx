@@ -41,6 +41,7 @@ interface Message {
   model?: string | null;
   createdAt: Date;
   isOptimistic?: boolean;
+  isError?: boolean;
   attachments?: FileAttachmentData[];
 }
 
@@ -456,23 +457,15 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     // Don't auto-scroll during initial load - we handle that in the server sync effect
     if (isInitialLoad || scrollLocked.current) return;
     
-    // Don't auto-scroll if we're currently loading server messages
-    if (isLoading) return;
-    
     // Don't auto-scroll if container overflow is hidden (during positioning)
     if (messagesContainer && messagesContainer.style.overflow === 'hidden') return;
     
-    // Check if we're currently streaming
-    const isStreaming = localMessages.some(msg => msg.isOptimistic && msg.role === "assistant");
-    
-    // Only scroll if we have messages and we're not in initial load
+    // Always scroll immediately when messages change (including during streaming)
     if (localMessages.length > 0) {
-      // During streaming, use instant scroll to avoid jitter
-      // Otherwise, use smooth scroll for better UX
-      const behavior = isStreaming ? "instant" : "smooth";
-      messagesEndRef.current?.scrollIntoView({ behavior });
+      // Use instant scroll for immediate response during streaming and user interactions
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
     }
-  }, [localMessages, isInitialLoad, isLoading, messagesContainer]);
+  }, [localMessages, isInitialLoad, messagesContainer]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -519,6 +512,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         // Add optimistic user message BEFORE URL change
         addMessage(newThread.id, optimisticUserMessage);
         
+        // Immediately scroll to bottom after adding user message
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+        }, 0);
+        
         // NOW change URL (after optimistic message is set)
         onThreadCreate(newThread.id);
 
@@ -530,6 +528,13 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       } else {
         // We're already on a thread page - stream immediately
         setLoading(threadId, true);
+        
+        // Remove any error messages before adding new user message
+        const currentMessages = getMessages(threadId);
+        const messagesWithoutErrors = currentMessages.filter(msg => !msg.isError);
+        if (messagesWithoutErrors.length !== currentMessages.length) {
+          setMessages(threadId, messagesWithoutErrors);
+        }
         
         // Create optimistic user message
         const optimisticUserMessage: Message = {
@@ -543,6 +548,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
         // Add optimistic user message
         addMessage(threadId, optimisticUserMessage);
+
+        // Immediately scroll to bottom after adding user message
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+        }, 0);
 
         // Start streaming response
         await streamResponse(threadId, messageContent, messageFiles);
@@ -568,15 +578,20 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
     addMessage(threadId, optimisticAssistantMessage);
     
+    // Immediately scroll to bottom after adding assistant message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+    }, 0);
+    
     // Mark as streaming to prevent server sync interference
     isStreamingRef.current = true;
     setStreaming(threadId, true);
 
     try {
-      // Get conversation history for streaming (exclude optimistic messages)
+      // Get conversation history for streaming (exclude optimistic and error messages)
       const currentMessages = getMessages(threadId);
       const messages = currentMessages
-        .filter(msg => !msg.isOptimistic)
+        .filter(msg => !msg.isOptimistic && !msg.isError)
         .map(msg => ({ role: msg.role, content: msg.content }));
       
       // Add the new user message
@@ -638,7 +653,28 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   console.log(`[STREAM] Got message ID: ${messageId}`);
                 }
                 if (metadata.error) {
-                  throw new Error(metadata.error);
+                  console.error(`[STREAM] API Error: ${metadata.error}`);
+                  
+                  // Replace the optimistic assistant message with an error message
+                  const currentMessages = getMessages(threadId);
+                  const updatedMessages = currentMessages.map(msg => {
+                    if (msg.id === optimisticAssistantMessage.id) {
+                      return {
+                        ...msg,
+                        content: `❌ **Error**: ${metadata.error}`,
+                        isOptimistic: false,
+                        isError: true
+                      };
+                    }
+                    return msg;
+                  });
+                  setMessages(threadId, updatedMessages);
+                  
+                  // Clear loading and streaming states
+                  setLoading(null, false);
+                  setStreaming(null, false);
+                  isStreamingRef.current = false;
+                  return; // Exit the stream processing
                 }
               } catch (e) {
                 console.error('[STREAM] Failed to parse metadata:', e);
@@ -739,14 +775,27 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
     } catch (error) {
       console.error("[STREAM] Streaming error:", error);
-      // Remove optimistic assistant message on error
+      
+      // Replace optimistic assistant message with error message instead of removing it
       const currentMessages = getMessages(threadId);
-      const filteredMessages = currentMessages.filter(msg => msg.id !== optimisticAssistantMessage.id);
-      setMessages(threadId, filteredMessages);
+      const updatedMessages = currentMessages.map(msg => {
+        if (msg.id === optimisticAssistantMessage.id) {
+          return {
+            ...msg,
+            content: `❌ **Error**: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`,
+            isOptimistic: false,
+            isError: true
+          };
+        }
+        return msg;
+      });
+      setMessages(threadId, updatedMessages);
+      
       isStreamingRef.current = false; // Clear streaming flag on error
       setStreaming(null, false);
       setLoading(null, false); // Clear loading on error
-      throw error;
+      
+      // Don't throw the error - we've handled it by showing it in the chat
     }
   };
 
@@ -767,10 +816,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     setStreaming(threadId, true);
 
     try {
-      // Get conversation history for streaming (exclude the message we're retrying)
+      // Get conversation history for streaming (exclude optimistic and error messages)
       const currentMessages = getMessages(threadId);
       const messages = currentMessages
-        .filter(msg => !msg.isOptimistic) // Don't include optimistic messages
+        .filter(msg => !msg.isOptimistic && !msg.isError) // Don't include optimistic or error messages
         .map(msg => ({ role: msg.role, content: msg.content }));
 
       // Create streaming request
@@ -1127,6 +1176,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           } ${
                             message.role === "user"
                               ? "bg-blue-50 text-gray-900 border border-blue-500 shadow-sm"
+                              : message.isError
+                              ? "bg-red-50 text-red-900 border border-red-300 shadow-sm"
                               : "text-gray-900"
                           }`}
                         >
@@ -1248,8 +1299,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           )}
                         </div>
 
-                        {/* Message Actions - Always render to prevent layout shift */}
-                        <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
+                        {/* Message Actions - Always render to prevent layout shift, but hide for error messages */}
+                        <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
                           {message.role === "assistant" && (
                             <div className="flex items-center gap-1 mr-1">
                               <div className="flex items-center gap-1 text-sm text-gray-500 px-5">

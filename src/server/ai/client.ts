@@ -251,6 +251,9 @@ class AnthropicClient implements AIClient {
 }
 
 class GeminiClient implements AIClient {
+  private static lastRequestTime = 0;
+  private static readonly MIN_REQUEST_INTERVAL = 1000; // 1 second between requests
+
   async createChatCompletion(params: {
     messages: Array<{ role: string; content: string }>;
     model?: string;
@@ -268,32 +271,72 @@ class GeminiClient implements AIClient {
         parts: [{ text: m.content }],
       }));
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 4096,
-        },
-      }),
-    });
+    // Rate limiting: ensure minimum interval between requests
+    const now = Date.now();
+    const timeSinceLastRequest = now - GeminiClient.lastRequestTime;
+    if (timeSinceLastRequest < GeminiClient.MIN_REQUEST_INTERVAL) {
+      const waitTime = GeminiClient.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+      console.log(`⏱️ [GEMINI] Rate limiting: waiting ${waitTime}ms before request`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+    }
+    GeminiClient.lastRequestTime = Date.now();
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
+    // Retry logic for rate limiting
+    const maxRetries = 3;
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents,
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 4096,
+            },
+          }),
+        });
+
+        if (response.status === 429) {
+          // Rate limited - wait and retry
+          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s
+          console.log(`🔄 [GEMINI] Rate limited, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          continue;
+        }
+
+        if (!response.ok) {
+          throw new Error(`Gemini API error: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const content = data.candidates[0]?.content?.parts[0]?.text || "";
+
+        if (params.stream) {
+          return this.createMockStream(content);
+        }
+
+        return content;
+      } catch (error) {
+        lastError = error as Error;
+        if (attempt === maxRetries - 1) {
+          // Last attempt failed
+          break;
+        }
+        
+        // Wait before retrying
+        const waitTime = Math.pow(2, attempt) * 1000;
+        console.log(`⚠️ [GEMINI] Request failed, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries}): ${error}`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
     }
 
-    const data = await response.json();
-    const content = data.candidates[0]?.content?.parts[0]?.text || "";
-
-    if (params.stream) {
-      return this.createMockStream(content);
-    }
-
-    return content;
+    // All retries failed
+    throw new Error(`Gemini API failed after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
   }
 
   private async *createMockStream(text: string): AsyncIterable<StreamChunk> {

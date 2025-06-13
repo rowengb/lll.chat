@@ -17,6 +17,7 @@ interface Message {
   model?: string | null;
   createdAt: Date;
   isOptimistic?: boolean;
+  isError?: boolean;
   attachments?: FileAttachment[];
 }
 

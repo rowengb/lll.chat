@@ -354,7 +354,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
   } catch (error) {
     console.error('❌ [LLL.CHAT] Streaming error:', error);
-    res.write(`f:{"error":"Failed to generate response"}\n`);
+    
+    // Provide specific error messages based on the error type
+    let errorMessage = "Failed to generate response";
+    
+    if (error instanceof Error) {
+      if (error.message.includes('rate limit') || error.message.includes('Too Many Requests')) {
+        errorMessage = "Rate limit exceeded. Please wait a moment and try again.";
+      } else if (error.message.includes('API key')) {
+        errorMessage = "Invalid API key. Please check your API key in Settings.";
+      } else if (error.message.includes('Gemini API failed after')) {
+        errorMessage = "Gemini API is currently unavailable. Please try again later or switch to a different model.";
+      } else if (error.message.includes('quota') || error.message.includes('billing')) {
+        errorMessage = "API quota exceeded or billing issue. Please check your account.";
+      } else if (error.message.includes('network') || error.message.includes('timeout')) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      }
+    }
+    
+    res.write(`f:{"error":"${errorMessage}"}\n`);
     res.end();
   }
 } 
