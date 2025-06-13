@@ -1,6 +1,7 @@
-import React from 'react';
-import { FileIcon, ImageIcon, FileTextIcon, VideoIcon, MusicIcon, DownloadIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { FileIcon, ImageIcon, FileTextIcon, VideoIcon, MusicIcon, DownloadIcon, EyeIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FileViewerModal } from './FileViewerModal';
 
 export interface FileAttachmentData {
   id: string;
@@ -14,6 +15,9 @@ export interface FileAttachmentData {
 interface FileAttachmentProps {
   file: FileAttachmentData;
   className?: string;
+  onDelete?: (fileId: string) => void;
+  canDelete?: boolean;
+  showPreview?: boolean;
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -35,9 +39,29 @@ const getFileIcon = (type: string) => {
 };
 
 const isImageFile = (type: string) => type.startsWith('image/');
+const isViewableFile = (type: string) => {
+  return type.startsWith('image/') || 
+         type.startsWith('video/') || 
+         type.startsWith('audio/') ||
+         type === 'application/pdf' ||
+         type.startsWith('text/') ||
+         type.includes('document') ||
+         type.includes('spreadsheet') ||
+         type.includes('presentation');
+};
 
-export function FileAttachment({ file, className = '' }: FileAttachmentProps) {
-  const handleDownload = () => {
+export function FileAttachment({ 
+  file, 
+  className = '', 
+  onDelete,
+  canDelete = false,
+  showPreview = true 
+}: FileAttachmentProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [imageWidth, setImageWidth] = useState<number | null>(null);
+
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (file.url) {
       const link = document.createElement('a');
       link.href = file.url;
@@ -48,16 +72,112 @@ export function FileAttachment({ file, className = '' }: FileAttachmentProps) {
     }
   };
 
+  const handleView = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsModalOpen(true);
+  };
+
+  const handleFileClick = () => {
+    if (isViewableFile(file.type) && file.url) {
+      setIsModalOpen(true);
+    }
+  };
+
+  const canView = isViewableFile(file.type) && file.url;
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    setImageWidth(img.offsetWidth);
+  };
+
   return (
-    <div className={`border border-gray-200 rounded-lg p-3 bg-gray-50 ${className}`}>
-      {isImageFile(file.type) && file.url ? (
-        // Image preview
-        <div className="space-y-2">
-          <img
-            src={file.url}
-            alt={file.name}
-            className="max-w-full max-h-48 rounded-lg object-contain"
-          />
+    <>
+      <div 
+        className={`border border-gray-200 rounded-lg p-3 bg-gray-50 transition-colors group/attachment ${
+          canView ? 'hover:bg-gray-100 cursor-pointer' : ''
+        } ${className}`}
+        onClick={handleFileClick}
+      >
+        {isImageFile(file.type) && file.url && showPreview ? (
+          // Image preview with enhanced interaction
+          <div className="inline-block">
+            <div className="relative">
+              <img
+                src={file.url}
+                alt={file.name}
+                className="max-w-full max-h-48 rounded-lg object-contain block"
+                onLoad={handleImageLoad}
+              />
+              {canView && (
+                <div className="absolute inset-0 bg-black/0 group-hover/attachment:bg-black/20 transition-colors rounded-lg flex items-center justify-center">
+                  <div className="opacity-0 group-hover/attachment:opacity-100 transition-opacity">
+                    <div className="bg-white/90 backdrop-blur-sm rounded-full p-2">
+                      <EyeIcon className="h-5 w-5 text-gray-700" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mt-2">
+              {imageWidth ? (
+                <div 
+                  className="overflow-hidden"
+                  style={{ width: `${imageWidth}px` }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="text-sm font-medium text-gray-900 truncate">
+                        {file.name}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">
+                        {formatFileSize(file.size)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {canView && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleView}
+                          className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                          title="View file"
+                        >
+                          <EyeIcon className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {file.url && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleDownload}
+                          className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                          title="Download file"
+                        >
+                          <DownloadIcon className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // Skeleton placeholder while image loads
+                <div className="animate-pulse">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="h-4 bg-gray-200 rounded mb-1"></div>
+                      <div className="h-3 bg-gray-200 rounded w-16"></div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                      <div className="h-8 w-8 bg-gray-200 rounded"></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          // Regular file display with enhanced interaction
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2 flex-1 min-w-0">
               {getFileIcon(file.type)}
@@ -67,47 +187,48 @@ export function FileAttachment({ file, className = '' }: FileAttachmentProps) {
                 </div>
                 <div className="text-xs text-gray-500">
                   {formatFileSize(file.size)}
+                  {canView && (
+                    <span className="ml-2 text-blue-500">• Click to view</span>
+                  )}
                 </div>
               </div>
             </div>
-            {file.url && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDownload}
-                className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
-              >
-                <DownloadIcon className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      ) : (
-        // Regular file display
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2 flex-1 min-w-0">
-            {getFileIcon(file.type)}
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-gray-900 truncate">
-                {file.name}
-              </div>
-              <div className="text-xs text-gray-500">
-                {formatFileSize(file.size)}
-              </div>
+            <div className="flex items-center gap-1">
+              {canView && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleView}
+                  className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                  title="View file"
+                >
+                  <EyeIcon className="h-4 w-4" />
+                </Button>
+              )}
+              {file.url && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDownload}
+                  className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                  title="Download file"
+                >
+                  <DownloadIcon className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
-          {file.url && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDownload}
-              className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
-            >
-              <DownloadIcon className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+
+      {/* File Viewer Modal */}
+      <FileViewerModal
+        file={file}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onDelete={onDelete}
+        canDelete={canDelete}
+      />
+    </>
   );
 } 

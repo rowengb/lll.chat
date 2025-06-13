@@ -1024,16 +1024,16 @@ const Home: NextPage = () => {
       </Head>
         <main className="h-screen flex">
         <div className={`${currentView === 'settings' || currentView === 'account' ? 'hidden' : ''}`}>
-          <Sidebar 
+        <Sidebar 
               currentThreadId={currentThreadId}
-            onThreadSelect={handleThreadSelect}
+          onThreadSelect={handleThreadSelect}
               onNewChat={handleNewChat}
               onNavigateToSettings={navigateToSettings}
               onNavigateToAccount={navigateToAccount}
-            collapsed={sidebarCollapsed}
+          collapsed={sidebarCollapsed}
               onToggleCollapse={toggleSidebar}
-            onWidthChange={setSidebarWidth}
-          />
+          onWidthChange={setSidebarWidth}
+        />
         </div>
           <div className="flex-1 flex items-center justify-center">
             <LoadingDots text="Loading" size="lg" />

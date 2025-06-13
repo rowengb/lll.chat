@@ -163,6 +163,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
   const [showFilters, setShowFilters] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const filterModalRef = useRef<HTMLDivElement>(null);
   
   // Fetch models from database
   const { data: favoriteModels = [] } = trpc.models.getFavoriteModels.useQuery();
@@ -260,9 +261,32 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    // Close filter modal when clicking outside of it (but keep main dropdown open)
+    const handleFilterClickOutside = (event: MouseEvent) => {
+      if (filterModalRef.current && !filterModalRef.current.contains(event.target as Node)) {
+        // Also check if the click was on the filter toggle button to avoid immediate reopening
+        const target = event.target as Element;
+        const isFilterButton = target.closest('[data-filter-toggle]');
+        if (!isFilterButton) {
+          setShowFilters(false);
+        }
+      }
+    };
+
+    if (showFilters) {
+      document.addEventListener('mousedown', handleFilterClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleFilterClickOutside);
+    };
+  }, [showFilters]);
+
   return (
     <div className="relative" ref={dropdownRef}>
       <Button
+        type="button"
         variant="ghost"
         onClick={() => setIsOpen(!isOpen)}
         className={`justify-start gap-2 px-2 py-1 h-auto font-normal text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors ${
@@ -325,6 +349,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                         const disabled = isModelDisabled(model.provider);
                         return (
                         <button
+                          type="button"
                           key={model.id}
                           onClick={() => {
                             if (!disabled) {
@@ -417,6 +442,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                         const disabled = isModelDisabled(model.provider);
                         return (
                         <button
+                          type="button"
                           key={model.id}
                           onClick={() => {
                             if (!disabled) {
@@ -493,6 +519,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
               <div className="flex-shrink-0 bg-white border-t border-gray-100 p-2 rounded-b-2xl">
                 <div className="flex items-center justify-between">
                   <button 
+                    type="button"
                     onClick={() => setShowAll(false)}
                     className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
                   >
@@ -502,6 +529,8 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                   </button>
                   <div className="relative">
                     <button 
+                      type="button"
+                      data-filter-toggle
                       onClick={() => setShowFilters(!showFilters)}
                       className={`p-1.5 rounded-lg transition-colors ${
                         showFilters || selectedFilters.length > 0 
@@ -518,7 +547,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                     </button>
                     
                     {showFilters && (
-                      <div className="fixed bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-48 z-[100] animate-in fade-in duration-300"
+                      <div ref={filterModalRef} className="fixed bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-48 z-[100] animate-in fade-in duration-300"
                            style={{
                              bottom: '60px',
                              left: showAll ? '630px' : '450px',
@@ -528,6 +557,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                           <h3 className="text-base font-medium text-gray-900">Filters</h3>
                           {selectedFilters.length > 0 && (
                             <button
+                              type="button"
                               onClick={clearFilters}
                               className="text-xs text-blue-600 hover:text-blue-800"
                             >
@@ -541,6 +571,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                             const isSelected = selectedFilters.includes(category.id);
                             return (
                               <button
+                                type="button"
                                 key={category.id}
                                 onClick={() => toggleFilter(category.id)}
                                 className={`flex items-center gap-2 p-1.5 rounded text-left transition-colors ${
@@ -578,18 +609,20 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                       <FilterIcon className="h-8 w-8 text-gray-300 mb-2" />
                       <p className="text-sm text-gray-500 mb-1">No models match your filters</p>
-                      <button
-                        onClick={clearFilters}
-                        className="text-xs text-blue-600 hover:text-blue-800"
-                      >
-                        Clear filters
-                      </button>
+                                              <button
+                          type="button"
+                          onClick={clearFilters}
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          Clear filters
+                        </button>
                     </div>
                   ) : (
                     displayedModels.map((model: ModelData) => {
                       const disabled = isModelDisabled(model.provider);
                       return (
                       <button
+                        type="button"
                         key={model.id}
                         onClick={() => {
                           if (!disabled) {
@@ -666,6 +699,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                 <div className="flex items-center justify-between">
                   {!showAll && filteredModels.length > 7 ? (
                     <button
+                      type="button"
                       onClick={() => setShowAll(true)}
                       className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
                     >
@@ -677,6 +711,8 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                   )}
                   <div className="relative">
                     <button 
+                      type="button"
+                      data-filter-toggle
                       onClick={() => setShowFilters(!showFilters)}
                       className={`p-1.5 rounded-lg transition-colors ${
                         showFilters || selectedFilters.length > 0 
@@ -693,7 +729,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                     </button>
                     
                     {showFilters && (
-                      <div className="fixed bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-48 z-[100] animate-in fade-in duration-300"
+                      <div ref={filterModalRef} className="fixed bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-48 z-[100] animate-in fade-in duration-300"
                            style={{
                              bottom: '60px',
                              left: showAll ? '630px' : '450px',
@@ -703,6 +739,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                           <h3 className="text-base font-medium text-gray-900">Filters</h3>
                           {selectedFilters.length > 0 && (
                             <button
+                              type="button"
                               onClick={clearFilters}
                               className="text-xs text-blue-600 hover:text-blue-800"
                             >
@@ -715,7 +752,7 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
                             const Icon = category.icon;
                             const isSelected = selectedFilters.includes(category.id);
                             return (
-                              <button
+                              <button type="button"
                                 key={category.id}
                                 onClick={() => toggleFilter(category.id)}
                                 className={`flex items-center gap-2 p-1.5 rounded text-left transition-colors ${

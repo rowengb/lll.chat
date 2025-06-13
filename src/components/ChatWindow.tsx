@@ -15,6 +15,7 @@ import { CodeBlock } from './CodeBlock';
 import { FileUpload, UploadedFile } from './FileUpload';
 import { FileAttachment, FileAttachmentData } from './FileAttachment';
 import { Chatbox } from './Chatbox';
+import { FileAttachmentWithUrl } from './FileAttachmentWithUrl';
 
 // Shared layout CSS for perfect alignment
 const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
@@ -116,8 +117,14 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
             ...msg, 
             createdAt: new Date(msg._creationTime),
             isOptimistic: false,
-            // Convert file IDs to empty array for now - we'll fetch file details separately
-            attachments: msg.attachments ? [] : undefined
+            // Convert attachment IDs to FileAttachmentData objects
+            attachments: msg.attachments ? msg.attachments.map(fileId => ({
+              id: fileId,
+              name: '', // Will be fetched by FileAttachmentWithUrl
+              type: '',
+              size: 0,
+              storageId: fileId
+            })) : undefined
           }));
           
           setMessages(threadId, serverMsgs);
@@ -1112,10 +1119,14 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
                           </p>
                           {/* Display file attachments for user messages */}
                           {message.attachments && message.attachments.length > 0 && (
-                            <div className="mt-2 space-y-2">
-                              {message.attachments.map((file) => (
-                                <FileAttachment key={file.id} file={file} />
-                              ))}
+                            <div className="mt-2 inline-block">
+                              <div className="grid grid-cols-2 gap-2 max-w-md">
+                                {message.attachments.map((file) => (
+                                  <div key={file.id}>
+                                    <FileAttachmentWithUrl fileId={file.id} />
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>

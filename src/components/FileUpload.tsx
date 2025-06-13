@@ -3,6 +3,8 @@ import { PaperclipIcon, XIcon, FileIcon, ImageIcon, FileTextIcon, VideoIcon, Mus
 import { Button } from '@/components/ui/button';
 import { trpc } from '@/utils/trpc';
 import toast from 'react-hot-toast';
+import { v4 as uuidv4 } from 'uuid';
+import { useUploadStore, UploadStatus } from '@/stores/uploadStore';
 
 export interface UploadedFile {
   id: string;
@@ -11,6 +13,10 @@ export interface UploadedFile {
   size: number;
   url?: string;
   storageId?: string;
+  status: UploadStatus;
+  progress?: number;
+  error?: string;
+  originalFile?: File;
 }
 
 interface FileUploadProps {
@@ -51,6 +57,12 @@ export function FileUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const uploads = useUploadStore((s) => s.uploads);
+  const addUpload = useUploadStore((s) => s.addUpload);
+  const updateProgress = useUploadStore((s) => s.updateProgress);
+  const updateStatus = useUploadStore((s) => s.updateStatus);
+  const updateError = useUploadStore((s) => s.updateError);
+  const removeUpload = useUploadStore((s) => s.removeUpload);
 
   const generateUploadUrl = trpc.files.generateUploadUrl.useMutation();
   const createFile = trpc.files.createFile.useMutation();
@@ -59,85 +71,116 @@ export function FileUpload({
     if (!selectedFiles || selectedFiles.length === 0) return;
 
     const newFiles = Array.from(selectedFiles);
-    
+    // Add all files to the upload store instantly as 'pending'
+    const tempIds = newFiles.map(file => {
+      const tempId = uuidv4();
+      addUpload({
+        id: tempId,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      });
+      return { tempId, file };
+    });
+
     // Check file count limit
     if (files.length + newFiles.length > maxFiles) {
+      tempIds.forEach(({ tempId }) => updateError(tempId, `Maximum ${maxFiles} files allowed`));
       toast.error(`Maximum ${maxFiles} files allowed`);
       return;
     }
 
     // Validate files
-    const validFiles = newFiles.filter(file => {
+    const validFiles: { tempId: string, file: File }[] = [];
+    for (const { tempId, file } of tempIds) {
+      updateStatus(tempId, 'validating');
       if (file.size > maxFileSize) {
+        updateError(tempId, `File is too large. Max size is ${formatFileSize(maxFileSize)}`);
         toast.error(`File "${file.name}" is too large. Maximum size is ${formatFileSize(maxFileSize)}`);
-        return false;
+        continue;
       }
-      
       const isValidType = acceptedTypes.some(type => {
         if (type.endsWith('/*')) {
           return file.type.startsWith(type.slice(0, -1));
         }
         return file.type === type;
       });
-      
       if (!isValidType) {
+        updateError(tempId, `File type not supported`);
         toast.error(`File type "${file.type}" is not supported`);
-        return false;
+        continue;
       }
-      
-      return true;
-    });
-
-    if (validFiles.length === 0) return;
+      validFiles.push({ tempId, file });
+    }
 
     setIsUploading(true);
 
     try {
       const uploadedFiles: UploadedFile[] = [];
-
-      for (const file of validFiles) {
+      for (const { tempId, file } of validFiles) {
+        updateStatus(tempId, 'uploading');
         // Generate upload URL
         const uploadUrl = await generateUploadUrl.mutateAsync();
-        
-        // Upload file to Convex storage
-        const result = await fetch(uploadUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': file.type },
-          body: file,
+        // Upload file to Convex storage with progress
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrl, true);
+        xhr.setRequestHeader('Content-Type', file.type);
+        const progressHandler = (event: ProgressEvent) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            updateProgress(tempId, percent);
+          }
+        };
+        xhr.upload.addEventListener('progress', progressHandler);
+        const uploadPromise = new Promise<{ storageId: string }>((resolve, reject) => {
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                resolve(JSON.parse(xhr.responseText));
+              } catch (e) {
+                reject(e);
+              }
+            } else {
+              reject(new Error(`Failed to upload ${file.name}`));
+            }
+          };
+          xhr.onerror = () => reject(new Error(`Failed to upload ${file.name}`));
         });
-
-        if (!result.ok) {
-          throw new Error(`Failed to upload ${file.name}`);
+        xhr.send(file);
+        try {
+          const { storageId } = await uploadPromise;
+          updateProgress(tempId, 100);
+          // Create file record in database
+          const fileRecord = await createFile.mutateAsync({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            storageId,
+          });
+          uploadedFiles.push({
+            id: fileRecord,
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            storageId,
+            status: 'done',
+          });
+          updateStatus(tempId, 'done');
+          setTimeout(() => removeUpload(tempId), 1000);
+        } catch (err) {
+          updateError(tempId, 'Upload failed');
+          setTimeout(() => removeUpload(tempId), 2000);
         }
-
-        const { storageId } = await result.json();
-
-        // Create file record in database
-        const fileRecord = await createFile.mutateAsync({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          storageId,
-        });
-
-        uploadedFiles.push({
-          id: fileRecord,
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          storageId,
-        });
       }
-
       onFilesChange([...files, ...uploadedFiles]);
-      toast.success(`${uploadedFiles.length} file(s) uploaded successfully`);
+      if (uploadedFiles.length > 0) toast.success(`${uploadedFiles.length} file(s) uploaded successfully`);
     } catch (error) {
       console.error('Upload error:', error);
       toast.error('Failed to upload files');
     } finally {
       setIsUploading(false);
     }
-  }, [files, maxFiles, maxFileSize, acceptedTypes, onFilesChange, generateUploadUrl, createFile]);
+  }, [files, maxFiles, maxFileSize, acceptedTypes, onFilesChange, generateUploadUrl, createFile, addUpload, updateProgress, updateStatus, updateError, removeUpload]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -212,8 +255,50 @@ export function FileUpload({
       </div>
 
       {/* Uploaded Files List */}
-      {files.length > 0 && (
+      {(uploads.length > 0 || files.length > 0) && (
         <div className="space-y-1">
+          {/* Uploading files (pending) */}
+          {uploads.map((file) => (
+            <div
+              key={file.id}
+              className={`flex items-center justify-between p-2 bg-gray-50 rounded-lg border ${file.status === 'error' ? 'border-red-400 bg-red-50' : 'opacity-80'}`}
+            >
+              <div className="flex items-center space-x-2 flex-1 min-w-0">
+                {getFileIcon(file.type)}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    {file.name}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {formatFileSize(file.size)}
+                  </div>
+                  <div className="w-full bg-gray-200 rounded h-2 mt-1">
+                    <div
+                      className={`h-2 rounded transition-all ${file.status === 'error' ? 'bg-red-400' : 'bg-blue-500'}`}
+                      style={{ width: `${file.progress || 0}%` }}
+                    />
+                  </div>
+                  <div className={`text-xs mt-1 text-right ${file.status === 'error' ? 'text-red-600' : 'text-blue-600'}`}
+                  >
+                    {file.status === 'error' ? (file.error || 'Error') : `${file.progress || 0}%`}
+                  </div>
+                  {file.status === 'pending' && <div className="text-xs text-gray-400 mt-1">Waiting...</div>}
+                  {file.status === 'validating' && <div className="text-xs text-gray-400 mt-1">Validating...</div>}
+                  {file.status === 'uploading' && <div className="text-xs text-blue-400 mt-1">Uploading...</div>}
+                  {file.status === 'done' && <div className="text-xs text-green-600 mt-1">Done</div>}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-gray-300 cursor-not-allowed"
+                disabled
+              >
+                <XIcon className="h-3 w-3" />
+              </Button>
+            </div>
+          ))}
+          {/* Uploaded files */}
           {files.map((file) => (
             <div
               key={file.id}
@@ -230,7 +315,6 @@ export function FileUpload({
                   </div>
                 </div>
               </div>
-              
               <Button
                 variant="ghost"
                 size="sm"

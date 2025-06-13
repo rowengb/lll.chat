@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { PlusIcon, MessageSquareIcon, SettingsIcon, ChevronLeftIcon, MenuIcon, SearchIcon, TrashIcon, PinIcon, MoreVerticalIcon, EditIcon, Waves, UserIcon, LogOutIcon, GitBranchIcon } from "lucide-react";
+import { PlusIcon, MessageSquareIcon, SettingsIcon, ChevronLeftIcon, MenuIcon, SearchIcon, TrashIcon, PinIcon, MoreVerticalIcon, EditIcon, Waves, UserIcon, LogOutIcon, GitBranchIcon, XIcon, PinOffIcon } from "lucide-react";
 import { useRouter } from "next/router";
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,17 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
   
   const [hoverAnimationsDisabled, setHoverAnimationsDisabled] = useState(false);
   
+  // Delete confirmation modal state
+  const [deleteConfirmation, setDeleteConfirmation] = useState<{
+    isOpen: boolean;
+    threadId: string | null;
+    threadTitle: string | null;
+  }>({
+    isOpen: false,
+    threadId: null,
+    threadTitle: null,
+  });
+  
   // Helper function to temporarily disable hover animations after pin/unpin actions
   // This prevents jittery animations when threads move and mouse ends up over different thread
   const temporarilyDisableHoverAnimations = () => {
@@ -111,8 +122,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
       utils.chat.getThreads.invalidate();
       
       if (currentThreadId && threads?.find(t => t.id === currentThreadId)) {
-        // If current thread was deleted, redirect to app welcome
-        router.push("/app");
+        // If current thread was deleted, redirect to home welcome
+        router.push("/");
       }
     },
     onError: () => {
@@ -187,6 +198,20 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     }
   }, [contextMenu]);
 
+  // Close delete confirmation modal when pressing Escape
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && deleteConfirmation.isOpen) {
+        handleCancelDelete();
+      }
+    };
+
+    if (deleteConfirmation.isOpen) {
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [deleteConfirmation.isOpen]);
+
   // Handle sidebar resizing
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -227,7 +252,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
       onNewChat();
     } else {
       // Fallback to router navigation if no prop provided
-      router.push("/app");
+      router.push("/");
     }
   };
 
@@ -236,7 +261,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
       onNewChat();
     } else {
       // Fallback to router navigation if no prop provided
-      router.push("/app");
+      router.push("/");
     }
   };
 
@@ -244,10 +269,38 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     // Prevent multiple calls while mutation is in progress
     if (deleteThread.isLoading) return;
     
-    deleteThread.mutate({ id: threadId });
+    // Find the thread to get its title
+    const thread = threads?.find(t => t.id === threadId);
+    const threadTitle = thread?.title || `Chat ${threadId.slice(0, 8)}`;
+    
+    // Show confirmation modal
+    setDeleteConfirmation({
+      isOpen: true,
+      threadId,
+      threadTitle,
+    });
     setContextMenu(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmation.threadId) return;
+    
+    deleteThread.mutate({ id: deleteConfirmation.threadId });
+    setDeleteConfirmation({
+      isOpen: false,
+      threadId: null,
+      threadTitle: null,
+    });
     toast.dismiss();
     toast.success("Conversation deleted");
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmation({
+      isOpen: false,
+      threadId: null,
+      threadTitle: null,
+    });
   };
 
   const handlePinThread = (threadId: string) => {
@@ -379,7 +432,6 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
             ) : (
               <div className="flex-1 text-left relative overflow-hidden pr-0 group-hover:pr-16">
                 <div className="flex items-center gap-1">
-                  {isPinned && <PinIcon className="h-3 w-3 text-blue-500 flex-shrink-0" />}
                   {thread.branchedFromThreadId && (
                     <button
                       onClick={(e) => {
@@ -404,7 +456,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
             
             {/* Hover Actions - Absolutely positioned to not take up layout space */}
             {!isEditing && (
-              <div className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 transition-all duration-75 ${
+              <div className={`absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1 transition-all duration-75 ${
                 hasAnimated ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'
               }`}>
                 <Button
@@ -420,10 +472,10 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                   size="sm"
                   variant="ghost"
                   disabled={updateThread.isLoading}
-                  className={`h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm border border-gray-300/60 hover:bg-gray-300 hover:border-gray-400 ${isPinned ? 'text-blue-500' : ''} ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm hover:bg-gray-300 ${isPinned ? 'text-blue-500' : ''} ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title={isPinned ? "Unpin" : "Pin"}
                 >
-                  <PinIcon className="h-3 w-3" />
+                  {isPinned ? <PinOffIcon className="h-4 w-4" /> : <PinIcon className="h-4 w-4" />}
                 </Button>
                 <Button
                   onClick={(e) => {
@@ -433,10 +485,10 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                   size="sm"
                   variant="ghost"
                   disabled={deleteThread.isLoading}
-                  className={`h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm border border-gray-300/60 hover:bg-red-200 hover:text-red-600 hover:border-red-300 ${deleteThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm hover:bg-red-200 hover:text-red-600 ${deleteThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title="Delete"
                 >
-                  <TrashIcon className="h-3 w-3" />
+                  <XIcon className="h-4 w-4" />
                 </Button>
               </div>
             )}
@@ -600,6 +652,51 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
         </div>
       </div>
 
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmation.isOpen && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50"
+          onClick={handleCancelDelete}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <XIcon className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Delete Conversation</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone</p>
+              </div>
+            </div>
+            
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to delete "{deleteConfirmation.threadTitle}"? This will permanently remove the conversation and all its messages.
+            </p>
+            
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={handleCancelDelete}
+                disabled={deleteThread.isLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmDelete}
+                disabled={deleteThread.isLoading}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                {deleteThread.isLoading ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Context Menu */}
       {contextMenu && (
         <div
@@ -630,7 +727,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
             disabled={deleteThread.isLoading}
             className={`w-full px-3 py-2 text-left text-sm hover:bg-red-50 hover:text-red-600 flex items-center gap-2 ${deleteThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            <TrashIcon className="h-3 w-3" />
+            <XIcon className="h-3 w-3" />
             Delete
           </button>
         </div>

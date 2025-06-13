@@ -77,6 +77,24 @@ export const createAssistantMessage = mutation({
 export const deleteMessage = mutation({
   args: { messageId: v.id("messages") },
   handler: async (ctx, args) => {
+    // Get the message to check for attachments
+    const message = await ctx.db.get(args.messageId);
+    if (!message) return null;
+    
+    // Delete associated files if any
+    if (message.attachments && message.attachments.length > 0) {
+      for (const fileId of message.attachments) {
+        const file = await ctx.db.get(fileId);
+        if (file) {
+          // Delete from storage
+          await ctx.storage.delete(file.storageId);
+          // Delete from database
+          await ctx.db.delete(fileId);
+        }
+      }
+    }
+    
+    // Delete the message
     return await ctx.db.delete(args.messageId);
   },
 });
@@ -102,6 +120,20 @@ export const deleteMessagesFromPoint = mutation({
     // Delete all messages from that point forward
     const messagesToDelete = messages.slice(fromIndex);
     for (const message of messagesToDelete) {
+      // Delete associated files if any
+      if (message.attachments && message.attachments.length > 0) {
+        for (const fileId of message.attachments) {
+          const file = await ctx.db.get(fileId);
+          if (file) {
+            // Delete from storage
+            await ctx.storage.delete(file.storageId);
+            // Delete from database
+            await ctx.db.delete(fileId);
+          }
+        }
+      }
+      
+      // Delete the message
       await ctx.db.delete(message._id);
     }
     

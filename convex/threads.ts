@@ -115,7 +115,21 @@ export const generateTitle = action({
 export const deleteThread = mutation({
   args: { id: v.id("threads"), userId: v.id("users") },
   handler: async (ctx, args) => {
-    // First delete all messages in this thread
+    // First get all files associated with this thread
+    const threadFiles = await ctx.db
+      .query("files")
+      .withIndex("by_thread", (q) => q.eq("threadId", args.id))
+      .collect();
+    
+    // Delete all files from storage and database
+    for (const file of threadFiles) {
+      // Delete from storage
+      await ctx.storage.delete(file.storageId);
+      // Delete from database
+      await ctx.db.delete(file._id);
+    }
+    
+    // Then delete all messages in this thread
     const messages = await ctx.db
       .query("messages")
       .withIndex("by_thread", (q) => q.eq("threadId", args.id))
@@ -125,7 +139,7 @@ export const deleteThread = mutation({
       await ctx.db.delete(message._id);
     }
     
-    // Then delete the thread
+    // Finally delete the thread
     return await ctx.db.delete(args.id);
   },
 }); 
