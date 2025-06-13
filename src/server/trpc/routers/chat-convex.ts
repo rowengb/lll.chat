@@ -149,6 +149,19 @@ export const chatConvexRouter = createTRPCRouter({
       assistantContent: z.string(),
       model: z.string().optional(),
       userAttachments: z.array(z.string()).optional(), // Array of file IDs
+      isGrounded: z.boolean().optional(),
+      groundingSources: z.array(z.object({
+        title: z.string(),
+        url: z.string(),
+        actualUrl: z.string().optional(),
+        snippet: z.string().optional(),
+        confidence: z.number().optional(),
+      })).optional(),
+      groundingSearchQueries: z.array(z.string()).optional(),
+      groundedSegments: z.array(z.object({
+        text: z.string(),
+        confidence: z.number(),
+      })).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -173,13 +186,27 @@ export const chatConvexRouter = createTRPCRouter({
             model: input.model,
             threadId: input.threadId as Id<"threads">,
             userId: convexUser._id,
+            isGrounded: input.isGrounded,
+            groundingSources: input.groundingSources,
+            groundingSearchQueries: input.groundingSearchQueries,
+            groundedSegments: input.groundedSegments,
           },
         ],
       });
 
-      return { 
-        userMessage: { id: messages[0], content: input.userContent },
-        assistantMessage: { id: messages[1], content: input.assistantContent }
+      return {
+        userMessage: {
+          id: messages[0],
+          content: input.userContent,
+          role: "user",
+        },
+        assistantMessage: {
+          id: messages[1],
+          content: input.assistantContent,
+          role: "assistant",
+          model: input.model,
+          isGrounded: input.isGrounded,
+        },
       };
     }),
 
@@ -188,6 +215,19 @@ export const chatConvexRouter = createTRPCRouter({
       threadId: z.string(),
       content: z.string(),
       model: z.string().optional(),
+      isGrounded: z.boolean().optional(),
+      groundingSources: z.array(z.object({
+        title: z.string(),
+        url: z.string(),
+        actualUrl: z.string().optional(),
+        snippet: z.string().optional(),
+        confidence: z.number().optional(),
+      })).optional(),
+      groundingSearchQueries: z.array(z.string()).optional(),
+      groundedSegments: z.array(z.object({
+        text: z.string(),
+        confidence: z.number(),
+      })).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -201,6 +241,10 @@ export const chatConvexRouter = createTRPCRouter({
         model: input.model,
         threadId: input.threadId as Id<"threads">,
         userId: convexUser._id,
+        isGrounded: input.isGrounded,
+        groundingSources: input.groundingSources,
+        groundingSearchQueries: input.groundingSearchQueries,
+        groundedSegments: input.groundedSegments,
       });
 
       return { 
@@ -208,6 +252,7 @@ export const chatConvexRouter = createTRPCRouter({
         content: input.content,
         role: "assistant",
         model: input.model,
+        isGrounded: input.isGrounded,
       };
     }),
 
@@ -401,5 +446,35 @@ export const chatConvexRouter = createTRPCRouter({
         messageIds: messages,
         count: messages.length 
       };
+    }),
+
+  updateGroundingSourceUnfurl: protectedProcedure
+    .input(z.object({
+      messageId: z.string(),
+      sourceIndex: z.number(),
+      unfurledData: z.object({
+        title: z.string().optional(),
+        description: z.string().optional(),
+        image: z.string().optional(),
+        favicon: z.string().optional(),
+        siteName: z.string().optional(),
+        finalUrl: z.string().optional(),
+      }),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      const result = await convex.mutation(api.messages.updateGroundingSourceUnfurl, {
+        messageId: input.messageId as Id<"messages">,
+        sourceIndex: input.sourceIndex,
+        userId: convexUser._id,
+        unfurledData: input.unfurledData,
+      });
+
+      return result;
     }),
 }); 

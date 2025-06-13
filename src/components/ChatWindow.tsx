@@ -16,6 +16,7 @@ import { FileUpload, UploadedFile } from './FileUpload';
 import { FileAttachment, FileAttachmentData } from './FileAttachment';
 import { Chatbox } from './Chatbox';
 import { FileAttachmentWithUrl } from './FileAttachmentWithUrl';
+import { GroundingSources } from './GroundingSources';
 
 // Shared layout CSS for perfect alignment
 const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
@@ -42,7 +43,35 @@ interface Message {
   createdAt: Date;
   isOptimistic?: boolean;
   isError?: boolean;
+  isGrounded?: boolean; // Indicates if response was grounded with Google Search
+  groundingMetadata?: GroundingMetadata; // Google Search grounding metadata
   attachments?: FileAttachmentData[];
+}
+
+interface GroundingSource {
+  title: string; // Domain name (e.g., "pbs.org", "democracynow.org")
+  url: string; // Vertexaisearch redirect URL (e.g., "https://vertexaisearch.cloud.google.com/grounding-api-redirect/...")
+  snippet?: string;
+  confidence?: number; // Confidence percentage (0-100)
+  // Unfurled metadata from the actual destination
+  unfurled?: {
+    title?: string; // Actual article title
+    description?: string; // Article description
+    image?: string; // Article image
+    favicon?: string; // Site favicon
+    siteName?: string; // Site name
+    finalUrl?: string; // Final URL after redirects
+  };
+}
+
+interface GroundingMetadata {
+  searchQueries?: string[]; // The search queries used
+  groundedSegments?: Array<{
+    text: string;
+    confidence: number;
+  }>; // Grounded text segments with confidence
+  sources?: GroundingSource[]; // The sources used for grounding (optional)
+  rawData?: any; // Include raw data for debugging
 }
 
 const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth }: ChatWindowProps) => {
@@ -51,6 +80,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState("");
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
+  const [searchGroundingEnabled, setSearchGroundingEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [messagesContainer, setMessagesContainer] = useState<HTMLDivElement | null>(null);
@@ -145,13 +175,33 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         ...msg, 
         createdAt: new Date(msg._creationTime),
         isOptimistic: false,
+        // Map grounding data from server response
+        isGrounded: msg.isGrounded,
+        groundingMetadata: msg.isGrounded && (msg.groundingSources || msg.groundingSearchQueries || msg.groundedSegments) ? {
+          sources: msg.groundingSources?.map(source => ({
+            title: source.title,
+            url: source.url,
+            snippet: source.snippet,
+            confidence: source.confidence,
+            // Map unfurled data from database
+            unfurled: (source.unfurledTitle || source.unfurledDescription || source.unfurledImage || source.unfurledFavicon || source.unfurledSiteName || source.unfurledFinalUrl) ? {
+              title: source.unfurledTitle,
+              description: source.unfurledDescription,
+              image: source.unfurledImage,
+              favicon: source.unfurledFavicon,
+              siteName: source.unfurledSiteName,
+              finalUrl: source.unfurledFinalUrl,
+            } : undefined,
+          })) || [],
+          searchQueries: msg.groundingSearchQueries,
+          groundedSegments: msg.groundedSegments,
+        } : undefined,
         attachments: msg.attachments ? msg.attachments.map(fileId => ({
           id: fileId,
-          name: '',
-          type: '',
+          name: `File ${fileId}`, // We'll need to fetch actual file names separately if needed
+          type: 'unknown',
           size: 0,
-          storageId: fileId
-        })) : undefined
+        })) : undefined,
       }));
       
       setMessages(threadId, serverMsgs);
@@ -610,6 +660,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           model: selectedModel,
           threadId,
           files: files.length > 0 ? files : undefined,
+          searchGrounding: searchGroundingEnabled,
         }),
       });
 
@@ -626,6 +677,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       const decoder = new TextDecoder();
       let fullContent = "";
       let messageId = "";
+      let isGrounded = false;
+      let groundingMetadata: GroundingMetadata | undefined = undefined;
 
       console.log(`[STREAM] Starting to read stream...`);
 
@@ -645,12 +698,90 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             
             // Handle T3.chat format: f:metadata, 0:content, d:done
             if (line.startsWith('f:')) {
-              // Metadata (message ID, etc.)
+              // Metadata (message ID, grounding, etc.)
               try {
                 const metadata = JSON.parse(line.slice(2));
                 if (metadata.messageId) {
                   messageId = metadata.messageId;
                   console.log(`[STREAM] Got message ID: ${messageId}`);
+                }
+                if (metadata.grounding) {
+                  isGrounded = true;
+                  console.log(`🔍 [STREAM] Grounding metadata received:`, metadata.grounding);
+                  
+                  // Store raw grounding data for debugging
+                  const rawGroundingData = metadata.grounding;
+                  
+                  // Extract grounding metadata with comprehensive search query extraction
+                  const extractedSources: GroundingSource[] = [];
+                  const extractedSearchQueries: string[] = [];
+                  const extractedGroundedSegments: Array<{ text: string; confidence: number }> = [];
+                  
+                  // Process grounding chunks for sources
+                  if (metadata.grounding.groundingChunks?.length > 0) {
+                    for (const chunk of metadata.grounding.groundingChunks) {
+                      if (chunk.web) {
+                        // Extract the vertexaisearch redirect URL - this is what we want to use as the clickable URL
+                        const redirectUrl = chunk.web.url || chunk.web.link || chunk.web.href;
+                        
+                        // Extract domain name for display (e.g., "pbs.org", "democracynow.org")
+                        const displayTitle = chunk.web.title || chunk.web.uri || 'Untitled';
+                        
+                        extractedSources.push({
+                          title: displayTitle,
+                          url: redirectUrl || chunk.web.uri || 'Unknown URL', // This should be the vertexaisearch redirect URL
+                          snippet: chunk.web.snippet,
+                          confidence: chunk.confidence ? Math.round(chunk.confidence * 100) : undefined
+                        });
+                      }
+                      
+                      // Try to extract search queries from chunks
+                      if (chunk.searchQuery || chunk.query) {
+                        const query = chunk.searchQuery || chunk.query;
+                        if (query && !extractedSearchQueries.includes(query)) {
+                          extractedSearchQueries.push(query);
+                        }
+                      }
+                    }
+                  }
+                  
+                  // Try to extract search queries from searchEntryPoint (but NOT renderedContent)
+                  if (metadata.grounding.searchEntryPoint) {
+                    if (metadata.grounding.searchEntryPoint.searchQuery) {
+                      const query = metadata.grounding.searchEntryPoint.searchQuery;
+                      if (!extractedSearchQueries.includes(query)) {
+                        extractedSearchQueries.push(query);
+                      }
+                    }
+                  }
+                  
+                  // Try to extract search queries from other possible locations
+                  if (metadata.grounding.queries) {
+                    for (const query of metadata.grounding.queries) {
+                      if (query && !extractedSearchQueries.includes(query)) {
+                        extractedSearchQueries.push(query);
+                      }
+                    }
+                  }
+                  
+                  // Extract grounded segments if available
+                  if (metadata.grounding.groundedSegments) {
+                    for (const segment of metadata.grounding.groundedSegments) {
+                      extractedGroundedSegments.push({
+                        text: segment.text || '',
+                        confidence: segment.confidence ? Math.round(segment.confidence * 100) : 0
+                      });
+                    }
+                  }
+                  
+                  groundingMetadata = {
+                    sources: extractedSources,
+                    searchQueries: extractedSearchQueries,
+                    groundedSegments: extractedGroundedSegments,
+                    rawData: rawGroundingData // Include raw data for debugging
+                  };
+                  
+                  console.log(`🔍 [STREAM] Processed grounding metadata:`, groundingMetadata);
                 }
                 if (metadata.error) {
                   console.error(`[STREAM] API Error: ${metadata.error}`);
@@ -710,6 +841,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   assistantContent: fullContent,
                   model: selectedModel,
                   userAttachments: files.map(file => file.id),
+                  isGrounded,
+                  groundingSources: groundingMetadata?.sources && groundingMetadata.sources.length > 0 ? groundingMetadata.sources : undefined,
+                  groundingSearchQueries: groundingMetadata?.searchQueries,
+                  groundedSegments: groundingMetadata?.groundedSegments,
                 });
 
                 // Update file associations if there are files
@@ -750,8 +885,15 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 const allMessages = getMessages(threadId);
                 const updatedMessages = allMessages.map(msg => {
                   if (msg.id === optimisticAssistantMessage.id) {
-                    // Mark assistant message as complete with model info
-                    return { ...msg, isOptimistic: false, content: fullContent, model: selectedModel };
+                    // Mark assistant message as complete with model info, grounding status, and sources
+                    return { 
+                      ...msg, 
+                      isOptimistic: false, 
+                      content: fullContent, 
+                      model: selectedModel, 
+                      isGrounded,
+                      groundingMetadata: groundingMetadata
+                    };
                   } else if (msg.role === "user" && msg.isOptimistic) {
                     // Mark user message as non-optimistic too
                     return { ...msg, isOptimistic: false };
@@ -832,6 +974,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           messages,
           model: model, // Use the specified model instead of selectedModel
           files: files.length > 0 ? files : undefined,
+          searchGrounding: searchGroundingEnabled,
         }),
       });
 
@@ -1133,6 +1276,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                     onModelChange={onModelChange}
                     isLoading={isLoading}
                     inputRef={inputRef}
+                    searchGroundingEnabled={searchGroundingEnabled}
+                    onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
                   />
                 </div>
               </div>
@@ -1143,291 +1288,302 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     );
   }
 
- // Find this section (around line 1080-1090) and replace it:
-
- return (
-  <div 
-    className="fixed top-0 right-0 bottom-0 flex flex-col bg-white transition-all duration-500 ease-out"
-    style={{ left: sidebarCollapsed ? '0px' : `${sidebarWidth}px` }}
-  >
-    {/* Messages + Chatbox Area */}
-    <div className="flex-1 overflow-hidden relative">
-      <CustomScrollbar 
-        className={`h-full ${scrollLocked.current ? 'scroll-locked' : ''}`}
-        onRef={setMessagesContainer}
-      >
-        <div className={`${sharedGridClasses} pt-8 pb-48`}>
-          <div></div>
-          <div className="w-full">
-            <div className={sharedLayoutClasses} id="messages-container">
-              <div className="space-y-0">
-                {localMessages?.filter(message => 
-                  // Filter out empty optimistic assistant messages
-                  !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
-                ).map((message: Message) => (
-                  <div key={message.id} className="flex justify-start">
-                    <div className="w-full">
-                      <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
-                        <div
-                          className={`rounded-2xl px-4 ${
-                            message.role === "user" 
-                              ? "py-2" 
-                              : "pt-1 pb-1"
-                          } ${
-                            message.role === "user"
-                              ? "bg-blue-50 text-gray-900 border border-blue-500 shadow-sm"
-                              : message.isError
-                              ? "bg-red-50 text-red-900 border border-red-300 shadow-sm"
-                              : "text-gray-900"
-                          }`}
-                        >
-                          {editingMessageId === message.id ? (
-                            <div className="space-y-2">
-                              <textarea
-                                value={editingContent}
-                                onChange={(e) => setEditingContent(e.target.value)}
-                                className="w-full p-2 border border-gray-300 rounded-lg text-sm resize-none bg-white"
-                                rows={Math.max(2, editingContent.split('\n').length)}
-                                autoFocus
-                              />
-                              <div className="flex gap-2">
-                                <Button
-                                  onClick={() => handleSaveEdit(message.id)}
-                                  size="sm"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                                >
-                                  Save
-                                </Button>
-                                <Button
-                                  onClick={handleCancelEdit}
-                                  size="sm"
-                                  variant="outline"
-                                >
-                                  Cancel
-                                </Button>
-                              </div>
-                            </div>
-                          ) : message.role === "user" ? (
-                            <div>
-                              <p className="whitespace-pre-wrap text-sm leading-loose">
-                                {message.content}
-                              </p>
-                              {/* Display file attachments for user messages */}
-                              {message.attachments && message.attachments.length > 0 && (
-                                <div className="mt-2 inline-block">
-                                  <div className="grid grid-cols-2 gap-2 max-w-md">
-                                    {message.attachments.map((file) => (
-                                      <div key={file.id}>
-                                        <FileAttachmentWithUrl fileId={file.id} />
-                                      </div>
-                                    ))}
-                                  </div>
+  return (
+    <div 
+      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white transition-all duration-500 ease-out"
+      style={{ left: sidebarCollapsed ? '0px' : `${sidebarWidth}px` }}
+    >
+      {/* Messages + Chatbox Area */}
+      <div className="flex-1 overflow-hidden relative">
+        <CustomScrollbar 
+          className={`h-full ${scrollLocked.current ? 'scroll-locked' : ''}`}
+          onRef={setMessagesContainer}
+        >
+          <div className={`${sharedGridClasses} pt-8 pb-48`}>
+            <div></div>
+            <div className="w-full">
+              <div className={sharedLayoutClasses} id="messages-container">
+                <div className="space-y-0">
+                  {localMessages?.filter(message => 
+                    // Filter out empty optimistic assistant messages
+                    !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
+                  ).map((message: Message) => (
+                    <div key={message.id} className="flex justify-start">
+                      <div className="w-full">
+                        <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
+                          <div
+                            className={`rounded-2xl px-4 ${
+                              message.role === "user" 
+                                ? "py-2" 
+                                : "pt-1 pb-1"
+                            } ${
+                              message.role === "user"
+                                ? "bg-blue-50 text-gray-900 border border-blue-500 shadow-sm"
+                                : message.isError
+                                ? "bg-red-50 text-red-900 border border-red-300 shadow-sm"
+                                : "text-gray-900"
+                            }`}
+                          >
+                            {editingMessageId === message.id ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  value={editingContent}
+                                  onChange={(e) => setEditingContent(e.target.value)}
+                                  className="w-full p-2 border border-gray-300 rounded-lg text-sm resize-none bg-white"
+                                  rows={Math.max(2, editingContent.split('\n').length)}
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    onClick={() => handleSaveEdit(message.id)}
+                                    size="sm"
+                                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    onClick={handleCancelEdit}
+                                    size="sm"
+                                    variant="outline"
+                                  >
+                                    Cancel
+                                  </Button>
                                 </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="prose prose-sm max-w-none text-gray-900 text-sm leading-loose">
-                              <ReactMarkdown 
-                                remarkPlugins={[remarkGfm]}
-                                rehypePlugins={[rehypeHighlight]}
-                                components={{
-                                  // Customize link styling
-                                  a: ({ node, ...props }) => (
-                                    <a 
-                                      {...props} 
-                                      className="text-blue-600 hover:text-blue-800 underline"
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    />
-                                  ),
-                                  // Customize code block styling
-                                  code: ({ node, className, children, ...props }) => {
-                                    const match = /language-(\w+)/.exec(className || '');
-                                    const isInline = !match;
-                                    
-                                    return isInline ? (
-                                      <code 
-                                        className="text-gray-100 px-2 py-1 rounded text-xs font-mono" 
-                                        style={{ backgroundColor: '#0C1117' }}
-                                        {...props}
-                                      >
-                                        {children}
-                                      </code>
-                                    ) : null; // Block code will be handled by pre
-                                  },
-                                  // Style pre blocks with copy functionality
-                                  pre: ({ node, children, ...props }) => {
-                                    // Extract language from the code element
-                                    const codeElement = children as any;
-                                    const className = codeElement?.props?.className || '';
-                                    const match = /language-(\w+)/.exec(className);
-                                    const language = match ? match[1] : undefined;
-                                    
-                                    return (
-                                      <CodeBlock 
-                                        className={className}
-                                        language={language}
-                                      >
-                                        {codeElement?.props?.children || children}
-                                      </CodeBlock>
-                                    );
-                                  },
-                                  // Style lists
-                                  ul: ({ node, ...props }) => (
-                                    <ul 
-                                      className="list-disc list-outside space-y-1 my-2 ml-4 pl-2"
-                                      {...props}
-                                    />
-                                  ),
-                                  ol: ({ node, ...props }) => (
-                                    <ol 
-                                      className="list-decimal list-outside space-y-1 my-2 ml-4 pl-2"
-                                      {...props}
-                                    />
-                                  ),
-                                  li: ({ node, ...props }) => (
-                                    <li 
-                                      className="text-sm leading-loose"
-                                      {...props}
-                                    />
-                                  ),
-                                }}
-                              >
-                                {message.content}
-                              </ReactMarkdown>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Message Actions - Always render to prevent layout shift, but hide for error messages */}
-                        <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
-                          {message.role === "assistant" && (
-                            <div className="flex items-center gap-1 mr-1">
-                              <div className="flex items-center gap-1 text-sm text-gray-500 px-5">
-                                {getProviderFromModel(message.model)}
-                                <span>•</span>
-                                <span>{message.model}</span>
                               </div>
-                            </div>
-                          )}
-                          
-                          {message.role === "user" ? (
-                            // User message actions: retry, edit, copy
-                            <>
-                              <ActionButton
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                              >
-                                <RotateCcwIcon className="h-4 w-4" />
-                              </ActionButton>
-                              
-                              <ActionButton
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditMessage(message.id)}
-                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                              >
-                                <EditIcon className="h-4 w-4" />
-                              </ActionButton>
-                              
-                              <ActionButton
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleCopyMessage(message.content)}
-                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                              >
-                                <CopyIcon className="h-4 w-4" />
-                              </ActionButton>
-                            </>
-                          ) : (
-                            // AI message actions: copy, branch off, retry
-                            <>
-                              <ActionButton
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleCopyMessage(message.content)}
-                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                              >
-                                <CopyIcon className="h-4 w-4" />
-                              </ActionButton>
-                              
-                              <ActionButton
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleBranchOff(message.id)}
-                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                              >
-                                <GitBranchIcon className="h-4 w-4" />
-                              </ActionButton>
-                              
-                              <ActionButton
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                              >
-                                <RotateCcwIcon className="h-4 w-4" />
-                              </ActionButton>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="w-full flex">
-                      <div className="max-w-full rounded-2xl bg-gray-100 px-5 py-3 shadow-sm">
-                        <div className="flex items-center space-x-3">
-                          <div className="flex items-center space-x-1">
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500"></div>
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-100"></div>
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-200"></div>
+                            ) : message.role === "user" ? (
+                              <div>
+                                <p className="whitespace-pre-wrap text-sm leading-loose">
+                                  {message.content}
+                                </p>
+                                {/* Display file attachments for user messages */}
+                                {message.attachments && message.attachments.length > 0 && (
+                                  <div className="mt-2 inline-block">
+                                    <div className="grid grid-cols-2 gap-2 max-w-md">
+                                      {message.attachments.map((file) => (
+                                        <div key={file.id}>
+                                          <FileAttachmentWithUrl fileId={file.id} />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="prose prose-sm max-w-none text-gray-900 text-sm leading-loose">
+                                <ReactMarkdown 
+                                  remarkPlugins={[remarkGfm]}
+                                  rehypePlugins={[rehypeHighlight]}
+                                  components={{
+                                    // Customize link styling
+                                    a: ({ node, ...props }) => (
+                                      <a 
+                                        {...props} 
+                                        className="text-blue-600 hover:text-blue-800 underline"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      />
+                                    ),
+                                    // Customize code block styling
+                                    code: ({ node, className, children, ...props }) => {
+                                      const match = /language-(\w+)/.exec(className || '');
+                                      const isInline = !match;
+                                      
+                                      return isInline ? (
+                                        <code 
+                                          className="text-gray-100 px-2 py-1 rounded text-xs font-mono" 
+                                          style={{ backgroundColor: '#0C1117' }}
+                                          {...props}
+                                        >
+                                          {children}
+                                        </code>
+                                      ) : null; // Block code will be handled by pre
+                                    },
+                                    // Style pre blocks with copy functionality
+                                    pre: ({ node, children, ...props }) => {
+                                      // Extract language from the code element
+                                      const codeElement = children as any;
+                                      const className = codeElement?.props?.className || '';
+                                      const match = /language-(\w+)/.exec(className);
+                                      const language = match ? match[1] : undefined;
+                                      
+                                      return (
+                                        <CodeBlock 
+                                          className={className}
+                                          language={language}
+                                        >
+                                          {codeElement?.props?.children || children}
+                                        </CodeBlock>
+                                      );
+                                    },
+                                    // Style lists
+                                    ul: ({ node, ...props }) => (
+                                      <ul 
+                                        className="list-disc list-outside space-y-1 my-2 ml-4 pl-2"
+                                        {...props}
+                                      />
+                                    ),
+                                    ol: ({ node, ...props }) => (
+                                      <ol 
+                                        className="list-decimal list-outside space-y-1 my-2 ml-4 pl-2"
+                                        {...props}
+                                      />
+                                    ),
+                                    li: ({ node, ...props }) => (
+                                      <li 
+                                        className="text-sm leading-loose"
+                                        {...props}
+                                      />
+                                    ),
+                                  }}
+                                >
+                                  {message.content}
+                                </ReactMarkdown>
+                                
+                                {/* Show grounding sources for assistant messages */}
+                                {message.role === "assistant" && message.groundingMetadata && (
+                                  <GroundingSources
+                                    sources={message.groundingMetadata.sources}
+                                    searchQueries={message.groundingMetadata.searchQueries}
+                                    groundedSegments={message.groundingMetadata.groundedSegments}
+                                    rawData={message.groundingMetadata.rawData}
+                                    messageId={message.id}
+                                  />
+                                )}
+                              </div>
+                            )}
                           </div>
-                          <span className="text-sm text-gray-500 animate-pulse">AI is thinking...</span>
+
+                          {/* Message Actions - Always render to prevent layout shift, but hide for error messages */}
+                          <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
+                            {message.role === "assistant" && (
+                              <div className="flex items-center gap-1 mr-1">
+                                <div className="flex items-center gap-1 text-sm text-gray-500 px-5">
+                                  {getProviderFromModel(message.model)}
+                                  <span>•</span>
+                                  <span>{message.model}</span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {message.role === "user" ? (
+                              // User message actions: retry, edit, copy
+                              <>
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRetryMessage(message.id, message.role === "user")}
+                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                >
+                                  <RotateCcwIcon className="h-4 w-4" />
+                                </ActionButton>
+                                
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditMessage(message.id)}
+                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                >
+                                  <EditIcon className="h-4 w-4" />
+                                </ActionButton>
+                                
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCopyMessage(message.content)}
+                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                >
+                                  <CopyIcon className="h-4 w-4" />
+                                </ActionButton>
+                              </>
+                            ) : (
+                              // AI message actions: copy, branch off, retry
+                              <>
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCopyMessage(message.content)}
+                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                >
+                                  <CopyIcon className="h-4 w-4" />
+                                </ActionButton>
+                                
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleBranchOff(message.id)}
+                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                >
+                                  <GitBranchIcon className="h-4 w-4" />
+                                </ActionButton>
+                                
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRetryMessage(message.id, message.role === "user")}
+                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                >
+                                  <RotateCcwIcon className="h-4 w-4" />
+                                </ActionButton>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
-                
-                <div ref={messagesEndRef} />
+                  ))}
+                  
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="w-full flex">
+                        <div className="max-w-full rounded-2xl bg-gray-100 px-5 py-3 shadow-sm">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-1">
+                              <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500"></div>
+                              <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-100"></div>
+                              <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-200"></div>
+                            </div>
+                            <span className="text-sm text-gray-500 animate-pulse">AI is thinking...</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div ref={messagesEndRef} />
+                </div>
               </div>
             </div>
+            <div></div>
           </div>
-          <div></div>
-        </div>
-      </CustomScrollbar>
-      
-      {/* Chatbox - Using shared component */}
-      <div className="absolute bottom-6 left-0 z-20" style={{ right: `${scrollbarWidth}px` }}>
-        <div className={chatboxGridClasses}>
-          <div></div>
-          <div className="w-full">
-            <div className={chatboxLayoutClasses}>
-              <Chatbox
-                input={input}
-                onInputChange={handleInputChange}
-                onSubmit={handleSubmit}
-                uploadedFiles={uploadedFiles}
-                onFilesChange={setUploadedFiles}
-                selectedModel={selectedModel}
-                onModelChange={onModelChange}
-                isLoading={isLoading}
-                inputRef={inputRef}
-              />
+        </CustomScrollbar>
+        
+        {/* Chatbox - Using shared component */}
+        <div className="absolute bottom-6 left-0 z-20" style={{ right: `${scrollbarWidth}px` }}>
+          <div className={chatboxGridClasses}>
+            <div></div>
+            <div className="w-full">
+              <div className={chatboxLayoutClasses}>
+                <Chatbox
+                  input={input}
+                  onInputChange={handleInputChange}
+                  onSubmit={handleSubmit}
+                  uploadedFiles={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                  isLoading={isLoading}
+                  inputRef={inputRef}
+                  searchGroundingEnabled={searchGroundingEnabled}
+                  onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
+                />
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
-);
-}; // <- Make sure this closing brace and semicolon are present
+  );
+};
 
 // Memoize the component with custom comparison to prevent unnecessary re-renders
 export const ChatWindow = React.memo(ChatWindowComponent, (prevProps, nextProps) => {

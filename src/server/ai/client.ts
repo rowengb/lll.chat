@@ -15,6 +15,7 @@ export interface StreamChunk {
   content: string;
   tokenUsage?: TokenUsage;
   isComplete?: boolean;
+  groundingMetadata?: any; // Gemini grounding metadata
 }
 
 export interface AIClient {
@@ -23,6 +24,7 @@ export interface AIClient {
     model?: string;
     stream?: boolean;
     apiKey?: string;
+    enableGrounding?: boolean;
   }): Promise<AsyncIterable<StreamChunk> | string>;
 }
 
@@ -32,6 +34,7 @@ class MockAIClient implements AIClient {
     model?: string;
     stream?: boolean;
     apiKey?: string;
+    enableGrounding?: boolean;
   }): Promise<AsyncIterable<StreamChunk> | string> {
     const lastMessage = params.messages[params.messages.length - 1];
     const response = `Mock response to: "${lastMessage?.content}" (using ${params.model || 'mock-model'})`;
@@ -72,6 +75,7 @@ class OpenAIClient implements AIClient {
     model?: string;
     stream?: boolean;
     apiKey?: string;
+    enableGrounding?: boolean;
   }): Promise<AsyncIterable<StreamChunk> | string> {
     const client = new OpenAI({
       apiKey: params.apiKey || process.env.OPENAI_API_KEY,
@@ -170,6 +174,7 @@ class AnthropicClient implements AIClient {
     model?: string;
     stream?: boolean;
     apiKey?: string;
+    enableGrounding?: boolean;
   }): Promise<AsyncIterable<StreamChunk> | string> {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -259,6 +264,7 @@ class GeminiClient implements AIClient {
     model?: string;
     stream?: boolean;
     apiKey?: string;
+    enableGrounding?: boolean;
   }): Promise<AsyncIterable<StreamChunk> | string> {
     const model = params.model || "gemini-pro";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${params.apiKey}`;
@@ -270,6 +276,31 @@ class GeminiClient implements AIClient {
         role: m.role === "assistant" ? "model" : "user",
         parts: [{ text: m.content }],
       }));
+
+    // Check if this is a Gemini 2.0+ model that supports Google Search grounding
+    const isGemini2Model = model.includes('gemini-2.0') || 
+                          model.includes('gemini-2.5') || 
+                          model.includes('gemini-2-0') || 
+                          model.includes('gemini-2-5');
+    
+    // Prepare request body with optional Google Search grounding
+    const requestBody: any = {
+      contents,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 4096,
+      },
+    };
+
+    // Add Google Search grounding for Gemini 2.0+ models if enabled
+    if (isGemini2Model && params.enableGrounding !== false) {
+      requestBody.tools = [{
+        googleSearch: {}
+      }];
+      console.log(`🔍 [GEMINI] Enabling Google Search grounding for ${model}`);
+    } else if (isGemini2Model && params.enableGrounding === false) {
+      console.log(`🚫 [GEMINI] Google Search grounding disabled for ${model}`);
+    }
 
     // Rate limiting: ensure minimum interval between requests
     const now = Date.now();
@@ -292,13 +323,7 @@ class GeminiClient implements AIClient {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            contents,
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 4096,
-            },
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         if (response.status === 429) {
@@ -316,8 +341,18 @@ class GeminiClient implements AIClient {
         const data = await response.json();
         const content = data.candidates[0]?.content?.parts[0]?.text || "";
 
+        // Log grounding metadata if available
+        if (data.candidates[0]?.groundingMetadata) {
+          const groundingMetadata = data.candidates[0].groundingMetadata;
+          console.log(`🔍 [GEMINI] Response grounded with ${groundingMetadata.groundingChunks?.length || 0} sources`);
+          
+          if (groundingMetadata.searchEntryPoint?.renderedContent) {
+            console.log(`🔗 [GEMINI] Search suggestions available`);
+          }
+        }
+
         if (params.stream) {
-          return this.createMockStream(content);
+          return this.createMockStream(content, data.candidates[0]?.groundingMetadata);
         }
 
         return content;
@@ -339,23 +374,32 @@ class GeminiClient implements AIClient {
     throw new Error(`Gemini API failed after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
   }
 
-  private async *createMockStream(text: string): AsyncIterable<StreamChunk> {
+  private async *createMockStream(text: string, groundingMetadata?: any): AsyncIterable<StreamChunk> {
     const words = text.split(" ");
     let outputTokens = 0;
 
     for (let i = 0; i < words.length; i++) {
       const content = words[i] + " ";
       outputTokens++;
+      const isLastChunk = i === words.length - 1;
 
-      yield {
+      const chunk: StreamChunk = {
         content,
-        tokenUsage: {
+        // Only send token usage on the final chunk to avoid performance overhead
+        tokenUsage: isLastChunk ? {
           inputTokens: 25, // Mock estimate
           outputTokens,
           totalTokens: 25 + outputTokens
-        },
-        isComplete: i === words.length - 1
+        } : undefined,
+        isComplete: isLastChunk
       };
+
+      // Add grounding metadata to the final chunk if available
+      if (isLastChunk && groundingMetadata) {
+        (chunk as any).groundingMetadata = groundingMetadata;
+      }
+
+      yield chunk;
 
       await new Promise(resolve => setTimeout(resolve, 50));
     }

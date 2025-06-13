@@ -18,7 +18,35 @@ interface Message {
   createdAt: Date;
   isOptimistic?: boolean;
   isError?: boolean;
+  isGrounded?: boolean; // Indicates if response was grounded with Google Search
+  groundingMetadata?: GroundingMetadata; // Google Search grounding metadata
   attachments?: FileAttachment[];
+}
+
+interface GroundingSource {
+  title: string; // Domain name (e.g., "pbs.org", "democracynow.org")
+  url: string; // Vertexaisearch redirect URL (e.g., "https://vertexaisearch.cloud.google.com/grounding-api-redirect/...")
+  snippet?: string;
+  confidence?: number; // Confidence percentage (0-100)
+  // Unfurled metadata from the actual destination
+  unfurled?: {
+    title?: string; // Actual article title
+    description?: string; // Article description
+    image?: string; // Article image
+    favicon?: string; // Site favicon
+    siteName?: string; // Site name
+    finalUrl?: string; // Final URL after redirects
+  };
+}
+
+interface GroundingMetadata {
+  searchQueries?: string[]; // The search queries used
+  groundedSegments?: Array<{
+    text: string;
+    confidence: number;
+  }>; // Grounded text segments with confidence
+  sources?: GroundingSource[]; // The sources used for grounding (optional)
+  rawData?: any; // Include raw data for debugging
 }
 
 interface ChatStore {

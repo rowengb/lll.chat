@@ -9,6 +9,19 @@ export const create = mutation({
     threadId: v.id("threads"),
     userId: v.id("users"),
     attachments: v.optional(v.array(v.id("files"))),
+    isGrounded: v.optional(v.boolean()),
+    groundingSources: v.optional(v.array(v.object({
+      title: v.string(),
+      url: v.string(),
+      actualUrl: v.optional(v.string()),
+      snippet: v.optional(v.string()),
+      confidence: v.optional(v.number()),
+    }))),
+    groundingSearchQueries: v.optional(v.array(v.string())),
+    groundedSegments: v.optional(v.array(v.object({
+      text: v.string(),
+      confidence: v.number(),
+    }))),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("messages", {
@@ -18,6 +31,10 @@ export const create = mutation({
       threadId: args.threadId,
       userId: args.userId,
       attachments: args.attachments,
+      isGrounded: args.isGrounded,
+      groundingSources: args.groundingSources,
+      groundingSearchQueries: args.groundingSearchQueries,
+      groundedSegments: args.groundedSegments,
     });
   },
 });
@@ -42,6 +59,19 @@ export const createMany = mutation({
       threadId: v.id("threads"),
       userId: v.id("users"),
       attachments: v.optional(v.array(v.id("files"))),
+      isGrounded: v.optional(v.boolean()),
+      groundingSources: v.optional(v.array(v.object({
+        title: v.string(),
+        url: v.string(),
+        actualUrl: v.optional(v.string()),
+        snippet: v.optional(v.string()),
+        confidence: v.optional(v.number()),
+      }))),
+      groundingSearchQueries: v.optional(v.array(v.string())),
+      groundedSegments: v.optional(v.array(v.object({
+        text: v.string(),
+        confidence: v.number(),
+      }))),
     })),
   },
   handler: async (ctx, args) => {
@@ -61,6 +91,19 @@ export const createAssistantMessage = mutation({
     threadId: v.id("threads"),
     userId: v.id("users"),
     attachments: v.optional(v.array(v.id("files"))),
+    isGrounded: v.optional(v.boolean()),
+    groundingSources: v.optional(v.array(v.object({
+      title: v.string(),
+      url: v.string(),
+      actualUrl: v.optional(v.string()),
+      snippet: v.optional(v.string()),
+      confidence: v.optional(v.number()),
+    }))),
+    groundingSearchQueries: v.optional(v.array(v.string())),
+    groundedSegments: v.optional(v.array(v.object({
+      text: v.string(),
+      confidence: v.number(),
+    }))),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("messages", {
@@ -70,6 +113,10 @@ export const createAssistantMessage = mutation({
       threadId: args.threadId,
       userId: args.userId,
       attachments: args.attachments,
+      isGrounded: args.isGrounded,
+      groundingSources: args.groundingSources,
+      groundingSearchQueries: args.groundingSearchQueries,
+      groundedSegments: args.groundedSegments,
     });
   },
 });
@@ -138,5 +185,58 @@ export const deleteMessagesFromPoint = mutation({
     }
     
     return { deletedCount: messagesToDelete.length };
+  },
+});
+
+export const updateGroundingSourceUnfurl = mutation({
+  args: {
+    messageId: v.id("messages"),
+    sourceIndex: v.number(),
+    userId: v.id("users"), // Accept userId directly from TRPC
+    unfurledData: v.object({
+      title: v.optional(v.string()),
+      description: v.optional(v.string()),
+      image: v.optional(v.string()),
+      favicon: v.optional(v.string()),
+      siteName: v.optional(v.string()),
+      finalUrl: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const { messageId, sourceIndex, userId, unfurledData } = args;
+    
+    // Get the message
+    const message = await ctx.db.get(messageId);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+    
+    // Check if user owns this message
+    if (message.userId !== userId) {
+      throw new Error("Not authorized");
+    }
+    
+    // Update the grounding source with unfurled data
+    if (message.groundingSources && message.groundingSources[sourceIndex]) {
+      const updatedSources = [...message.groundingSources];
+      updatedSources[sourceIndex] = {
+        ...updatedSources[sourceIndex],
+        unfurledTitle: unfurledData.title,
+        unfurledDescription: unfurledData.description,
+        unfurledImage: unfurledData.image,
+        unfurledFavicon: unfurledData.favicon,
+        unfurledSiteName: unfurledData.siteName,
+        unfurledFinalUrl: unfurledData.finalUrl,
+        unfurledAt: Date.now(),
+      };
+      
+      await ctx.db.patch(messageId, {
+        groundingSources: updatedSources,
+      });
+      
+      return { success: true };
+    }
+    
+    return { success: false, error: "Source not found" };
   },
 }); 

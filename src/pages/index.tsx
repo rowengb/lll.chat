@@ -70,6 +70,7 @@ const Home: NextPage = () => {
   // Get thread data to determine the last used model
   const { data: threads } = trpc.chat.getThreads.useQuery();
   const currentThread = threads?.find(thread => thread.id === currentThreadId);
+  const utils = trpc.useUtils();
 
   // Settings page tRPC queries and mutations
   const { data: dbApiKeys } = trpc.apiKeys.getApiKeys.useQuery();
@@ -78,6 +79,7 @@ const Home: NextPage = () => {
   const { data: userPreferences } = trpc.userPreferences.getPreferences.useQuery();
   const { data: allModels } = trpc.models.getModels.useQuery();
   const setDefaultModelMutation = trpc.userPreferences.setDefaultModel.useMutation();
+  const updateThreadMetadataMutation = trpc.chat.updateThreadMetadata.useMutation();
 
   // Initialize selectedModel based on user preferences
   useEffect(() => {
@@ -112,15 +114,24 @@ const Home: NextPage = () => {
     }
   }, [router.query, user]);
 
-  // Update selected model when switching threads (only if thread has a specific model)
+  // Update selected model when switching threads to remember the last model used in that chat
   useEffect(() => {
-    if (currentThread && selectedModel) {
+    if (currentThread) {
       const threadModel = (currentThread as any).model || currentThread.lastModel;
+      console.log(`🔍 [MODEL] Thread ${currentThreadId} data:`, { 
+        model: (currentThread as any).model, 
+        lastModel: currentThread.lastModel, 
+        threadModel, 
+        currentSelectedModel: selectedModel 
+      });
       if (threadModel && threadModel !== selectedModel) {
+        console.log(`🔄 [MODEL] Switching to thread model: ${threadModel} (was: ${selectedModel})`);
         setSelectedModel(threadModel);
       }
+    } else if (currentThreadId) {
+      console.log(`⚠️ [MODEL] No thread data found for threadId: ${currentThreadId}`);
     }
-  }, [currentThread]);
+  }, [currentThread, currentThreadId]); // Also depend on currentThreadId to ensure it triggers on thread changes
 
   // Settings page useEffect hooks
   useEffect(() => {
@@ -318,6 +329,29 @@ const Home: NextPage = () => {
     navigateToWelcome();
   };
 
+  // Custom model change handler that persists the selection to the current thread
+  const handleModelChange = async (modelId: string) => {
+    console.log(`🎯 [MODEL] User changed model to: ${modelId} (thread: ${currentThreadId})`);
+    setSelectedModel(modelId);
+    
+    // If we're in a chat thread, update the thread's lastModel
+    if (currentThreadId) {
+      try {
+        await updateThreadMetadataMutation.mutateAsync({
+          threadId: currentThreadId,
+          lastModel: modelId,
+        });
+        console.log(`✅ [MODEL] Successfully updated thread ${currentThreadId} lastModel to: ${modelId}`);
+        
+        // Invalidate threads cache to immediately update the UI with the new model
+        utils.chat.getThreads.invalidate();
+      } catch (error) {
+        console.error('Failed to update thread model:', error);
+        // Don't show error to user as this is not critical
+      }
+    }
+  };
+
   const getPageTitle = () => {
     switch (currentView) {
       case 'chat':
@@ -340,7 +374,7 @@ const Home: NextPage = () => {
               threadId={currentThreadId}
               onThreadCreate={handleThreadCreate}
               selectedModel={selectedModel}
-              onModelChange={setSelectedModel}
+              onModelChange={handleModelChange}
               sidebarCollapsed={sidebarCollapsed}
               sidebarWidth={sidebarWidth}
             />
@@ -693,7 +727,7 @@ const Home: NextPage = () => {
               threadId={null}
               onThreadCreate={handleThreadCreate}
               selectedModel={selectedModel}
-              onModelChange={setSelectedModel}
+              onModelChange={handleModelChange}
               sidebarCollapsed={sidebarCollapsed}
               sidebarWidth={sidebarWidth}
             />

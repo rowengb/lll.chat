@@ -30,6 +30,27 @@ export default defineSchema({
     threadId: v.id("threads"),
     userId: v.id("users"),
     attachments: v.optional(v.array(v.id("files"))), // Array of file IDs
+    isGrounded: v.optional(v.boolean()), // Whether response was grounded with Google Search
+    groundingSources: v.optional(v.array(v.object({
+      title: v.string(),
+      url: v.string(),
+      actualUrl: v.optional(v.string()),
+      snippet: v.optional(v.string()),
+      confidence: v.optional(v.number()),
+      // Unfurled metadata from the actual destination
+      unfurledTitle: v.optional(v.string()),
+      unfurledDescription: v.optional(v.string()),
+      unfurledImage: v.optional(v.string()),
+      unfurledFavicon: v.optional(v.string()),
+      unfurledSiteName: v.optional(v.string()),
+      unfurledFinalUrl: v.optional(v.string()),
+      unfurledAt: v.optional(v.number()), // Timestamp when unfurled
+    }))), // Google Search grounding sources
+    groundingSearchQueries: v.optional(v.array(v.string())), // Search queries used
+    groundedSegments: v.optional(v.array(v.object({
+      text: v.string(),
+      confidence: v.number(),
+    }))), // Grounded text segments with confidence
   }).index("by_thread", ["threadId"]).index("by_user", ["userId"]),
 
   files: defineTable({

@@ -172,7 +172,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Failed to get or create user' });
   }
 
-  const { messages, model = 'gpt-4o', threadId, files = [] } = req.body;
+  const { messages, model = 'gpt-4o', threadId, files = [], searchGrounding = true } = req.body;
   console.log(`📝 [LLL.CHAT] Parsed request: model=${model}, messages count=${messages?.length || 0}, files count=${files?.length || 0}`);
   
   // Ensure we're using the fastest model
@@ -268,6 +268,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       model: model,
       stream: true,
       apiKey,
+      enableGrounding: searchGrounding,
     });
 
     const streamReceived = Date.now();
@@ -295,10 +296,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return chunk && typeof chunk === 'object' && 'content' in chunk;
     };
 
+    let groundingMetadata: any = null;
+
     for await (const chunk of stream as AsyncIterable<any>) {
       const content = isStreamChunk(chunk) ? chunk.content : chunk;
       const tokenUsage = isStreamChunk(chunk) ? chunk.tokenUsage : undefined;
       const isComplete = isStreamChunk(chunk) ? chunk.isComplete : false;
+      
+      // Check for grounding metadata in the chunk
+      if (isStreamChunk(chunk) && chunk.groundingMetadata) {
+        groundingMetadata = chunk.groundingMetadata;
+        console.log(`🔍 [LLL.CHAT] Grounding metadata received with ${groundingMetadata.groundingChunks?.length || 0} sources`);
+      }
 
       if (!firstChunkReceived && content) {
         firstChunkTime = Date.now();
@@ -310,26 +319,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         chunkCount++;
         fullResponse += content;
 
-        // Log only first few chunks to avoid performance overhead
-        if (chunkCount <= 3) {
-          console.log(`📦 [LLL.CHAT] Chunk ${chunkCount}: "${content}" (${content.length} chars)`);
+        // Log only first chunk to avoid performance overhead
+        if (chunkCount === 1) {
+          console.log(`📦 [LLL.CHAT] First chunk: "${content}" (${content.length} chars)`);
         }
 
         // Send content in T3.chat format: 0:"content"
         res.write(`0:${JSON.stringify(content)}\n`);
       }
 
-      // Update token statistics
+      // Update token statistics (only log final stats to avoid performance overhead)
       if (tokenUsage) {
         tokenStats = tokenUsage;
-        const currentTime = Date.now();
-        const elapsedSeconds = (currentTime - streamStartTime) / 1000;
-        const tokensPerSecond = tokenStats.outputTokens / elapsedSeconds;
-        
-        console.log(`🔢 [LLL.CHAT] Token update - Input: ${tokenStats.inputTokens}, Output: ${tokenStats.outputTokens}, Total: ${tokenStats.totalTokens}, TPS: ${tokensPerSecond.toFixed(2)}`);
         
         if (isComplete) {
-          console.log(`🎯 [LLL.CHAT] FINAL STATS - ${tokensPerSecond.toFixed(2)} tokens/second`);
+          const currentTime = Date.now();
+          const elapsedSeconds = (currentTime - streamStartTime) / 1000;
+          const tokensPerSecond = tokenStats.outputTokens / elapsedSeconds;
+          console.log(`🎯 [LLL.CHAT] FINAL STATS - Input: ${tokenStats.inputTokens}, Output: ${tokenStats.outputTokens}, Total: ${tokenStats.totalTokens}, TPS: ${tokensPerSecond.toFixed(2)}`);
         }
       }
 
@@ -347,6 +354,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`✅ [LLL.CHAT] Stream completed after ${streamComplete - aiCallStart}ms`);
     console.log(`📊 [LLL.CHAT] Total: ${chunkCount} chunks, ${fullResponse.length} characters`);
     console.log(`⏱️  [LLL.CHAT] Total request time: ${streamComplete - requestStart}ms`);
+    
+    // Send grounding metadata if available
+    if (groundingMetadata) {
+      console.log(`🔗 [LLL.CHAT] Sending grounding metadata with response`);
+      res.write(`f:{"grounding":${JSON.stringify(groundingMetadata)}}\n`);
+    }
     
     // Send completion signal (T3.chat style) - don't include full content to avoid parsing issues
     res.write(`d:{"type":"done","length":${fullResponse.length}}\n`);

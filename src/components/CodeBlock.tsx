@@ -59,7 +59,7 @@ export function CodeBlock({ children, className, language }: CodeBlockProps) {
       )}
       
       {/* Code content */}
-      <pre className="group text-gray-100 p-4 rounded-xl overflow-x-auto text-xs font-mono" style={{ backgroundColor: '#0C1117' }}>
+      <pre className="group text-gray-100 p-4 rounded-xl overflow-x-auto text-xs font-mono max-w-full" style={{ backgroundColor: '#0C1117' }}>
         <code className={className}>
           {children}
         </code>

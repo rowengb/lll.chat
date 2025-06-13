@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { ArrowUpIcon, PaperclipIcon, XIcon, FileIcon, ImageIcon, FileTextIcon, VideoIcon, MusicIcon, FileSpreadsheetIcon } from 'lucide-react';
+import { ArrowUpIcon, PaperclipIcon, XIcon, FileIcon, ImageIcon, FileTextIcon, VideoIcon, MusicIcon, FileSpreadsheetIcon, GlobeIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ModelSelector } from './ModelSelector';
 import { UploadedFile } from './FileUpload';
@@ -19,8 +19,10 @@ interface ChatboxProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
   isLoading: boolean;
-  inputRef: React.RefObject<HTMLInputElement>;
+  inputRef: React.RefObject<HTMLInputElement | null>;
   className?: string;
+  searchGroundingEnabled?: boolean;
+  onSearchGroundingChange?: (enabled: boolean) => void;
 }
 
 // Circular progress component
@@ -136,6 +138,7 @@ const ImagePreview = ({ file, onRemove, onClick }: { file: any; onRemove: () => 
       </div>
       {/* Remove button on hover */}
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           onRemove();
@@ -201,6 +204,7 @@ const CompactFileItem = ({ file, onRemove, isLoading = false, onClick }: { file:
       {/* Remove button */}
       {onRemove && !file.isUploading && (
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onRemove();
@@ -224,13 +228,21 @@ export function Chatbox({
   onModelChange,
   isLoading,
   inputRef,
-  className = ""
+  className = "",
+  searchGroundingEnabled = true,
+  onSearchGroundingChange
 }: ChatboxProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Modal state
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Check if the selected model supports Google Search grounding
+  const supportsGrounding = selectedModel.includes('gemini-2.0') || 
+                           selectedModel.includes('gemini-2.5') || 
+                           selectedModel.includes('gemini-2-0') || 
+                           selectedModel.includes('gemini-2-5');
   
   // Upload store for progress tracking
   const uploads = useUploadStore((s) => s.uploads);
@@ -501,13 +513,31 @@ export function Chatbox({
               selectedModel={selectedModel}
               onModelChange={onModelChange}
             />
+            {supportsGrounding && onSearchGroundingChange && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onSearchGroundingChange(!searchGroundingEnabled)}
+                disabled={isLoading}
+                className={`h-8 px-3 transition-colors border rounded-full ${
+                  searchGroundingEnabled 
+                    ? 'text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100 hover:border-blue-300' 
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-gray-100 hover:border-gray-300'
+                }`}
+                title={searchGroundingEnabled ? "Disable Google Search grounding" : "Enable Google Search grounding"}
+              >
+                <GlobeIcon className="h-4 w-4 mr-1" />
+                Search
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={handleAttachClick}
               disabled={isLoading}
-              className="h-8 px-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-gray-100 hover:border-gray-300 transition-colors"
+              className="h-8 px-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-gray-100 hover:border-gray-300 transition-colors rounded-full"
             >
               <PaperclipIcon className="h-4 w-4 mr-1" />
               Attach
