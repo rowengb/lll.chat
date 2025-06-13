@@ -14,6 +14,7 @@ import toast from "react-hot-toast";
 import { getProviderIcon } from "@/components/ModelSelector";
 
 import Logo from '../components/Logo';
+import { SidebarSkeleton, MainChatSkeleton, ChatboxSkeleton } from '../components/skeletons';
 import { trpc } from "@/utils/trpc";
 
 interface ApiKeys {
@@ -729,56 +730,10 @@ const Home: NextPage = () => {
         
         {/* Simple loading skeleton with main layout shapes */}
         <main className="h-screen flex">
-          {/* Sidebar skeleton */}
-          <div 
-            className="bg-white border-r border-gray-200 flex flex-col"
-            style={{ width: '288px' }}
-          >
-            {/* Header area */}
-            <div className="p-4 border-b border-gray-200">
-              <div className="h-6 bg-gray-200 rounded animate-pulse mb-3"></div>
-              <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
-            </div>
-            
-            {/* Content area */}
-            <div className="flex-1 p-4 space-y-3">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="h-10 bg-gray-200 rounded animate-pulse"></div>
-              ))}
-            </div>
-            
-            {/* Bottom area */}
-            <div className="border-t border-gray-200 p-4">
-              <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
-            </div>
-          </div>
-          
-          {/* Main content skeleton */}
-          <div className="flex-1 flex flex-col bg-gray-50">
-            {/* Content area */}
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="text-center space-y-6 w-full max-w-4xl">
-                {/* Title area */}
-                <div className="space-y-3">
-                  <div className="h-8 bg-gray-200 rounded mx-auto w-80 animate-pulse"></div>
-                  <div className="h-5 bg-gray-200 rounded mx-auto w-96 animate-pulse"></div>
-                </div>
-                
-                {/* Cards grid */}
-                <div className="grid grid-cols-2 gap-4 mt-8">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-24 bg-white border border-gray-200 rounded-xl animate-pulse"></div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            
-            {/* Input area */}
-            <div className="border-t border-gray-200 bg-white p-6">
-              <div className="max-w-4xl mx-auto">
-                <div className="h-12 bg-gray-200 rounded-xl animate-pulse"></div>
-              </div>
-            </div>
+          <SidebarSkeleton />
+          <div className="flex-1 flex flex-col">
+            <MainChatSkeleton />
+            <ChatboxSkeleton />
       </div>
         </main>
       </>

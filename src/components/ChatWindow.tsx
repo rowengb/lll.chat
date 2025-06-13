@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ArrowUpIcon, CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, Waves, PenToolIcon, CodeIcon, BrainIcon, LightbulbIcon, BarChartIcon, ChefHatIcon, ZapIcon, BotIcon, ShieldIcon, PaperclipIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/utils/trpc";
@@ -44,7 +44,7 @@ interface Message {
   attachments?: FileAttachmentData[];
 }
 
-export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth }: ChatWindowProps) {
+const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth }: ChatWindowProps) => {
   const [input, setInput] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -53,6 +53,10 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [messagesContainer, setMessagesContainer] = useState<HTMLDivElement | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const previousThreadId = useRef<string | null>(null);
+  const scrollLocked = useRef<boolean>(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
   // Use global chat store instead of local state
   const { 
@@ -63,11 +67,15 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     isStreaming, 
     setStreaming,
     isLoading,
-    setLoading
+    setLoading,
+    isTransitioning: globalIsTransitioning,
+    startThreadTransition,
+    endThreadTransition,
+    getDisplayMessages
   } = useChatStore();
   
-  // Get messages for current thread from global store
-  const localMessages = threadId ? getMessages(threadId) : [];
+  // Simple approach: get messages directly and let smooth transitions handle the rest
+  const localMessages = getMessages(threadId || '');
   
   // Ref to track streaming state and prevent race conditions
   const isStreamingRef = useRef(false);
@@ -100,38 +108,67 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     setInput(value);
   };
 
-  // Robust server message sync with streaming protection
+  // Fast but smooth scroll from top to bottom on thread change
   useEffect(() => {
-    // Don't sync during loading/streaming
-    if (isLoading || isStreamingRef.current || !threadId) return;
-    
-    if (serverMessages) {
-      // Only sync if we're not currently streaming
-      if (!isStreamingRef.current) {
-        const currentMessages = getMessages(threadId);
-        // If we have optimistic messages, don't sync
-        const hasOptimistic = currentMessages.some(msg => msg.isOptimistic);
-        if (!hasOptimistic) {
-          // Convert server messages and handle file attachments
-          const serverMsgs: Message[] = serverMessages.map(msg => ({ 
-            ...msg, 
-            createdAt: new Date(msg._creationTime),
-            isOptimistic: false,
-            // Convert attachment IDs to FileAttachmentData objects
-            attachments: msg.attachments ? msg.attachments.map(fileId => ({
-              id: fileId,
-              name: '', // Will be fetched by FileAttachmentWithUrl
-              type: '',
-              size: 0,
-              storageId: fileId
-            })) : undefined
-          }));
-          
-          setMessages(threadId, serverMsgs);
-        }
+    if (threadId !== previousThreadId.current) {
+      setIsInitialLoad(true);
+      previousThreadId.current = threadId;
+      
+      if (messagesContainer && threadId) {
+        // Start from top
+        messagesContainer.scrollTop = 0;
+        
+        // Fast smooth animate to bottom
+        requestAnimationFrame(() => {
+          if (messagesContainer) {
+            messagesContainer.scrollTo({
+              top: messagesContainer.scrollHeight,
+              behavior: 'smooth'
+            });
+            setIsInitialLoad(false);
+          }
+        });
       }
     }
-  }, [serverMessages, threadId, isLoading, getMessages, setMessages]);
+  }, [threadId, messagesContainer]);
+
+  // Simple server message sync
+  useEffect(() => {
+    if (isLoading || isStreamingRef.current || !threadId || !serverMessages) return;
+    
+    const currentMessages = getMessages(threadId);
+    const hasOptimistic = currentMessages.some(msg => msg.isOptimistic);
+    
+    if (!hasOptimistic) {
+      const serverMsgs: Message[] = serverMessages.map(msg => ({ 
+        ...msg, 
+        createdAt: new Date(msg._creationTime),
+        isOptimistic: false,
+        attachments: msg.attachments ? msg.attachments.map(fileId => ({
+          id: fileId,
+          name: '',
+          type: '',
+          size: 0,
+          storageId: fileId
+        })) : undefined
+      }));
+      
+      setMessages(threadId, serverMsgs);
+      
+      // Fast smooth scroll to bottom after loading
+      if (isInitialLoad && messagesContainer) {
+        requestAnimationFrame(() => {
+          if (messagesContainer) {
+            messagesContainer.scrollTo({
+              top: messagesContainer.scrollHeight,
+              behavior: 'smooth'
+            });
+            setIsInitialLoad(false);
+          }
+        });
+      }
+    }
+  }, [serverMessages, threadId, isLoading, isInitialLoad, messagesContainer, setMessages, getMessages]);
 
   // Detect scrollbar width and compensate chatbox position
   useEffect(() => {
@@ -416,14 +453,26 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
   }, [input]);
 
   useEffect(() => {
+    // Don't auto-scroll during initial load - we handle that in the server sync effect
+    if (isInitialLoad || scrollLocked.current) return;
+    
+    // Don't auto-scroll if we're currently loading server messages
+    if (isLoading) return;
+    
+    // Don't auto-scroll if container overflow is hidden (during positioning)
+    if (messagesContainer && messagesContainer.style.overflow === 'hidden') return;
+    
     // Check if we're currently streaming
     const isStreaming = localMessages.some(msg => msg.isOptimistic && msg.role === "assistant");
     
-    // During streaming, use instant scroll to avoid jitter
-    // Otherwise, use smooth scroll for better UX
-    const behavior = isStreaming ? "instant" : "smooth";
-    messagesEndRef.current?.scrollIntoView({ behavior });
-  }, [localMessages]);
+    // Only scroll if we have messages and we're not in initial load
+    if (localMessages.length > 0) {
+      // During streaming, use instant scroll to avoid jitter
+      // Otherwise, use smooth scroll for better UX
+      const behavior = isStreaming ? "instant" : "smooth";
+      messagesEndRef.current?.scrollIntoView({ behavior });
+    }
+  }, [localMessages, isInitialLoad, isLoading, messagesContainer]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -894,7 +943,7 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     }
   };
 
-  // Show welcome page when no thread exists (T3.chat style)
+  // Show welcome screen when no thread is selected
   if (!threadId) {
     const examplePrompts = [
       {
@@ -1045,293 +1094,303 @@ export function ChatWindow({ threadId, onThreadCreate, selectedModel, onModelCha
     );
   }
 
-  return (
-    <div 
-      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white transition-all duration-500 ease-out"
-      style={{ left: sidebarCollapsed ? '0px' : `${sidebarWidth}px` }}
-    >
+ // Find this section (around line 1080-1090) and replace it:
 
-
-      {/* Messages + Chatbox Area */}
-      <div className="flex-1 overflow-hidden relative">
-        <CustomScrollbar 
-          className="h-full"
-          onRef={setMessagesContainer}
-        >
-                      <div className={`${sharedGridClasses} pt-8 pb-48`}>
-            <div></div>
-            <div className="w-full">
-              <div className={sharedLayoutClasses} id="messages-container">
+ return (
+  <div 
+    className="fixed top-0 right-0 bottom-0 flex flex-col bg-white transition-all duration-500 ease-out"
+    style={{ left: sidebarCollapsed ? '0px' : `${sidebarWidth}px` }}
+  >
+    {/* Messages + Chatbox Area */}
+    <div className="flex-1 overflow-hidden relative">
+      <CustomScrollbar 
+        className={`h-full ${scrollLocked.current ? 'scroll-locked' : ''}`}
+        onRef={setMessagesContainer}
+      >
+        <div className={`${sharedGridClasses} pt-8 pb-48`}>
+          <div></div>
+          <div className="w-full">
+            <div className={sharedLayoutClasses} id="messages-container">
               <div className="space-y-0">
-            {(() => {
-              const filteredMessages = localMessages?.filter(message => 
-                // Filter out empty optimistic assistant messages
-                !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
-              ) || [];
-              console.log(`[RENDER] Total messages to render: ${filteredMessages.length}`);
-              return filteredMessages.map((message: Message) => {
-                console.log(`[RENDER] Rendering message: ${message.role} - "${message.content.slice(0, 50)}..." (optimistic: ${message.isOptimistic})`);
-                return (
-              <div key={message.id} className="flex justify-start">
-                <div className="w-full">
-                  <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
-                                          <div
-                        className={`rounded-2xl px-4 ${
-                        message.role === "user" 
-                          ? "py-2" 
-                          : "pt-1 pb-1"
-                        } ${
-                        message.role === "user"
-                          ? "bg-blue-50 text-gray-900 border border-blue-500 shadow-sm"
-                          : "text-gray-900"
-                      }`}
-                    >
-                      {editingMessageId === message.id ? (
-                        <div className="space-y-2">
-                          <textarea
-                            value={editingContent}
-                            onChange={(e) => setEditingContent(e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm resize-none bg-white"
-                            rows={Math.max(2, editingContent.split('\n').length)}
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => handleSaveEdit(message.id)}
-                              size="sm"
-                              className="bg-blue-600 hover:bg-blue-700 text-white"
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              onClick={handleCancelEdit}
-                              size="sm"
-                              variant="outline"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : message.role === "user" ? (
-                        <div>
-                          <p className="whitespace-pre-wrap text-sm leading-loose">
-                            {message.content}
-                          </p>
-                          {/* Display file attachments for user messages */}
-                          {message.attachments && message.attachments.length > 0 && (
-                            <div className="mt-2 inline-block">
-                              <div className="grid grid-cols-2 gap-2 max-w-md">
-                                {message.attachments.map((file) => (
-                                  <div key={file.id}>
-                                    <FileAttachmentWithUrl fileId={file.id} />
-                                  </div>
-                                ))}
+                {localMessages?.filter(message => 
+                  // Filter out empty optimistic assistant messages
+                  !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
+                ).map((message: Message) => (
+                  <div key={message.id} className="flex justify-start">
+                    <div className="w-full">
+                      <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
+                        <div
+                          className={`rounded-2xl px-4 ${
+                            message.role === "user" 
+                              ? "py-2" 
+                              : "pt-1 pb-1"
+                          } ${
+                            message.role === "user"
+                              ? "bg-blue-50 text-gray-900 border border-blue-500 shadow-sm"
+                              : "text-gray-900"
+                          }`}
+                        >
+                          {editingMessageId === message.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingContent}
+                                onChange={(e) => setEditingContent(e.target.value)}
+                                className="w-full p-2 border border-gray-300 rounded-lg text-sm resize-none bg-white"
+                                rows={Math.max(2, editingContent.split('\n').length)}
+                                autoFocus
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={() => handleSaveEdit(message.id)}
+                                  size="sm"
+                                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                                >
+                                  Save
+                                </Button>
+                                <Button
+                                  onClick={handleCancelEdit}
+                                  size="sm"
+                                  variant="outline"
+                                >
+                                  Cancel
+                                </Button>
                               </div>
+                            </div>
+                          ) : message.role === "user" ? (
+                            <div>
+                              <p className="whitespace-pre-wrap text-sm leading-loose">
+                                {message.content}
+                              </p>
+                              {/* Display file attachments for user messages */}
+                              {message.attachments && message.attachments.length > 0 && (
+                                <div className="mt-2 inline-block">
+                                  <div className="grid grid-cols-2 gap-2 max-w-md">
+                                    {message.attachments.map((file) => (
+                                      <div key={file.id}>
+                                        <FileAttachmentWithUrl fileId={file.id} />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="prose prose-sm max-w-none text-gray-900 text-sm leading-loose">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeHighlight]}
+                                components={{
+                                  // Customize link styling
+                                  a: ({ node, ...props }) => (
+                                    <a 
+                                      {...props} 
+                                      className="text-blue-600 hover:text-blue-800 underline"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    />
+                                  ),
+                                  // Customize code block styling
+                                  code: ({ node, className, children, ...props }) => {
+                                    const match = /language-(\w+)/.exec(className || '');
+                                    const isInline = !match;
+                                    
+                                    return isInline ? (
+                                      <code 
+                                        className="text-gray-100 px-2 py-1 rounded text-xs font-mono" 
+                                        style={{ backgroundColor: '#0C1117' }}
+                                        {...props}
+                                      >
+                                        {children}
+                                      </code>
+                                    ) : null; // Block code will be handled by pre
+                                  },
+                                  // Style pre blocks with copy functionality
+                                  pre: ({ node, children, ...props }) => {
+                                    // Extract language from the code element
+                                    const codeElement = children as any;
+                                    const className = codeElement?.props?.className || '';
+                                    const match = /language-(\w+)/.exec(className);
+                                    const language = match ? match[1] : undefined;
+                                    
+                                    return (
+                                      <CodeBlock 
+                                        className={className}
+                                        language={language}
+                                      >
+                                        {codeElement?.props?.children || children}
+                                      </CodeBlock>
+                                    );
+                                  },
+                                  // Style lists
+                                  ul: ({ node, ...props }) => (
+                                    <ul 
+                                      className="list-disc list-outside space-y-1 my-2 ml-4 pl-2"
+                                      {...props}
+                                    />
+                                  ),
+                                  ol: ({ node, ...props }) => (
+                                    <ol 
+                                      className="list-decimal list-outside space-y-1 my-2 ml-4 pl-2"
+                                      {...props}
+                                    />
+                                  ),
+                                  li: ({ node, ...props }) => (
+                                    <li 
+                                      className="text-sm leading-loose"
+                                      {...props}
+                                    />
+                                  ),
+                                }}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
                             </div>
                           )}
                         </div>
-                      ) : (
-                        <div className="prose prose-sm max-w-none text-gray-900 text-sm leading-loose">
-                          <ReactMarkdown 
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight]}
-                            components={{
-                              // Customize link styling
-                              a: ({ node, ...props }) => (
-                                <a 
-                                  {...props} 
-                                  className="text-blue-600 hover:text-blue-800 underline"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                />
-                              ),
-                              // Customize code block styling
-                              code: ({ node, className, children, ...props }) => {
-                                const match = /language-(\w+)/.exec(className || '');
-                                const isInline = !match;
-                                
-                                return isInline ? (
-                                  <code 
-                                    className="text-gray-100 px-2 py-1 rounded text-xs font-mono" 
-                                    style={{ backgroundColor: '#0C1117' }}
-                                    {...props}
-                                  >
-                                    {children}
-                                  </code>
-                                ) : null; // Block code will be handled by pre
-                              },
-                              // Style pre blocks with copy functionality
-                              pre: ({ node, children, ...props }) => {
-                                // Extract language from the code element
-                                const codeElement = children as any;
-                                const className = codeElement?.props?.className || '';
-                                const match = /language-(\w+)/.exec(className);
-                                const language = match ? match[1] : undefined;
-                                
-                                return (
-                                  <CodeBlock 
-                                    className={className}
-                                    language={language}
-                                  >
-                                    {codeElement?.props?.children || children}
-                                  </CodeBlock>
-                                );
-                              },
-                              // Style lists
-                              ul: ({ node, ...props }) => (
-                                <ul 
-                                  className="list-disc list-outside space-y-1 my-2 ml-4 pl-2"
-                                  {...props}
-                                />
-                              ),
-                              ol: ({ node, ...props }) => (
-                                <ol 
-                                  className="list-decimal list-outside space-y-1 my-2 ml-4 pl-2"
-                                  {...props}
-                                />
-                              ),
-                              li: ({ node, ...props }) => (
-                                <li 
-                                  className="text-sm leading-loose"
-                                  {...props}
-                                />
-                              ),
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Message Actions - Always render to prevent layout shift */}
-                    <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
-                        {message.role === "assistant" && (
-                          <div className="flex items-center gap-1 mr-1">
-                            <div className="flex items-center gap-1 text-sm text-gray-500 px-5">
-                              {getProviderFromModel(message.model)}
-                              <span>•</span>
-                              <span>{message.model}</span>
+                        {/* Message Actions - Always render to prevent layout shift */}
+                        <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
+                          {message.role === "assistant" && (
+                            <div className="flex items-center gap-1 mr-1">
+                              <div className="flex items-center gap-1 text-sm text-gray-500 px-5">
+                                {getProviderFromModel(message.model)}
+                                <span>•</span>
+                                <span>{message.model}</span>
+                              </div>
                             </div>
-                          </div>
-                        )}
-                        
-                        {message.role === "user" ? (
-                          // User message actions: retry, edit, copy
-                          <>
-                            <ActionButton
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                            >
-                              <RotateCcwIcon className="h-4 w-4" />
-                            </ActionButton>
-                            
-                            <ActionButton
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditMessage(message.id)}
-                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                            >
-                              <EditIcon className="h-4 w-4" />
-                            </ActionButton>
-                            
-                            <ActionButton
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleCopyMessage(message.content)}
-                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                            >
-                              <CopyIcon className="h-4 w-4" />
-                            </ActionButton>
-                          </>
-                        ) : (
-                          // AI message actions: copy, branch off, retry
-                          <>
-                            <ActionButton
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleCopyMessage(message.content)}
-                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                            >
-                              <CopyIcon className="h-4 w-4" />
-                            </ActionButton>
-                            
-                            <ActionButton
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleBranchOff(message.id)}
-                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                            >
-                              <GitBranchIcon className="h-4 w-4" />
-                            </ActionButton>
-                            
-                            <ActionButton
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                              className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                            >
-                              <RotateCcwIcon className="h-4 w-4" />
-                            </ActionButton>
-                          </>
-                        )}
+                          )}
+                          
+                          {message.role === "user" ? (
+                            // User message actions: retry, edit, copy
+                            <>
+                              <ActionButton
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRetryMessage(message.id, message.role === "user")}
+                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                              >
+                                <RotateCcwIcon className="h-4 w-4" />
+                              </ActionButton>
+                              
+                              <ActionButton
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditMessage(message.id)}
+                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                              >
+                                <EditIcon className="h-4 w-4" />
+                              </ActionButton>
+                              
+                              <ActionButton
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopyMessage(message.content)}
+                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                              >
+                                <CopyIcon className="h-4 w-4" />
+                              </ActionButton>
+                            </>
+                          ) : (
+                            // AI message actions: copy, branch off, retry
+                            <>
+                              <ActionButton
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCopyMessage(message.content)}
+                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                              >
+                                <CopyIcon className="h-4 w-4" />
+                              </ActionButton>
+                              
+                              <ActionButton
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleBranchOff(message.id)}
+                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                              >
+                                <GitBranchIcon className="h-4 w-4" />
+                              </ActionButton>
+                              
+                              <ActionButton
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRetryMessage(message.id, message.role === "user")}
+                                className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                              >
+                                <RotateCcwIcon className="h-4 w-4" />
+                              </ActionButton>
+                            </>
+                          )}
+                        </div>
                       </div>
-                  </div>
-                </div>
-              </div>
-            );
-            });
-            })()}
-            
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="w-full flex">
-                  <div className="max-w-full rounded-2xl bg-gray-100 px-5 py-3 shadow-sm">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center space-x-1">
-                        <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500"></div>
-                        <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-100"></div>
-                        <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-200"></div>
-                      </div>
-                      <span className="text-sm text-gray-500 animate-pulse">AI is thinking...</span>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} />
-                </div>
+                ))}
+                
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="w-full flex">
+                      <div className="max-w-full rounded-2xl bg-gray-100 px-5 py-3 shadow-sm">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-1">
+                            <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500"></div>
+                            <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-100"></div>
+                            <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-200"></div>
+                          </div>
+                          <span className="text-sm text-gray-500 animate-pulse">AI is thinking...</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div ref={messagesEndRef} />
               </div>
             </div>
-            <div></div>
           </div>
-        </CustomScrollbar>
-        
-        {/* Chatbox - Using shared component */}
-        <div className="absolute bottom-6 left-0 z-20" style={{ right: `${scrollbarWidth}px` }}>
-          <div className={chatboxGridClasses}>
-            <div></div>
-            <div className="w-full">
-              <div className={chatboxLayoutClasses}>
-                <Chatbox
-                  input={input}
-                  onInputChange={handleInputChange}
-                  onSubmit={handleSubmit}
-                  uploadedFiles={uploadedFiles}
-                  onFilesChange={setUploadedFiles}
-                  selectedModel={selectedModel}
-                  onModelChange={onModelChange}
-                  isLoading={isLoading}
-                  inputRef={inputRef}
-                />
-              </div>
+          <div></div>
+        </div>
+      </CustomScrollbar>
+      
+      {/* Chatbox - Using shared component */}
+      <div className="absolute bottom-6 left-0 z-20" style={{ right: `${scrollbarWidth}px` }}>
+        <div className={chatboxGridClasses}>
+          <div></div>
+          <div className="w-full">
+            <div className={chatboxLayoutClasses}>
+              <Chatbox
+                input={input}
+                onInputChange={handleInputChange}
+                onSubmit={handleSubmit}
+                uploadedFiles={uploadedFiles}
+                onFilesChange={setUploadedFiles}
+                selectedModel={selectedModel}
+                onModelChange={onModelChange}
+                isLoading={isLoading}
+                inputRef={inputRef}
+              />
             </div>
           </div>
         </div>
       </div>
     </div>
-  );
-} 
+  </div>
+);
+}; // <- Make sure this closing brace and semicolon are present
+
+// Memoize the component with custom comparison to prevent unnecessary re-renders
+export const ChatWindow = React.memo(ChatWindowComponent, (prevProps, nextProps) => {
+// During transitions, prevent re-renders by returning true (props are "equal")
+const { isTransitioning } = useChatStore.getState();
+if (isTransitioning) {
+  return true; // Prevent re-render during transitions
+}
+
+// Normal comparison for other cases
+return (
+  prevProps.threadId === nextProps.threadId &&
+  prevProps.selectedModel === nextProps.selectedModel &&
+  prevProps.sidebarCollapsed === nextProps.sidebarCollapsed &&
+  prevProps.sidebarWidth === nextProps.sidebarWidth
+);
+});

@@ -262,4 +262,13 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
   }
+}
+
+/* Prevent any scroll behavior during initial load */
+.scroll-locked {
+  scroll-behavior: auto !important;
+}
+
+.scroll-locked * {
+  scroll-behavior: auto !important;
 } 
