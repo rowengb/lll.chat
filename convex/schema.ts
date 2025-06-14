@@ -30,27 +30,21 @@ export default defineSchema({
     threadId: v.id("threads"),
     userId: v.id("users"),
     attachments: v.optional(v.array(v.id("files"))), // Array of file IDs
-    isGrounded: v.optional(v.boolean()), // Whether response was grounded with Google Search
+    isGrounded: v.optional(v.boolean()), // Indicates if response was grounded with Google Search
     groundingSources: v.optional(v.array(v.object({
-      title: v.string(),
-      url: v.string(),
-      actualUrl: v.optional(v.string()),
+      title: v.string(), // Domain name (e.g., "pbs.org", "democracynow.org")
+      url: v.string(), // Vertexaisearch redirect URL
       snippet: v.optional(v.string()),
-      confidence: v.optional(v.number()),
+      confidence: v.optional(v.number()), // Confidence percentage (0-100)
       // Unfurled metadata from the actual destination
-      unfurledTitle: v.optional(v.string()),
-      unfurledDescription: v.optional(v.string()),
-      unfurledImage: v.optional(v.string()),
-      unfurledFavicon: v.optional(v.string()),
-      unfurledSiteName: v.optional(v.string()),
-      unfurledFinalUrl: v.optional(v.string()),
+      unfurledTitle: v.optional(v.string()), // Actual article title
+      unfurledDescription: v.optional(v.string()), // Article description
+      unfurledImage: v.optional(v.string()), // Article image
+      unfurledFavicon: v.optional(v.string()), // Site favicon
+      unfurledSiteName: v.optional(v.string()), // Site name
+      unfurledFinalUrl: v.optional(v.string()), // Final URL after redirects
       unfurledAt: v.optional(v.number()), // Timestamp when unfurled
-    }))), // Google Search grounding sources
-    groundingSearchQueries: v.optional(v.array(v.string())), // Search queries used
-    groundedSegments: v.optional(v.array(v.object({
-      text: v.string(),
-      confidence: v.number(),
-    }))), // Grounded text segments with confidence
+    }))),
   }).index("by_thread", ["threadId"]).index("by_user", ["userId"]),
 
   files: defineTable({

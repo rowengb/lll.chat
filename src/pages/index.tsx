@@ -9,9 +9,9 @@ import { LoadingDots } from "@/components/LoadingDots";
 import { useChatStore } from "@/stores/chatStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Waves, MessageSquare, Zap, Shield, Key, ArrowLeftIcon, KeyIcon, CheckIcon, TrashIcon, EyeIcon, EyeOffIcon, BotIcon, ChevronDownIcon, LogOutIcon } from "lucide-react";
+import { Waves, MessageSquare, Zap, Shield, Key, ArrowLeftIcon, KeyIcon, CheckIcon, TrashIcon, EyeIcon, EyeOffIcon, LogOutIcon, UserIcon } from "lucide-react";
 import toast from "react-hot-toast";
-import { getProviderIcon } from "@/components/ModelSelector";
+import { ModelSelector, getProviderIcon } from "@/components/ModelSelector";
 
 import Logo from '../components/Logo';
 import { SidebarSkeleton, MainChatSkeleton, ChatboxSkeleton } from '../components/skeletons';
@@ -41,7 +41,7 @@ const Home: NextPage = () => {
   } = useChatStore();
 
   // Settings page state
-  const dropdownRef = useRef<HTMLDivElement>(null);
+
   const [apiKeys, setApiKeys] = useState<ApiKeys>({
     openai: "",
     anthropic: "",
@@ -59,7 +59,8 @@ const Home: NextPage = () => {
   const [saved, setSaved] = useState(false);
   const [defaultModelSaved, setDefaultModelSaved] = useState(false);
   const [selectedDefaultModel, setSelectedDefaultModel] = useState<string>("");
-  const [isDefaultModelDropdownOpen, setIsDefaultModelDropdownOpen] = useState(false);
+
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'api-keys' | 'account'>('account');
 
   // Get user's best default model
   const { data: bestDefaultModel } = trpc.userPreferences.getBestDefaultModel.useQuery(
@@ -134,21 +135,6 @@ const Home: NextPage = () => {
   }, [currentThread, currentThreadId]); // Also depend on currentThreadId to ensure it triggers on thread changes
 
   // Settings page useEffect hooks
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDefaultModelDropdownOpen(false);
-      }
-    };
-
-    if (isDefaultModelDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isDefaultModelDropdownOpen]);
 
   useEffect(() => {
     if (dbApiKeys) {
@@ -234,7 +220,7 @@ const Home: NextPage = () => {
       setSelectedDefaultModel(modelId);
       setDefaultModelSaved(true);
       setTimeout(() => setDefaultModelSaved(false), 2000);
-      setIsDefaultModelDropdownOpen(false);
+
       toast.dismiss();
       toast.success("Default model updated!");
     } catch (error) {
@@ -308,13 +294,15 @@ const Home: NextPage = () => {
   const navigateToSettings = () => {
     setCurrentView('settings');
     setCurrentThreadId(null);
-    router.push('/?view=settings', undefined, { shallow: true });
+    setActiveSettingsTab('api-keys'); // Switch to API keys tab
+    router.push('/?view=settings&tab=api-keys', undefined, { shallow: true });
   };
 
   const navigateToAccount = () => {
-    setCurrentView('account');
+    setCurrentView('settings');
     setCurrentThreadId(null);
-    router.push('/?view=account', undefined, { shallow: true });
+    setActiveSettingsTab('account'); // Switch to account tab
+    router.push('/?view=settings&tab=account', undefined, { shallow: true });
   };
 
   const handleThreadSelect = (threadId: string) => {
@@ -357,7 +345,7 @@ const Home: NextPage = () => {
       case 'chat':
         return `lll.chat - ${currentThreadId}`;
       case 'settings':
-        return 'lll.chat - Settings';
+        return activeSettingsTab === 'account' ? 'lll.chat - Account' : 'lll.chat - Settings';
       case 'account':
         return 'lll.chat - Account';
       default:
@@ -385,7 +373,7 @@ const Home: NextPage = () => {
           <div 
             className="flex-1 flex items-center justify-center"
             style={{ 
-              marginLeft: sidebarCollapsed ? '60px' : `${sidebarWidth}px`,
+              marginLeft: sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
               transition: 'margin-left 0.2s ease-in-out'
             }}
           >
@@ -394,13 +382,7 @@ const Home: NextPage = () => {
         );
       case 'settings':
         return (
-          <div 
-            className="flex-1 overflow-y-auto"
-            style={{ 
-              marginLeft: sidebarCollapsed ? '60px' : `${sidebarWidth}px`,
-              transition: 'margin-left 0.2s ease-in-out'
-            }}
-          >
+          <div className="flex-1 overflow-y-auto">
             <main className="min-h-screen bg-gray-50">
               <div className="max-w-4xl mx-auto px-6 py-8">
                 <div className="space-y-8">
@@ -417,218 +399,228 @@ const Home: NextPage = () => {
                     <div>
                       <h1 className="text-2xl font-semibold text-gray-900">Settings</h1>
                       <p className="text-sm text-gray-500 mt-1">
-                        Manage your API keys and preferences
+                        Manage your API keys, account, and preferences
                       </p>
                     </div>
                   </div>
 
-                  {/* API Keys Section */}
+                  {/* Tab Navigation */}
                   <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-                    <div className="p-6 border-b border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gray-100 rounded-lg">
-                          <KeyIcon className="h-5 w-5 text-gray-900" />
-                        </div>
-                        <div>
-                          <h2 className="text-lg font-medium text-gray-900">API Keys</h2>
-                          <p className="text-sm text-gray-500">
-                            Configure your API keys for different AI providers
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="p-6 space-y-6">
-                      {(Object.keys(apiKeys) as Array<keyof ApiKeys>).map((provider) => (
-                        <div key={provider} className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <label className="text-sm font-medium text-gray-700">
-                              {getProviderInfo(provider).name}
-                            </label>
-                            {apiKeys[provider] && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleClear(provider)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
-                              >
-                                <TrashIcon className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                          
-                          <div className="relative">
-                            <Input
-                              type={showKeys[provider] ? "text" : "password"}
-                              placeholder={getProviderInfo(provider).placeholder}
-                              value={showKeys[provider] ? apiKeys[provider] : maskKey(apiKeys[provider])}
-                              onChange={(e) => handleKeyChange(provider, e.target.value)}
-                              onFocus={() => setShowKeys(prev => ({ ...prev, [provider]: true }))}
-                              onBlur={() => setShowKeys(prev => ({ ...prev, [provider]: false }))}
-                              className="pr-12 bg-gray-50 border-gray-200 focus:bg-white focus:border-gray-900 transition-colors"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => toggleKeyVisibility(provider)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                            >
-                              {showKeys[provider] ? (
-                                <EyeOffIcon className="h-4 w-4" />
-                              ) : (
-                                <EyeIcon className="h-4 w-4" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      
-                      <div className="pt-4 border-t border-gray-100">
-                        <Button 
-                          onClick={handleSave}
-                          className="w-full bg-gray-900 hover:bg-gray-800 text-white rounded-xl py-2 px-4 transition-colors"
+                    <div className="p-6 pb-0">
+                      <nav className="flex space-x-2 bg-gray-100 rounded-xl p-1" aria-label="Tabs">
+                        <button
+                          onClick={() => setActiveSettingsTab('account')}
+                          className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-all ${
+                            activeSettingsTab === 'account'
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          }`}
                         >
-                          {saved ? (
-                            <span className="flex items-center gap-2">
-                              <CheckIcon className="h-4 w-4" />
-                              Saved!
-                            </span>
-                          ) : (
-                            "Save API Keys"
-                          )}
-                        </Button>
-                        
-                        <p className="text-xs text-gray-500 mt-3 text-center">
-                          API keys are encrypted and stored securely in the database.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Default Model Section */}
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-                    <div className="p-6 border-b border-gray-100">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-gray-100 rounded-lg">
-                          <BotIcon className="h-5 w-5 text-gray-900" />
-                        </div>
-                        <div>
-                          <h2 className="text-lg font-medium text-gray-900">Default Model</h2>
-                          <p className="text-sm text-gray-500">
-                            Choose your preferred default model for new conversations
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="p-6">
-                      {availableModels.length > 0 ? (
-                        <div className="space-y-4">
-                          <div className="relative" ref={dropdownRef}>
-                            <button
-                              onClick={() => setIsDefaultModelDropdownOpen(!isDefaultModelDropdownOpen)}
-                              className="w-full flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors"
-                            >
-                              <div className="flex items-center gap-3">
-                                {selectedModelData ? (
-                                  <>
-                                    <div className="flex-shrink-0">
-                                      {getProviderIcon(selectedModelData.provider, selectedModelData.name)}
-                                    </div>
-                                    <div className="text-left">
-                                      <div className="font-medium text-gray-900">
-                                        {selectedModelData.name}
-                                      </div>
-                                      <div className="text-sm text-gray-500">
-                                        {selectedModelData.description}
-                                      </div>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <div className="text-gray-500">Select a default model</div>
-                                )}
-                              </div>
-                              <ChevronDownIcon 
-                                className={`h-5 w-5 text-gray-400 transition-transform ${
-                                  isDefaultModelDropdownOpen ? 'rotate-180' : ''
-                                }`} 
-                              />
-                            </button>
-                            
-                            {isDefaultModelDropdownOpen && (
-                              <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-60 overflow-y-auto">
-                                {availableModels.map((model) => (
-                                  <button
-                                    key={model.id}
-                                    onClick={() => handleSetDefaultModel(model.id)}
-                                    className={`w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50 transition-colors ${
-                                      selectedDefaultModel === model.id ? 'bg-blue-50 border-l-4 border-blue-500' : ''
-                                    }`}
-                                  >
-                                    <div className="flex-shrink-0">
-                                      {getProviderIcon(model.provider, model.name)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="font-medium text-gray-900 truncate">
-                                        {model.name}
-                                      </div>
-                                      <div className="text-sm text-gray-500 truncate">
-                                        {model.description}
-                                      </div>
-                                      {model.costPer1kTokens && (
-                                        <div className="text-xs text-green-600 mt-1">
-                                          ${(model.costPer1kTokens * 1000).toFixed(2)} per 1M tokens
-                                        </div>
-                                      )}
-                                    </div>
-                                    {selectedDefaultModel === model.id && (
-                                      <CheckIcon className="h-4 w-4 text-blue-500" />
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
+                          <div className="flex items-center justify-center gap-2">
+                            <UserIcon className="h-4 w-4" />
+                            Account
                           </div>
-                          
-                          {selectedDefaultModel && (
-                            <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-xl">
-                              <div className="flex items-center gap-2 text-green-700">
-                                <CheckIcon className="h-4 w-4" />
-                                <span className="text-sm font-medium">
-                                  {defaultModelSaved ? "Default model updated!" : "Default model set"}
-                                </span>
-                              </div>
-                              <button
-                                onClick={handleClearDefaultModel}
-                                className="text-green-600 hover:text-green-700 text-sm underline"
-                              >
-                                Clear
-                              </button>
+                        </button>
+                        <button
+                          onClick={() => setActiveSettingsTab('api-keys')}
+                          className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-all ${
+                            activeSettingsTab === 'api-keys'
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-center gap-2">
+                            <KeyIcon className="h-4 w-4" />
+                            API Keys
+                          </div>
+                        </button>
+                      </nav>
+                    </div>
+
+                    {/* Tab Content */}
+                    <div className="p-6">
+                      {activeSettingsTab === 'account' ? (
+                        <div className="space-y-6">
+                          {/* Account Content */}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h2 className="text-lg font-medium text-gray-900">Account Settings</h2>
+                              <p className="text-sm text-gray-500 mt-1">
+                                Manage your account settings and preferences
+                              </p>
                             </div>
-                          )}
-                          
-                          <p className="text-xs text-gray-500">
-                            Only models with API keys are available for selection. When no default is set, the cheapest available model will be used automatically.
-                          </p>
+                            <SignOutButton>
+                              <Button variant="outline" size="sm" className="flex items-center gap-2">
+                                <LogOutIcon className="h-4 w-4" />
+                                Sign Out
+                              </Button>
+                            </SignOutButton>
+                          </div>
+
+                          <div className="w-full">
+                            <div className="pr-16 max-w-5xl overflow-hidden scrollbar-hide">
+                              <UserProfile 
+                                routing="hash"
+                                appearance={{
+                                  elements: {
+                                    rootBox: "w-full shadow-none border-0 bg-transparent",
+                                    card: "shadow-none border-0 bg-transparent p-0",
+                                    cardBox: "shadow-none",
+                                    main: "shadow-none",
+                                    navbar: "hidden",
+                                    navbarButton: "text-gray-700 hover:text-gray-900",
+                                    navbarButtonIcon: "text-gray-500",
+                                    headerTitle: "text-xl font-semibold text-gray-900",
+                                    headerSubtitle: "text-sm text-gray-500",
+                                    socialButtonsBlockButton: "border border-gray-300 hover:bg-gray-50 bg-white text-gray-700",
+                                    formButtonPrimary: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-4 rounded-md transition-colors",
+                                    formFieldInput: "border-gray-300 focus:border-gray-500 focus:ring-gray-500 bg-white",
+                                    identityPreviewEditButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                                    profileSectionPrimaryButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                                    badge: "bg-gray-100 text-gray-800",
+                                    avatarImageActions: "bg-white border border-gray-300 rounded-lg",
+                                    avatarImageActionsUpload: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-md",
+                                    profileSection: "bg-white rounded-lg border border-gray-200 p-6 mb-6 mt-9 mr-20",
+                                    profileSectionContent: "space-y-4",
+                                    button: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                                    buttonPrimary: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                                    modalCloseButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                                    fileDropAreaButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                                    fileDropAreaButtonPrimary: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
+                                  },
+                                  variables: {
+                                    colorPrimary: "#6B7280",
+                                    colorText: "#374151", 
+                                    colorTextSecondary: "#6B7280",
+                                    colorBackground: "transparent",
+                                    colorInputBackground: "#FFFFFF",
+                                    colorInputText: "#374151",
+                                    borderRadius: "0.5rem",
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
                         </div>
                       ) : (
-                        <div className="text-center py-8">
-                          <BotIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                          <h3 className="font-medium text-gray-900 mb-2">No Models Available</h3>
-                          <p className="text-sm text-gray-500 mb-4">
-                            Add API keys above to enable model selection
-                          </p>
+                        <div className="space-y-6">
+                          {/* API Keys Content */}
+                          <div>
+                            <h2 className="text-lg font-medium text-gray-900 mb-2">API Keys</h2>
+                            <p className="text-sm text-gray-500 mb-6">
+                              Configure your API keys for different AI providers
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-6">
+                            {(Object.keys(apiKeys) as Array<keyof ApiKeys>).map((provider) => (
+                              <div key={provider} className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-sm font-medium text-gray-700">
+                                    {getProviderInfo(provider).name}
+                                  </label>
+                                  {apiKeys[provider] && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleClear(provider)}
+                                      className="text-red-600 hover:text-red-700 hover:bg-red-50 p-1"
+                                    >
+                                      <TrashIcon className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                                
+                                <div className="relative">
+                                  <Input
+                                    type={showKeys[provider] ? "text" : "password"}
+                                    placeholder={getProviderInfo(provider).placeholder}
+                                    value={showKeys[provider] ? apiKeys[provider] : maskKey(apiKeys[provider])}
+                                    onChange={(e) => handleKeyChange(provider, e.target.value)}
+                                    onFocus={() => setShowKeys(prev => ({ ...prev, [provider]: true }))}
+                                    onBlur={() => setShowKeys(prev => ({ ...prev, [provider]: false }))}
+                                    className="pr-12 bg-gray-50 border-gray-200 focus:bg-white focus:border-gray-900 transition-colors"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleKeyVisibility(provider)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                  >
+                                    {showKeys[provider] ? (
+                                      <EyeOffIcon className="h-4 w-4" />
+                                    ) : (
+                                      <EyeIcon className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            
+                            <div className="pt-4 border-t border-gray-100">
+                              <Button 
+                                onClick={handleSave}
+                                className="w-full bg-gray-900 hover:bg-gray-800 text-white rounded-xl py-2 px-4 transition-colors"
+                              >
+                                {saved ? (
+                                  <span className="flex items-center gap-2">
+                                    <CheckIcon className="h-4 w-4" />
+                                    Saved!
+                                  </span>
+                                ) : (
+                                  "Save API Keys"
+                                )}
+                              </Button>
+                              
+                              <p className="text-xs text-gray-500 mt-3 text-center">
+                                API keys are encrypted and stored securely in the database.
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Default Model Section */}
+                          <div className="pt-6 border-t border-gray-200">
+                            <div className="mb-4">
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">Default Model</h3>
+                              <p className="text-sm text-gray-500">
+                                Choose your preferred AI model for new conversations
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-4">
+                              <div className="px-4 py-2 border border-gray-200 rounded-xl bg-gray-50">
+                                <ModelSelector
+                                  selectedModel={selectedDefaultModel || selectedModel || ""}
+                                  onModelChange={handleSetDefaultModel}
+                                  size="lg"
+                                />
+                              </div>
+                              
+                              {selectedDefaultModel && (
+                                <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-xl">
+                                  <div className="flex items-center gap-2 text-green-700">
+                                    <CheckIcon className="h-4 w-4" />
+                                    <span className="text-sm font-medium">
+                                      {defaultModelSaved ? "Default model updated!" : "Default model set"}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={handleClearDefaultModel}
+                                    className="text-green-600 hover:text-green-700 text-sm underline"
+                                  >
+                                    Clear
+                                  </button>
+                                </div>
+                              )}
+                              
+                              <p className="text-xs text-gray-500">
+                                Only models with API keys are available for selection. When no default is set, the cheapest available model will be used automatically.
+                              </p>
+                            </div>
+                          </div>
+
+
                         </div>
                       )}
-                    </div>
-                  </div>
-
-                  {/* About Section */}
-                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm">
-                    <div className="p-6">
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">About</h3>
-                      <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                        lll.chat - Built with Next.js, tRPC, Convex, and TypeScript
-                      </p>
                     </div>
                   </div>
                 </div>
@@ -637,89 +629,10 @@ const Home: NextPage = () => {
           </div>
         );
       case 'account':
-        return (
-          <div 
-            className="flex-1 overflow-y-auto"
-            style={{ 
-              marginLeft: sidebarCollapsed ? '60px' : `${sidebarWidth}px`,
-              transition: 'margin-left 0.2s ease-in-out'
-            }}
-          >
-            <div className="min-h-screen bg-gray-50">
-              <main className="flex-1 overflow-y-auto">
-                <div className="max-w-4xl mx-auto px-6 py-8">
-                  <div className="mb-8">
-                    <div className="flex items-center gap-4 mb-6">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={navigateToWelcome}
-                        className="rounded-full hover:bg-gray-100 p-2"
-                      >
-                        <ArrowLeftIcon className="h-4 w-4" />
-                      </Button>
-                      <div className="flex-1">
-                        <h1 className="text-2xl font-semibold text-gray-900">Account Settings</h1>
-                        <p className="mt-1 text-sm text-gray-500">
-                          Manage your account settings and preferences
-                        </p>
-                      </div>
-                      <SignOutButton>
-                        <Button variant="outline" size="sm" className="flex items-center gap-2">
-                          <LogOutIcon className="h-4 w-4" />
-                          Sign Out
-                        </Button>
-                      </SignOutButton>
-                    </div>
-                  </div>
-
-                  <div className="w-full">
-                    <UserProfile 
-                      routing="hash"
-                      appearance={{
-                        elements: {
-                          rootBox: "w-full shadow-none border border-gray-200 rounded-lg bg-white",
-                          card: "shadow-none border-0 bg-transparent p-0",
-                          cardBox: "shadow-none",
-                          main: "shadow-none",
-                          navbar: "hidden",
-                          navbarButton: "text-gray-700 hover:text-gray-900",
-                          navbarButtonIcon: "text-gray-500",
-                          headerTitle: "text-xl font-semibold text-gray-900",
-                          headerSubtitle: "text-sm text-gray-500",
-                          socialButtonsBlockButton: "border border-gray-300 hover:bg-gray-50 bg-white text-gray-700",
-                          formButtonPrimary: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-2 px-4 rounded-md transition-colors",
-                          formFieldInput: "border-gray-300 focus:border-gray-500 focus:ring-gray-500 bg-white",
-                          identityPreviewEditButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
-                          profileSectionPrimaryButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
-                          badge: "bg-gray-100 text-gray-800",
-                          avatarImageActions: "bg-white border border-gray-300 rounded-lg",
-                          avatarImageActionsUpload: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-md",
-                          profileSection: "bg-white rounded-lg border border-gray-200 p-6 mb-6 -ml-2 mr-6 mt-6",
-                          profileSectionContent: "space-y-4",
-                          button: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
-                          buttonPrimary: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
-                          modalCloseButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
-                          fileDropAreaButton: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
-                          fileDropAreaButtonPrimary: "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50",
-                        },
-                        variables: {
-                          colorPrimary: "#6B7280",
-                          colorText: "#374151", 
-                          colorTextSecondary: "#6B7280",
-                          colorBackground: "transparent",
-                          colorInputBackground: "#FFFFFF",
-                          colorInputText: "#374151",
-                          borderRadius: "0.5rem",
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-              </main>
-            </div>
-          </div>
-        );
+        // Redirect to settings with account tab
+        setCurrentView('settings');
+        setActiveSettingsTab('account');
+        return null;
       default: // welcome
         if (user && selectedModel) {
           return (
@@ -734,18 +647,18 @@ const Home: NextPage = () => {
           );
         }
         // Show loading state instead of null to prevent flashing
-    return (
+        return (
           <div 
             className="flex-1 flex items-center justify-center"
             style={{ 
-              marginLeft: sidebarCollapsed ? '60px' : `${sidebarWidth}px`,
+              marginLeft: sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
               transition: 'margin-left 0.2s ease-in-out'
             }}
           >
             <LoadingDots text="Loading" size="lg" className="text-gray-500" />
-      </div>
-    );
-  }
+          </div>
+        );
+    }
   };
 
   // For authenticated users, we'll render the SPA directly instead of redirecting
@@ -1012,13 +925,14 @@ const Home: NextPage = () => {
           <link rel="manifest" href="/site.webmanifest" />
       </Head>
         <main className="h-screen flex">
-        <div className={`${currentView === 'settings' || currentView === 'account' ? 'hidden' : ''}`}>
+        <div className={`${currentView === 'settings' ? 'hidden' : ''}`}>
         <Sidebar 
               currentThreadId={currentThreadId}
           onThreadSelect={handleThreadSelect}
               onNewChat={handleNewChat}
               onNavigateToSettings={navigateToSettings}
               onNavigateToAccount={navigateToAccount}
+              onNavigateToWelcome={navigateToWelcome}
           collapsed={sidebarCollapsed}
               onToggleCollapse={toggleSidebar}
           onWidthChange={setSidebarWidth}
@@ -1045,14 +959,15 @@ const Home: NextPage = () => {
           <link rel="manifest" href="/site.webmanifest" />
         </Head>
         <main className="h-screen flex">
-          {/* Sidebar - Hidden with CSS on settings and account pages to preserve width */}
-          <div className={`${currentView === 'settings' || currentView === 'account' ? 'hidden' : ''}`}>
+          {/* Sidebar - Hidden with CSS on settings page to preserve width */}
+          <div className={`${currentView === 'settings' ? 'hidden' : ''}`}>
             <Sidebar 
               currentThreadId={currentThreadId}
               onThreadSelect={handleThreadSelect}
               onNewChat={handleNewChat}
               onNavigateToSettings={navigateToSettings}
               onNavigateToAccount={navigateToAccount}
+              onNavigateToWelcome={navigateToWelcome}
               collapsed={sidebarCollapsed}
               onToggleCollapse={toggleSidebar}
               onWidthChange={setSidebarWidth}

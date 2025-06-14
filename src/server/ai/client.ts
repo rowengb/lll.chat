@@ -318,11 +318,11 @@ class GeminiClient implements AIClient {
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
           body: JSON.stringify(requestBody),
         });
 
@@ -334,12 +334,12 @@ class GeminiClient implements AIClient {
           continue;
         }
 
-        if (!response.ok) {
-          throw new Error(`Gemini API error: ${response.statusText}`);
-        }
+    if (!response.ok) {
+      throw new Error(`Gemini API error: ${response.statusText}`);
+    }
 
-        const data = await response.json();
-        const content = data.candidates[0]?.content?.parts[0]?.text || "";
+    const data = await response.json();
+    const content = data.candidates[0]?.content?.parts[0]?.text || "";
 
         // Log grounding metadata if available
         if (data.candidates[0]?.groundingMetadata) {
@@ -351,11 +351,11 @@ class GeminiClient implements AIClient {
           }
         }
 
-        if (params.stream) {
+    if (params.stream) {
           return this.createMockStream(content, data.candidates[0]?.groundingMetadata);
-        }
+    }
 
-        return content;
+    return content;
       } catch (error) {
         lastError = error as Error;
         if (attempt === maxRetries - 1) {

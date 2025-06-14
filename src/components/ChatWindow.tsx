@@ -65,13 +65,7 @@ interface GroundingSource {
 }
 
 interface GroundingMetadata {
-  searchQueries?: string[]; // The search queries used
-  groundedSegments?: Array<{
-    text: string;
-    confidence: number;
-  }>; // Grounded text segments with confidence
   sources?: GroundingSource[]; // The sources used for grounding (optional)
-  rawData?: any; // Include raw data for debugging
 }
 
 const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth }: ChatWindowProps) => {
@@ -177,14 +171,13 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         isOptimistic: false,
         // Map grounding data from server response
         isGrounded: msg.isGrounded,
-        groundingMetadata: msg.isGrounded && (msg.groundingSources || msg.groundingSearchQueries || msg.groundedSegments) ? {
+        groundingMetadata: msg.isGrounded && msg.groundingSources ? {
           sources: msg.groundingSources?.map(source => ({
             title: source.title,
             url: source.url,
             snippet: source.snippet,
             confidence: source.confidence,
-            // Map unfurled data from database
-            unfurled: (source.unfurledTitle || source.unfurledDescription || source.unfurledImage || source.unfurledFavicon || source.unfurledSiteName || source.unfurledFinalUrl) ? {
+            unfurled: source.unfurledTitle ? {
               title: source.unfurledTitle,
               description: source.unfurledDescription,
               image: source.unfurledImage,
@@ -192,9 +185,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               siteName: source.unfurledSiteName,
               finalUrl: source.unfurledFinalUrl,
             } : undefined,
-          })) || [],
-          searchQueries: msg.groundingSearchQueries,
-          groundedSegments: msg.groundedSegments,
+          })),
         } : undefined,
         attachments: msg.attachments ? msg.attachments.map(fileId => ({
           id: fileId,
@@ -295,6 +286,52 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Handler for when grounding sources are toggled
+  const handleGroundingSourcesToggle = (isExpanded: boolean, elementRef: HTMLDivElement | null) => {
+    if (!elementRef || !messagesContainer) return;
+
+    setTimeout(() => {
+      const elementRect = elementRef.getBoundingClientRect();
+      const containerRect = messagesContainer.getBoundingClientRect();
+      
+      // Get the chatbox height (more generous estimate) + margin
+      const chatboxHeight = 160; // Increased from 120 to account for larger chatbox
+      const bottomBuffer = 40; // Increased buffer space
+      
+      if (isExpanded) {
+        // When expanding, scroll to ensure the expanded content isn't hidden by the chatbox
+        const elementBottom = elementRect.bottom;
+        const visibleBottom = containerRect.bottom - chatboxHeight - bottomBuffer;
+        
+        if (elementBottom > visibleBottom) {
+          // Calculate how much we need to scroll down (more generous scrolling)
+          const scrollAmount = elementBottom - visibleBottom + 60; // Extra 60px for comfort
+          
+          messagesContainer.scrollTo({
+            top: messagesContainer.scrollTop + scrollAmount,
+            behavior: 'smooth'
+          });
+        }
+      } else {
+        // When collapsing, scroll back down to show more of the message content
+        // Check if the element is too high up in the viewport
+        const elementTop = elementRect.top;
+        const containerTop = containerRect.top;
+        const topBuffer = 100; // Buffer from top of container
+        
+        if (elementTop < containerTop + topBuffer) {
+          // Calculate how much to scroll back up to center the element better
+          const scrollBackAmount = (containerTop + topBuffer) - elementTop + 40; // Extra space for comfort
+          
+          messagesContainer.scrollTo({
+            top: messagesContainer.scrollTop - scrollBackAmount,
+            behavior: 'smooth'
+          });
+        }
+      }
+    }, 100); // Small delay to ensure DOM has updated
+  };
+
   const handleCopyMessage = async (content: string) => {
     try {
       await navigator.clipboard.writeText(content);
@@ -331,7 +368,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         // For assistant messages, remove this message and all after it, then resend the last user message
         const messagesToKeep = currentMessages.slice(0, messageIndex);
         setMessages(threadId, messagesToKeep);
-        
+          
         // Find the last user message to resend
         const lastUserMessage = messagesToKeep.reverse().find(msg => msg.role === "user");
         if (lastUserMessage) {
@@ -401,16 +438,16 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
          
          // Stream the AI response (this will save both user and assistant messages)
          await streamResponse(threadId, editingContent.trim());
-       }
+      }
 
       setEditingMessageId(null);
       setEditingContent("");
-      toast.dismiss();
+              toast.dismiss();
       toast.success("Message edited and conversation updated");
     } catch (error) {
       console.error("Failed to save edit:", error);
-      toast.dismiss();
-      toast.error("Failed to save edit");
+              toast.dismiss();
+        toast.error("Failed to save edit");
     }
   };
 
@@ -431,9 +468,9 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       addMessage(threadId, optimisticUserMessage = {
         id: `temp-user-${Date.now()}`,
         content,
-        role: "user",
-        createdAt: new Date(),
-        isOptimistic: true,
+      role: "user",
+      createdAt: new Date(),
+      isOptimistic: true,
       });
 
       // Stream the response
@@ -548,16 +585,16 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         // Start streaming setup BEFORE URL change to prevent clearing messages
         setLoading(newThread.id, true);
         isStreamingRef.current = true; // Protect from useEffect clearing messages
-        
+
         // Create optimistic user message FIRST
-        const optimisticUserMessage: Message = {
+    const optimisticUserMessage: Message = {
           id: `temp-user-${Date.now()}`,
-          content: messageContent,
-          role: "user",
-          createdAt: new Date(),
-          isOptimistic: true,
+      content: messageContent,
+      role: "user",
+      createdAt: new Date(),
+      isOptimistic: true,
           attachments: messageFiles.length > 0 ? messageFiles : undefined,
-        };
+    };
 
         // Add optimistic user message BEFORE URL change
         addMessage(newThread.id, optimisticUserMessage);
@@ -604,7 +641,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
         }, 0);
 
-        // Start streaming response
+      // Start streaming response
         await streamResponse(threadId, messageContent, messageFiles);
       }
       
@@ -709,79 +746,30 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   isGrounded = true;
                   console.log(`🔍 [STREAM] Grounding metadata received:`, metadata.grounding);
                   
-                  // Store raw grounding data for debugging
-                  const rawGroundingData = metadata.grounding;
-                  
-                  // Extract grounding metadata with comprehensive search query extraction
+                  // Extract grounding metadata if present
                   const extractedSources: GroundingSource[] = [];
-                  const extractedSearchQueries: string[] = [];
-                  const extractedGroundedSegments: Array<{ text: string; confidence: number }> = [];
                   
-                  // Process grounding chunks for sources
-                  if (metadata.grounding.groundingChunks?.length > 0) {
-                    for (const chunk of metadata.grounding.groundingChunks) {
-                      if (chunk.web) {
-                        // Extract the vertexaisearch redirect URL - this is what we want to use as the clickable URL
-                        const redirectUrl = chunk.web.url || chunk.web.link || chunk.web.href;
-                        
-                        // Extract domain name for display (e.g., "pbs.org", "democracynow.org")
-                        const displayTitle = chunk.web.title || chunk.web.uri || 'Untitled';
-                        
+                  if (metadata.grounding) {
+                    console.log(`🔍 [STREAM] Raw grounding data:`, metadata.grounding);
+                    
+                    // Extract sources
+                    if (metadata.grounding.sources) {
+                      for (const source of metadata.grounding.sources) {
                         extractedSources.push({
-                          title: displayTitle,
-                          url: redirectUrl || chunk.web.uri || 'Unknown URL', // This should be the vertexaisearch redirect URL
-                          snippet: chunk.web.snippet,
-                          confidence: chunk.confidence ? Math.round(chunk.confidence * 100) : undefined
+                          title: source.title || 'Unknown Source',
+                          url: source.url || '#',
+                          snippet: source.snippet,
+                          confidence: source.confidence,
                         });
                       }
-                      
-                      // Try to extract search queries from chunks
-                      if (chunk.searchQuery || chunk.query) {
-                        const query = chunk.searchQuery || chunk.query;
-                        if (query && !extractedSearchQueries.includes(query)) {
-                          extractedSearchQueries.push(query);
-                        }
-                      }
                     }
+                    
+                    groundingMetadata = {
+                      sources: extractedSources,
+                    };
+                    
+                    console.log(`🔍 [STREAM] Processed grounding metadata:`, groundingMetadata);
                   }
-                  
-                  // Try to extract search queries from searchEntryPoint (but NOT renderedContent)
-                  if (metadata.grounding.searchEntryPoint) {
-                    if (metadata.grounding.searchEntryPoint.searchQuery) {
-                      const query = metadata.grounding.searchEntryPoint.searchQuery;
-                      if (!extractedSearchQueries.includes(query)) {
-                        extractedSearchQueries.push(query);
-                      }
-                    }
-                  }
-                  
-                  // Try to extract search queries from other possible locations
-                  if (metadata.grounding.queries) {
-                    for (const query of metadata.grounding.queries) {
-                      if (query && !extractedSearchQueries.includes(query)) {
-                        extractedSearchQueries.push(query);
-                      }
-                    }
-                  }
-                  
-                  // Extract grounded segments if available
-                  if (metadata.grounding.groundedSegments) {
-                    for (const segment of metadata.grounding.groundedSegments) {
-                      extractedGroundedSegments.push({
-                        text: segment.text || '',
-                        confidence: segment.confidence ? Math.round(segment.confidence * 100) : 0
-                      });
-                    }
-                  }
-                  
-                  groundingMetadata = {
-                    sources: extractedSources,
-                    searchQueries: extractedSearchQueries,
-                    groundedSegments: extractedGroundedSegments,
-                    rawData: rawGroundingData // Include raw data for debugging
-                  };
-                  
-                  console.log(`🔍 [STREAM] Processed grounding metadata:`, groundingMetadata);
                 }
                 if (metadata.error) {
                   console.error(`[STREAM] API Error: ${metadata.error}`);
@@ -843,8 +831,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   userAttachments: files.map(file => file.id),
                   isGrounded,
                   groundingSources: groundingMetadata?.sources && groundingMetadata.sources.length > 0 ? groundingMetadata.sources : undefined,
-                  groundingSearchQueries: groundingMetadata?.searchQueries,
-                  groundedSegments: groundingMetadata?.groundedSegments,
                 });
 
                 // Update file associations if there are files
@@ -1177,8 +1163,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
     return (
       <div 
-        className="fixed top-0 right-0 bottom-0 flex flex-col bg-white transition-all duration-500 ease-out"
-        style={{ left: sidebarCollapsed ? '0px' : `${sidebarWidth}px` }}
+        className="fixed top-0 right-0 bottom-0 flex flex-col bg-white"
+        style={{ 
+          left: sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
+          transition: 'left 0.3s ease-out'
+        }}
       >
         {/* Welcome Content Area with proper scrolling container for chatbox alignment */}
         <div className="flex-1 overflow-hidden relative">
@@ -1189,75 +1178,75 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 <div className={sharedLayoutClasses}>
                   {/* Welcome elements that hide/show based on input - T3.chat style */}
                   <div className={`text-center transition-all duration-300 ${showWelcomeElements ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
-                    {/* Welcome Header */}
-                    <div className="mb-8">
-                      <h1 className="text-3xl font-light text-gray-900 mb-4">
-                        Welcome to <span className="font-bold">lll</span><span className="font-normal">.chat</span>
-                      </h1>
-                      <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                        Start a conversation with AI. Choose from the examples below or type your own message.
-                      </p>
-                    </div>
+            {/* Welcome Header */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-light text-gray-900 mb-4">
+                Welcome to <span className="font-bold">lll</span><span className="font-normal">.chat</span>
+              </h1>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Start a conversation with AI. Choose from the examples below or type your own message.
+              </p>
+            </div>
 
-                    {/* Example Prompts Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-                      {examplePrompts.map((example, index) => {
-                        const IconComponent = example.icon;
-                        return (
-                          <button
-                            key={index}
-                            onClick={() => handleExampleClick(example.prompt)}
-                            className="group text-left p-4 bg-gradient-to-br from-gray-50/80 to-gray-100/60 backdrop-blur-sm hover:from-gray-100/90 hover:to-gray-150/70 rounded-2xl border border-gray-200/60 hover:border-gray-300/80 shadow-lg shadow-gray-100/50 hover:shadow-xl hover:shadow-gray-200/60 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className="text-gray-600 mt-1 group-hover:text-gray-700 transition-colors">
-                                <IconComponent className="h-5 w-5" />
-                              </div>
-                              <div className="flex-1">
-                                <h3 className="font-medium text-gray-900 mb-2 group-hover:text-black transition-colors">
-                                  {example.title}
-                                </h3>
-                                <p className="text-sm text-gray-600 group-hover:text-gray-700 line-clamp-3 transition-colors">
-                                  {example.prompt}
-                                </p>
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Features highlight */}
-                    <div className="bg-gradient-to-r from-gray-50/90 to-gray-100/80 backdrop-blur-sm rounded-2xl border border-gray-200/70 p-6 max-w-2xl mx-auto shadow-lg shadow-gray-100/50 backdrop-saturate-150">
-                      <div className="grid grid-cols-3 gap-6 text-center">
-                        <div>
-                          <div className="flex justify-center mb-2">
-                            <ZapIcon className="h-6 w-6 text-gray-600" />
-                          </div>
-                          <div className="text-sm font-medium text-gray-900">Lightning Fast</div>
-                          <div className="text-xs text-gray-600">Real-time streaming</div>
-                        </div>
-                        <div>
-                          <div className="flex justify-center mb-2">
-                            <BotIcon className="h-6 w-6 text-gray-600" />
-                          </div>
-                          <div className="text-sm font-medium text-gray-900">Multiple Models</div>
-                          <div className="text-xs text-gray-600">GPT, Claude, Gemini & more</div>
-                        </div>  
-                        <div>
-                          <div className="flex justify-center mb-2">
-                            <ShieldIcon className="h-6 w-6 text-gray-600" />
-                          </div>
-                          <div className="text-sm font-medium text-gray-900">BYOK & Privacy</div>
-                          <div className="text-xs text-gray-600">Your keys, your data</div>
-                        </div>
+            {/* Example Prompts Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+              {examplePrompts.map((example, index) => {
+                const IconComponent = example.icon;
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleExampleClick(example.prompt)}
+                    className="group text-left p-4 bg-gradient-to-br from-gray-50/80 to-gray-100/60 backdrop-blur-sm hover:from-gray-100/90 hover:to-gray-150/70 rounded-2xl border border-gray-200/60 hover:border-gray-300/80 shadow-lg shadow-gray-100/50 hover:shadow-xl hover:shadow-gray-200/60 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="text-gray-600 mt-1 group-hover:text-gray-700 transition-colors">
+                        <IconComponent className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900 mb-2 group-hover:text-black transition-colors">
+                          {example.title}
+                        </h3>
+                        <p className="text-sm text-gray-600 group-hover:text-gray-700 line-clamp-3 transition-colors">
+                          {example.prompt}
+                        </p>
                       </div>
                     </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Features highlight */}
+            <div className="bg-gradient-to-r from-gray-50/90 to-gray-100/80 backdrop-blur-sm rounded-2xl border border-gray-200/70 p-6 max-w-2xl mx-auto shadow-lg shadow-gray-100/50 backdrop-saturate-150">
+              <div className="grid grid-cols-3 gap-6 text-center">
+                <div>
+                  <div className="flex justify-center mb-2">
+                    <ZapIcon className="h-6 w-6 text-gray-600" />
                   </div>
+                  <div className="text-sm font-medium text-gray-900">Lightning Fast</div>
+                  <div className="text-xs text-gray-600">Real-time streaming</div>
+                </div>
+                <div>
+                  <div className="flex justify-center mb-2">
+                    <BotIcon className="h-6 w-6 text-gray-600" />
+                  </div>
+                  <div className="text-sm font-medium text-gray-900">Multiple Models</div>
+                  <div className="text-xs text-gray-600">GPT, Claude, Gemini & more</div>
+                </div>  
+                <div>
+                  <div className="flex justify-center mb-2">
+                    <ShieldIcon className="h-6 w-6 text-gray-600" />
+                  </div>
+                  <div className="text-sm font-medium text-gray-900">BYOK & Privacy</div>
+                  <div className="text-xs text-gray-600">Your keys, your data</div>
                 </div>
               </div>
-              <div></div>
             </div>
+          </div>
+        </div>
+                    </div>
+              <div></div>
+                  </div>
           </div>
           
           {/* Chatbox - Using shared component */}
@@ -1272,14 +1261,14 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                     onSubmit={handleSubmit}
                     uploadedFiles={uploadedFiles}
                     onFilesChange={setUploadedFiles}
-                    selectedModel={selectedModel}
-                    onModelChange={onModelChange}
+                      selectedModel={selectedModel}
+                      onModelChange={onModelChange}
                     isLoading={isLoading}
                     inputRef={inputRef}
                     searchGroundingEnabled={searchGroundingEnabled}
                     onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
-                  />
-                </div>
+                    />
+                    </div>
               </div>
             </div>
           </div>
@@ -1290,8 +1279,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
   return (
     <div 
-      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white transition-all duration-500 ease-out"
-      style={{ left: sidebarCollapsed ? '0px' : `${sidebarWidth}px` }}
+      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white"
+      style={{ 
+        left: sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
+        transition: 'left 0.3s ease-out'
+      }}
     >
       {/* Messages + Chatbox Area */}
       <div className="flex-1 overflow-hidden relative">
@@ -1304,16 +1296,16 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             <div className="w-full">
               <div className={sharedLayoutClasses} id="messages-container">
                 <div className="space-y-0">
-                  {localMessages?.filter(message => 
-                    // Filter out empty optimistic assistant messages
-                    !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
-                  ).map((message: Message) => (
+            {localMessages?.filter(message => 
+              // Filter out empty optimistic assistant messages
+              !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
+            ).map((message: Message) => (
                     <div key={message.id} className="flex justify-start">
-                      <div className="w-full">
+                      <div className="w-full max-w-full min-w-0">
                         <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
-                          <div
-                            className={`rounded-2xl px-4 ${
-                              message.role === "user" 
+                    <div
+                            className={`rounded-2xl px-4 max-w-full overflow-hidden min-w-0 ${
+                        message.role === "user"
                                 ? "py-2" 
                                 : "pt-1 pb-1"
                             } ${
@@ -1322,39 +1314,39 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                 : message.isError
                                 ? "bg-red-50 text-red-900 border border-red-300 shadow-sm"
                                 : "text-gray-900"
-                            }`}
-                          >
-                            {editingMessageId === message.id ? (
-                              <div className="space-y-2">
-                                <textarea
-                                  value={editingContent}
-                                  onChange={(e) => setEditingContent(e.target.value)}
-                                  className="w-full p-2 border border-gray-300 rounded-lg text-sm resize-none bg-white"
-                                  rows={Math.max(2, editingContent.split('\n').length)}
-                                  autoFocus
-                                />
-                                <div className="flex gap-2">
-                                  <Button
-                                    onClick={() => handleSaveEdit(message.id)}
-                                    size="sm"
-                                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                                  >
-                                    Save
-                                  </Button>
-                                  <Button
-                                    onClick={handleCancelEdit}
-                                    size="sm"
-                                    variant="outline"
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : message.role === "user" ? (
+                      }`}
+                    >
+                      {editingMessageId === message.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingContent}
+                            onChange={(e) => setEditingContent(e.target.value)}
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm resize-none bg-white"
+                            rows={Math.max(2, editingContent.split('\n').length)}
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => handleSaveEdit(message.id)}
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              onClick={handleCancelEdit}
+                              size="sm"
+                              variant="outline"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : message.role === "user" ? (
                               <div>
-                                <p className="whitespace-pre-wrap text-sm leading-loose">
-                                  {message.content}
-                                </p>
+                        <p className="whitespace-pre-wrap text-sm leading-loose">
+                          {message.content}
+                        </p>
                                 {/* Display file attachments for user messages */}
                                 {message.attachments && message.attachments.length > 0 && (
                                   <div className="mt-2 inline-block">
@@ -1368,36 +1360,36 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                   </div>
                                 )}
                               </div>
-                            ) : (
-                              <div className="prose prose-sm max-w-none text-gray-900 text-sm leading-loose">
-                                <ReactMarkdown 
-                                  remarkPlugins={[remarkGfm]}
-                                  rehypePlugins={[rehypeHighlight]}
-                                  components={{
-                                    // Customize link styling
-                                    a: ({ node, ...props }) => (
-                                      <a 
-                                        {...props} 
-                                        className="text-blue-600 hover:text-blue-800 underline"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      />
-                                    ),
-                                    // Customize code block styling
-                                    code: ({ node, className, children, ...props }) => {
-                                      const match = /language-(\w+)/.exec(className || '');
-                                      const isInline = !match;
-                                      
-                                      return isInline ? (
-                                        <code 
+                      ) : (
+                              <div className="prose prose-sm w-full min-w-0 overflow-hidden text-gray-900 text-sm leading-loose">
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight]}
+                            components={{
+                              // Customize link styling
+                              a: ({ node, ...props }) => (
+                                <a 
+                                  {...props} 
+                                  className="text-blue-600 hover:text-blue-800 underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                />
+                              ),
+                              // Customize code block styling
+                              code: ({ node, className, children, ...props }) => {
+                                const match = /language-(\w+)/.exec(className || '');
+                                const isInline = !match;
+                                
+                                return isInline ? (
+                                  <code 
                                           className="text-gray-100 px-2 py-1 rounded text-xs font-mono" 
                                           style={{ backgroundColor: '#0C1117' }}
-                                          {...props}
-                                        >
-                                          {children}
-                                        </code>
+                                    {...props}
+                                  >
+                                    {children}
+                                  </code>
                                       ) : null; // Block code will be handled by pre
-                                    },
+                              },
                                     // Style pre blocks with copy functionality
                                     pre: ({ node, children, ...props }) => {
                                       // Extract language from the code element
@@ -1415,80 +1407,78 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                         </CodeBlock>
                                       );
                                     },
-                                    // Style lists
-                                    ul: ({ node, ...props }) => (
-                                      <ul 
-                                        className="list-disc list-outside space-y-1 my-2 ml-4 pl-2"
-                                        {...props}
-                                      />
-                                    ),
-                                    ol: ({ node, ...props }) => (
-                                      <ol 
-                                        className="list-decimal list-outside space-y-1 my-2 ml-4 pl-2"
-                                        {...props}
-                                      />
-                                    ),
-                                    li: ({ node, ...props }) => (
-                                      <li 
-                                        className="text-sm leading-loose"
-                                        {...props}
-                                      />
-                                    ),
-                                  }}
-                                >
-                                  {message.content}
-                                </ReactMarkdown>
+                              // Style lists
+                              ul: ({ node, ...props }) => (
+                                <ul 
+                                  className="list-disc list-outside space-y-1 my-2 ml-4 pl-2"
+                                  {...props}
+                                />
+                              ),
+                              ol: ({ node, ...props }) => (
+                                <ol 
+                                  className="list-decimal list-outside space-y-1 my-2 ml-4 pl-2"
+                                  {...props}
+                                />
+                              ),
+                              li: ({ node, ...props }) => (
+                                <li 
+                                  className="text-sm leading-loose"
+                                  {...props}
+                                />
+                              ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
                                 
                                 {/* Show grounding sources for assistant messages */}
                                 {message.role === "assistant" && message.groundingMetadata && (
                                   <GroundingSources
                                     sources={message.groundingMetadata.sources}
-                                    searchQueries={message.groundingMetadata.searchQueries}
-                                    groundedSegments={message.groundingMetadata.groundedSegments}
-                                    rawData={message.groundingMetadata.rawData}
                                     messageId={message.id}
+                                    onToggle={handleGroundingSourcesToggle}
                                   />
                                 )}
-                              </div>
-                            )}
-                          </div>
+                        </div>
+                      )}
+                    </div>
 
                           {/* Message Actions - Always render to prevent layout shift, but hide for error messages */}
                           <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
-                            {message.role === "assistant" && (
+                        {message.role === "assistant" && (
                               <div className="flex items-center gap-1 mr-1">
                                 <div className="flex items-center gap-1 text-sm text-gray-500 px-5">
-                                  {getProviderFromModel(message.model)}
-                                  <span>•</span>
-                                  <span>{message.model}</span>
-                                </div>
-                              </div>
-                            )}
-                            
+                              {getProviderFromModel(message.model)}
+                              <span>•</span>
+                              <span>{message.model}</span>
+                            </div>
+                          </div>
+                        )}
+                        
                             {message.role === "user" ? (
                               // User message actions: retry, edit, copy
                               <>
                                 <ActionButton
-                                  variant="ghost"
-                                  size="sm"
+                          variant="ghost"
+                          size="sm"
                                   onClick={() => handleRetryMessage(message.id, message.role === "user")}
                                   className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                                >
+                        >
                                   <RotateCcwIcon className="h-4 w-4" />
                                 </ActionButton>
-                                
+                        
                                 <ActionButton
-                                  variant="ghost"
-                                  size="sm"
+                          variant="ghost"
+                          size="sm"
                                   onClick={() => handleEditMessage(message.id)}
                                   className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                                >
+                        >
                                   <EditIcon className="h-4 w-4" />
                                 </ActionButton>
-                                
+                        
                                 <ActionButton
-                                  variant="ghost"
-                                  size="sm"
+                          variant="ghost"
+                          size="sm"
                                   onClick={() => handleCopyMessage(message.content)}
                                   className="h-8 px-2 text-gray-400 hover:text-gray-600"
                                 >
@@ -1503,13 +1493,13 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                   size="sm"
                                   onClick={() => handleCopyMessage(message.content)}
                                   className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                                >
+                        >
                                   <CopyIcon className="h-4 w-4" />
                                 </ActionButton>
-                                
+                        
                                 <ActionButton
-                                  variant="ghost"
-                                  size="sm"
+                          variant="ghost"
+                          size="sm"
                                   onClick={() => handleBranchOff(message.id)}
                                   className="h-8 px-2 text-gray-400 hover:text-gray-600"
                                 >
@@ -1521,21 +1511,21 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                   size="sm"
                                   onClick={() => handleRetryMessage(message.id, message.role === "user")}
                                   className="h-8 px-2 text-gray-400 hover:text-gray-600"
-                                >
+                        >
                                   <RotateCcwIcon className="h-4 w-4" />
                                 </ActionButton>
                               </>
-                            )}
+                    )}
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {isLoading && (
-                    <div className="flex justify-start">
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {isLoading && (
+              <div className="flex justify-start">
                       <div className="w-full flex">
-                        <div className="max-w-full rounded-2xl bg-gray-100 px-5 py-3 shadow-sm">
+                  <div className="max-w-full rounded-2xl bg-gray-100 px-5 py-3 shadow-sm">
                           <div className="flex items-center space-x-3">
                             <div className="flex items-center space-x-1">
                               <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500"></div>
@@ -1543,18 +1533,18 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                               <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-200"></div>
                             </div>
                             <span className="text-sm text-gray-500 animate-pulse">AI is thinking...</span>
-                          </div>
-                        </div>
-                      </div>
                     </div>
-                  )}
-                  
-                  <div ref={messagesEndRef} />
+                  </div>
                 </div>
               </div>
-            </div>
-            <div></div>
+            )}
+            
+            <div ref={messagesEndRef} />
           </div>
+        </div>
+      </div>
+            <div></div>
+                  </div>
         </CustomScrollbar>
         
         {/* Chatbox - Using shared component */}
@@ -1569,14 +1559,14 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   onSubmit={handleSubmit}
                   uploadedFiles={uploadedFiles}
                   onFilesChange={setUploadedFiles}
-                  selectedModel={selectedModel}
-                  onModelChange={onModelChange}
+                    selectedModel={selectedModel}
+                    onModelChange={onModelChange}
                   isLoading={isLoading}
                   inputRef={inputRef}
                   searchGroundingEnabled={searchGroundingEnabled}
                   onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
-                />
-              </div>
+                  />
+                  </div>
             </div>
           </div>
         </div>

@@ -153,14 +153,8 @@ export const chatConvexRouter = createTRPCRouter({
       groundingSources: z.array(z.object({
         title: z.string(),
         url: z.string(),
-        actualUrl: z.string().optional(),
         snippet: z.string().optional(),
         confidence: z.number().optional(),
-      })).optional(),
-      groundingSearchQueries: z.array(z.string()).optional(),
-      groundedSegments: z.array(z.object({
-        text: z.string(),
-        confidence: z.number(),
       })).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -188,13 +182,11 @@ export const chatConvexRouter = createTRPCRouter({
             userId: convexUser._id,
             isGrounded: input.isGrounded,
             groundingSources: input.groundingSources,
-            groundingSearchQueries: input.groundingSearchQueries,
-            groundedSegments: input.groundedSegments,
           },
         ],
       });
 
-      return {
+      return { 
         userMessage: {
           id: messages[0],
           content: input.userContent,
@@ -219,14 +211,8 @@ export const chatConvexRouter = createTRPCRouter({
       groundingSources: z.array(z.object({
         title: z.string(),
         url: z.string(),
-        actualUrl: z.string().optional(),
         snippet: z.string().optional(),
         confidence: z.number().optional(),
-      })).optional(),
-      groundingSearchQueries: z.array(z.string()).optional(),
-      groundedSegments: z.array(z.object({
-        text: z.string(),
-        confidence: z.number(),
       })).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -236,15 +222,14 @@ export const chatConvexRouter = createTRPCRouter({
         throw new Error("Failed to get or create user");
       }
 
-      const messageId = await convex.mutation(api.messages.createAssistantMessage, {
+      const messageId = await convex.mutation(api.messages.createMessage, {
         content: input.content,
+        role: "assistant",
         model: input.model,
         threadId: input.threadId as Id<"threads">,
         userId: convexUser._id,
         isGrounded: input.isGrounded,
         groundingSources: input.groundingSources,
-        groundingSearchQueries: input.groundingSearchQueries,
-        groundedSegments: input.groundedSegments,
       });
 
       return { 
@@ -321,7 +306,7 @@ export const chatConvexRouter = createTRPCRouter({
       }
 
       // Save the user message
-      const messageId = await convex.mutation(api.messages.create, {
+      const messageId = await convex.mutation(api.messages.createMessage, {
         content: input.content,
         role: "user",
         threadId: input.threadId as Id<"threads">,
@@ -474,6 +459,19 @@ export const chatConvexRouter = createTRPCRouter({
         userId: convexUser._id,
         unfurledData: input.unfurledData,
       });
+
+      return result;
+    }),
+
+  cleanupOldGroundingFields: protectedProcedure
+    .mutation(async ({ ctx }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      const result = await convex.mutation(api.messages.cleanupOldGroundingFields, {});
 
       return result;
     }),

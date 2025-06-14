@@ -1,41 +1,35 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-export const create = mutation({
+export const createMessage = mutation({
   args: {
+    threadId: v.id("threads"),
     content: v.string(),
     role: v.string(),
     model: v.optional(v.string()),
-    threadId: v.id("threads"),
     userId: v.id("users"),
-    attachments: v.optional(v.array(v.id("files"))),
     isGrounded: v.optional(v.boolean()),
     groundingSources: v.optional(v.array(v.object({
       title: v.string(),
       url: v.string(),
-      actualUrl: v.optional(v.string()),
       snippet: v.optional(v.string()),
       confidence: v.optional(v.number()),
     }))),
-    groundingSearchQueries: v.optional(v.array(v.string())),
-    groundedSegments: v.optional(v.array(v.object({
-      text: v.string(),
-      confidence: v.number(),
-    }))),
+    attachments: v.optional(v.array(v.id("files"))),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("messages", {
+    const messageId = await ctx.db.insert("messages", {
+      threadId: args.threadId,
       content: args.content,
       role: args.role,
       model: args.model,
-      threadId: args.threadId,
       userId: args.userId,
-      attachments: args.attachments,
       isGrounded: args.isGrounded,
       groundingSources: args.groundingSources,
-      groundingSearchQueries: args.groundingSearchQueries,
-      groundedSegments: args.groundedSegments,
+      attachments: args.attachments,
     });
+    
+    return messageId;
   },
 });
 
@@ -63,14 +57,8 @@ export const createMany = mutation({
       groundingSources: v.optional(v.array(v.object({
         title: v.string(),
         url: v.string(),
-        actualUrl: v.optional(v.string()),
         snippet: v.optional(v.string()),
         confidence: v.optional(v.number()),
-      }))),
-      groundingSearchQueries: v.optional(v.array(v.string())),
-      groundedSegments: v.optional(v.array(v.object({
-        text: v.string(),
-        confidence: v.number(),
       }))),
     })),
   },
@@ -95,14 +83,8 @@ export const createAssistantMessage = mutation({
     groundingSources: v.optional(v.array(v.object({
       title: v.string(),
       url: v.string(),
-      actualUrl: v.optional(v.string()),
       snippet: v.optional(v.string()),
       confidence: v.optional(v.number()),
-    }))),
-    groundingSearchQueries: v.optional(v.array(v.string())),
-    groundedSegments: v.optional(v.array(v.object({
-      text: v.string(),
-      confidence: v.number(),
     }))),
   },
   handler: async (ctx, args) => {
@@ -115,8 +97,6 @@ export const createAssistantMessage = mutation({
       attachments: args.attachments,
       isGrounded: args.isGrounded,
       groundingSources: args.groundingSources,
-      groundingSearchQueries: args.groundingSearchQueries,
-      groundedSegments: args.groundedSegments,
     });
   },
 });
@@ -238,5 +218,243 @@ export const updateGroundingSourceUnfurl = mutation({
     }
     
     return { success: false, error: "Source not found" };
+  },
+});
+
+// Migration function to clean up old grounding fields from existing messages
+export const cleanupOldGroundingFields = mutation({
+  args: {},
+  handler: async (ctx) => {
+    console.log("🧹 Starting cleanup of old grounding fields...");
+    
+    // Get all messages that have the old fields
+    const allMessages = await ctx.db.query("messages").collect();
+    
+    let updatedCount = 0;
+    
+    for (const message of allMessages) {
+      // Check if the message has the old fields (using any type to access them)
+      const messageAny = message as any;
+      
+      if (messageAny.groundingSearchQueries || messageAny.groundedSegments) {
+        console.log(`🧹 Cleaning message ${message._id}...`);
+        
+        // Create a clean version without the old fields
+        const cleanMessage: any = { ...message };
+        delete cleanMessage.groundingSearchQueries;
+        delete cleanMessage.groundedSegments;
+        
+        // Remove the fields we don't want to update
+        delete cleanMessage._id;
+        delete cleanMessage._creationTime;
+        
+        // Update the message
+        await ctx.db.patch(message._id, cleanMessage);
+        updatedCount++;
+      }
+    }
+    
+    console.log(`🧹 Cleanup complete! Updated ${updatedCount} messages.`);
+    return { 
+      success: true, 
+      totalMessages: allMessages.length,
+      updatedMessages: updatedCount 
+    };
+  },
+});
+
+// Migration function to clean up actualUrl fields from grounding sources
+export const cleanupActualUrlFields = mutation({
+  args: {},
+  handler: async (ctx) => {
+    console.log("🧹 Starting cleanup of actualUrl fields from grounding sources...");
+    
+    // Get all messages that have grounding sources
+    const allMessages = await ctx.db.query("messages").collect();
+    
+    let updatedCount = 0;
+    
+    for (const message of allMessages) {
+      if (message.groundingSources && message.groundingSources.length > 0) {
+        // Check if any source has actualUrl field
+        const hasActualUrl = message.groundingSources.some((source: any) => source.actualUrl);
+        
+        if (hasActualUrl) {
+          console.log(`🧹 Cleaning grounding sources in message ${message._id}...`);
+          
+          // Clean up the grounding sources
+          const cleanedSources = message.groundingSources.map((source: any) => {
+            const cleanSource = { ...source };
+            delete cleanSource.actualUrl;
+            return cleanSource;
+          });
+          
+          // Update the message
+          await ctx.db.patch(message._id, {
+            groundingSources: cleanedSources
+          });
+          updatedCount++;
+        }
+      }
+    }
+    
+    console.log(`🧹 Cleanup complete! Updated ${updatedCount} messages.`);
+    return { 
+      success: true, 
+      totalMessages: allMessages.length,
+      updatedMessages: updatedCount 
+    };
+  },
+});
+
+// Comprehensive cleanup function to forcefully remove ALL deprecated fields
+export const forceCleanupAllDeprecatedFields = mutation({
+  args: {},
+  handler: async (ctx) => {
+    console.log("🧹 Starting FORCE cleanup of ALL deprecated fields...");
+    
+    // Get all messages
+    const allMessages = await ctx.db.query("messages").collect();
+    
+    let updatedCount = 0;
+    
+    for (const message of allMessages) {
+      const messageAny = message as any;
+      let needsUpdate = false;
+      
+      // Check for any deprecated fields
+      if (messageAny.groundingSearchQueries !== undefined || 
+          messageAny.groundedSegments !== undefined ||
+          (messageAny.groundingSources && messageAny.groundingSources.some((s: any) => s.actualUrl !== undefined))) {
+        
+        console.log(`🧹 FORCE cleaning message ${message._id}...`);
+        needsUpdate = true;
+        
+        // Build a completely clean message object with only valid fields
+        const cleanMessage: any = {
+          content: message.content,
+          role: message.role,
+          threadId: message.threadId,
+          userId: message.userId,
+        };
+        
+        // Add optional fields if they exist and are valid
+        if (message.model) cleanMessage.model = message.model;
+        if (message.attachments) cleanMessage.attachments = message.attachments;
+        if (message.isGrounded !== undefined) cleanMessage.isGrounded = message.isGrounded;
+        
+        // Clean grounding sources if they exist
+        if (message.groundingSources && message.groundingSources.length > 0) {
+          cleanMessage.groundingSources = message.groundingSources.map((source: any) => {
+            const cleanSource: any = {
+              title: source.title,
+              url: source.url,
+            };
+            
+            // Add optional fields if they exist
+            if (source.snippet !== undefined) cleanSource.snippet = source.snippet;
+            if (source.confidence !== undefined) cleanSource.confidence = source.confidence;
+            if (source.unfurledTitle !== undefined) cleanSource.unfurledTitle = source.unfurledTitle;
+            if (source.unfurledDescription !== undefined) cleanSource.unfurledDescription = source.unfurledDescription;
+            if (source.unfurledImage !== undefined) cleanSource.unfurledImage = source.unfurledImage;
+            if (source.unfurledFavicon !== undefined) cleanSource.unfurledFavicon = source.unfurledFavicon;
+            if (source.unfurledSiteName !== undefined) cleanSource.unfurledSiteName = source.unfurledSiteName;
+            if (source.unfurledFinalUrl !== undefined) cleanSource.unfurledFinalUrl = source.unfurledFinalUrl;
+            if (source.unfurledAt !== undefined) cleanSource.unfurledAt = source.unfurledAt;
+            
+            return cleanSource;
+          });
+        }
+        
+        // Replace the entire message with the clean version
+        await ctx.db.replace(message._id, cleanMessage);
+        updatedCount++;
+      }
+    }
+    
+    console.log(`🧹 FORCE cleanup complete! Updated ${updatedCount} messages.`);
+    return { 
+      success: true, 
+      totalMessages: allMessages.length,
+      updatedMessages: updatedCount 
+    };
+  },
+});
+
+// NUCLEAR cleanup function - DELETE and recreate problematic messages
+export const nuclearCleanupDeprecatedFields = mutation({
+  args: {},
+  handler: async (ctx) => {
+    console.log("💥 Starting NUCLEAR cleanup - DELETE and recreate problematic messages...");
+    
+    // Get all messages
+    const allMessages = await ctx.db.query("messages").collect();
+    
+    let deletedCount = 0;
+    let recreatedCount = 0;
+    
+    for (const message of allMessages) {
+      const messageAny = message as any;
+      
+      // Check for any deprecated fields
+      if (messageAny.groundingSearchQueries !== undefined || 
+          messageAny.groundedSegments !== undefined ||
+          (messageAny.groundingSources && messageAny.groundingSources.some((s: any) => s.actualUrl !== undefined))) {
+        
+        console.log(`💥 DELETING and recreating message ${message._id}...`);
+        
+        // Build a completely clean message object with only valid fields
+        const cleanMessage: any = {
+          content: message.content,
+          role: message.role,
+          threadId: message.threadId,
+          userId: message.userId,
+        };
+        
+        // Add optional fields if they exist and are valid
+        if (message.model) cleanMessage.model = message.model;
+        if (message.attachments) cleanMessage.attachments = message.attachments;
+        if (message.isGrounded !== undefined) cleanMessage.isGrounded = message.isGrounded;
+        
+        // Clean grounding sources if they exist
+        if (message.groundingSources && message.groundingSources.length > 0) {
+          cleanMessage.groundingSources = message.groundingSources.map((source: any) => {
+            const cleanSource: any = {
+              title: source.title,
+              url: source.url,
+            };
+            
+            // Add optional fields if they exist
+            if (source.snippet !== undefined) cleanSource.snippet = source.snippet;
+            if (source.confidence !== undefined) cleanSource.confidence = source.confidence;
+            if (source.unfurledTitle !== undefined) cleanSource.unfurledTitle = source.unfurledTitle;
+            if (source.unfurledDescription !== undefined) cleanSource.unfurledDescription = source.unfurledDescription;
+            if (source.unfurledImage !== undefined) cleanSource.unfurledImage = source.unfurledImage;
+            if (source.unfurledFavicon !== undefined) cleanSource.unfurledFavicon = source.unfurledFavicon;
+            if (source.unfurledSiteName !== undefined) cleanSource.unfurledSiteName = source.unfurledSiteName;
+            if (source.unfurledFinalUrl !== undefined) cleanSource.unfurledFinalUrl = source.unfurledFinalUrl;
+            if (source.unfurledAt !== undefined) cleanSource.unfurledAt = source.unfurledAt;
+            
+            return cleanSource;
+          });
+        }
+        
+        // DELETE the old message completely
+        await ctx.db.delete(message._id);
+        deletedCount++;
+        
+        // INSERT a new clean message
+        await ctx.db.insert("messages", cleanMessage);
+        recreatedCount++;
+      }
+    }
+    
+    console.log(`💥 NUCLEAR cleanup complete! Deleted ${deletedCount} messages, recreated ${recreatedCount} messages.`);
+    return { 
+      success: true, 
+      totalMessages: allMessages.length,
+      deletedMessages: deletedCount,
+      recreatedMessages: recreatedCount
+    };
   },
 }); 

@@ -437,7 +437,23 @@ export function Chatbox({
   ];
 
   return (
-    <div className={`bg-white/70 backdrop-blur-lg rounded-2xl border border-gray-200 shadow-2xl px-5 py-4 chatbox-stable ${className}`}>
+    <div 
+      className={`relative chatbox-stable shadow-xl ${className}`}
+      style={{
+        transform: 'translateY(-4px)',
+        borderRadius: '20px'
+      }}
+    >
+      {/* Glassmorphic background with subtle white overlay */}
+      <div 
+        className="absolute inset-0 bg-white/20 backdrop-blur-xl border border-gray-300"
+        style={{
+          borderRadius: '20px',
+          clipPath: 'inset(0 round 20px)'
+        }}
+      />
+      {/* Content */}
+      <div className="relative z-10 px-5 py-4">
       <form onSubmit={onSubmit}>
         {/* Unified Files Display - All in rows */}
         {allFiles.length > 0 && (
@@ -567,6 +583,7 @@ export function Chatbox({
         />,
         document.body
       )}
+      </div>
     </div>
   );
 } 

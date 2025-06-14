@@ -26,7 +26,7 @@ const MyApp: AppType = ({
       signInFallbackRedirectUrl="/"
       signUpFallbackRedirectUrl="/"
     >
-      <div className="h-full min-h-screen bg-gray-50">
+      <div className="h-full min-h-screen bg-white">
         <ConvexClientProvider>
           <Component {...pageProps} />
           <Toaster

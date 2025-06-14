@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { PlusIcon, MessageSquareIcon, SettingsIcon, ChevronLeftIcon, MenuIcon, SearchIcon, TrashIcon, PinIcon, MoreVerticalIcon, EditIcon, Waves, UserIcon, LogOutIcon, GitBranchIcon, XIcon, PinOffIcon } from "lucide-react";
+import { PlusIcon, MessageSquareIcon, SettingsIcon, ChevronLeftIcon, MenuIcon, SearchIcon, TrashIcon, PinIcon, MoreVerticalIcon, EditIcon, Waves, UserIcon, LogOutIcon, GitBranchIcon, XIcon, PinOffIcon, PanelLeftIcon } from "lucide-react";
 import { useRouter } from "next/router";
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ interface SidebarProps {
   onNewChat?: () => void;
   onNavigateToSettings?: () => void;
   onNavigateToAccount?: () => void;
+  onNavigateToWelcome?: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   onWidthChange?: (width: number) => void;
@@ -43,7 +44,7 @@ interface ContextMenu {
   y: number;
 }
 
-export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, collapsed, onToggleCollapse, onWidthChange }: SidebarProps) {
+export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, collapsed, onToggleCollapse, onWidthChange }: SidebarProps) {
   const router = useRouter();
   const { user } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
@@ -51,7 +52,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [editingThread, setEditingThread] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [showFloatingButtons, setShowFloatingButtons] = useState(false);
+  const [showFloatingButtons, setShowFloatingButtons] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(288); // Default 18rem = 288px
   const [isResizing, setIsResizing] = useState(false);
   
@@ -169,19 +171,17 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     // Remove onSettled to avoid unnecessary refetch since we have optimistic updates
   });
 
-  // Handle floating buttons delay
+  // Handle floating buttons transition animation
   useEffect(() => {
-    if (collapsed) {
-      // When collapsing, show floating buttons after a short delay
-      const timer = setTimeout(() => {
-        setShowFloatingButtons(true);
-      }, 200); // Reduced delay for quicker appearance
-      
-      return () => clearTimeout(timer);
-    } else {
-      // When expanding, hide floating buttons immediately
-      setShowFloatingButtons(false);
-    }
+    // Start transition (fade out)
+    setIsTransitioning(true);
+    
+    // After a short delay, fade back in
+    const timer = setTimeout(() => {
+      setIsTransitioning(false);
+    }, 200); // Quicker fade out and back in
+    
+    return () => clearTimeout(timer);
   }, [collapsed]);
 
   // Close context menu when clicking outside
@@ -386,8 +386,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     
     return (
       <div
-        className={`group relative flex w-full items-center gap-3 rounded-lg p-2 text-left text-sm hover:bg-gray-200 cursor-pointer ${
-          currentThreadId === thread.id ? "bg-gray-200 text-gray-900" : "text-gray-700"
+        className={`group relative flex w-full items-center gap-3 rounded-lg p-2 text-left text-sm hover:bg-gray-100 cursor-pointer ${
+          currentThreadId === thread.id ? "bg-gray-100 text-gray-900" : "text-gray-700"
         }`}
         onClick={() => !isEditing && onThreadSelect(thread.id)}
         onContextMenu={(e: React.MouseEvent) => handleRightClick(e, thread.id)}
@@ -472,7 +472,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                   size="sm"
                   variant="ghost"
                   disabled={updateThread.isLoading}
-                  className={`h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm hover:bg-gray-300 ${isPinned ? 'text-blue-500' : ''} ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`h-7 w-7 p-0 rounded bg-white/80 backdrop-blur-sm hover:bg-gray-100 border border-gray-200/50 ${isPinned ? 'text-blue-500' : ''} ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title={isPinned ? "Unpin" : "Pin"}
                 >
                   {isPinned ? <PinOffIcon className="h-4 w-4" /> : <PinIcon className="h-4 w-4" />}
@@ -485,7 +485,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                   size="sm"
                   variant="ghost"
                   disabled={deleteThread.isLoading}
-                  className={`h-7 w-7 p-0 rounded bg-gray-200/80 backdrop-blur-sm hover:bg-red-200 hover:text-red-600 ${deleteThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`h-7 w-7 p-0 rounded bg-white/80 backdrop-blur-sm hover:bg-red-50 hover:text-red-600 border border-gray-200/50 ${deleteThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title="Delete"
                 >
                   <XIcon className="h-4 w-4" />
@@ -500,78 +500,145 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
 
   return (
     <>
-      {/* Floating buttons when collapsed */}
-      {collapsed && (
-        <div className={`fixed top-4 left-4 z-50 flex gap-2 transition-all duration-300 ease-in-out ${
-          showFloatingButtons ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
-        }`}>
-          <Button
-            onClick={handleNewChatCollapsed}
-            size="sm"
-            variant="ghost"
-            title="New Chat"
-            className="h-8 w-8 p-0 bg-white border border-gray-200 shadow-md hover:bg-gray-50 rounded-lg transition-all duration-300 ease-in-out"
-          >
-            <PlusIcon className="h-4 w-4" />
-          </Button>
-          <Button
-            onClick={onToggleCollapse}
-            size="sm"
-            variant="ghost"
-            title="Expand Sidebar"
-            className="h-8 w-8 p-0 bg-white border border-gray-200 shadow-md hover:bg-gray-50 rounded-lg transition-all duration-300 ease-in-out"
-          >
-            <MenuIcon className="h-4 w-4" />
-          </Button>
+      {/* Floating buttons - Collapsed state (with search) */}
+      <div 
+        className={`fixed z-50 transition-opacity duration-200 ease-out ${
+          collapsed && !isTransitioning ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        style={{
+          top: '40px',
+          left: '0px'
+        }}
+      >
+        <div 
+          className="bg-gray-100 border border-gray-200" 
+          style={{ 
+            borderRadius: '0 20px 20px 0',
+            padding: '4px'
+          }}
+        >
+          <div className="flex gap-1">
+            <Button
+              onClick={() => {/* TODO: Add search functionality */}}
+              size="sm"
+              variant="ghost"
+              title="Search"
+              className="h-8 w-8 p-0 hover:bg-white rounded-full transition-colors"
+            >
+              <SearchIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={onToggleCollapse}
+              size="sm"
+              variant="ghost"
+              title="Expand Sidebar"
+              className="h-8 w-8 p-0 hover:bg-white rounded-full transition-colors"
+            >
+              <PanelLeftIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={handleNewChat}
+              size="sm"
+              variant="ghost"
+              title="New Chat"
+              className="h-8 w-8 p-0 hover:bg-white rounded-full transition-colors"
+            >
+              <PlusIcon className="h-4.25 w-4.25" />
+            </Button>
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* Floating buttons - Expanded state (no search) */}
+      <div 
+        className={`fixed z-50 transition-opacity duration-200 ease-out ${
+          !collapsed && !isTransitioning ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        style={{
+          top: '40px',
+          left: '40px'
+        }}
+      >
+        <div 
+          className="bg-gray-100 border border-gray-200" 
+          style={{ 
+            borderRadius: '20px',
+            padding: '4px'
+          }}
+        >
+          <div className="flex gap-1">
+            <Button
+              onClick={onToggleCollapse}
+              size="sm"
+              variant="ghost"
+              title="Collapse Sidebar"
+              className="h-8 w-8 p-0 hover:bg-white rounded-full transition-colors"
+            >
+              <PanelLeftIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={handleNewChat}
+              size="sm"
+              variant="ghost"
+              title="New Chat"
+              className="h-8 w-8 p-0 hover:bg-white rounded-full transition-colors"
+            >
+              <PlusIcon className="h-4.25 w-4.25" />
+            </Button>
+          </div>
+        </div>
+      </div>
       
       {/* Sidebar */}
       <div 
-        className={`fixed top-0 left-0 z-40 flex h-full flex-col transition-transform duration-500 ease-out ${
-          collapsed ? '-translate-x-full' : 'translate-x-0'
+        className={`fixed z-40 flex flex-col transition-all duration-300 ease-out ${
+          collapsed ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'
         }`}
-        style={{ width: `${sidebarWidth}px` }}
+        style={{ 
+          width: `${sidebarWidth - 48}px`, // Subtract padding from both sides (24px each)
+          top: '24px', // Match chatbox spacing (24px from top)
+          bottom: '24px', // Match chatbox bottom-6 positioning (24px from bottom)
+          left: '24px' // Match consistent 24px spacing
+        }}
       >
-        <div className="h-full bg-gray-100 border-r border-gray-200 flex flex-col relative">
+        <div 
+          className="h-full relative shadow-xl"
+          style={{
+            borderRadius: '20px'
+          }}
+        >
+          {/* Light grey background with grey border */}
+          <div 
+            className="absolute inset-0 bg-gray-50 border border-gray-300"
+            style={{
+              borderRadius: '20px',
+              clipPath: 'inset(0 round 20px)'
+            }}
+          />
+          {/* Content */}
+          <div className="relative z-10 h-full flex flex-col overflow-hidden rounded-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <Logo size="md" className="flex-shrink-0" />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={onNavigateToSettings}
-                size="sm"
-                variant="ghost"
-                title="Settings"
-                className="h-8 w-8 p-0 hover:bg-gray-200"
-              >
-                <SettingsIcon className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={handleNewChat}
-                size="sm"
-                variant="ghost"
-                title="New Chat"
-                className="h-8 w-8 p-0 hover:bg-gray-200"
-              >
-                <PlusIcon className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={onToggleCollapse}
-                size="sm"
-                variant="ghost"
-                title="Collapse Sidebar"
-                className="h-8 w-8 p-0 hover:bg-gray-200"
-              >
-                <ChevronLeftIcon className="h-4 w-4" />
-              </Button>
+          <div className="flex items-center justify-between p-4 border-b border-gray-200/50">
+            <div className="w-20"></div> {/* Spacer for floating buttons */}
+            <div className="flex items-center">
+              <div className="bg-gray-100 border border-gray-200 px-3 py-1.5 hover:bg-gray-200 transition-colors cursor-pointer" style={{ borderRadius: '20px' }} onClick={onNavigateToWelcome}>
+                <Logo size="sm" className="flex-shrink-0" />
+              </div>
             </div>
           </div>
 
+          {/* New Chat Button */}
+          <div className="px-4 py-3 pb-2">
+            <Button
+              onClick={handleNewChat}
+              className="w-full bg-gradient-to-b from-blue-500 via-blue-425 to-blue-500 hover:from-blue-600 hover:via-blue-525 hover:to-blue-600 text-white rounded-lg h-10 text-sm font-medium transition-all duration-200"
+            >
+              New Chat
+            </Button>
+          </div>
+
           {/* Search Bar */}
-          <div className="p-3">
+          <div className="px-3 pt-2 pb-3">
             <div className="relative">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -579,9 +646,10 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                 placeholder="Search chats..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-transparent border border-gray-300 rounded-md focus:border-blue-500 focus:ring-0 focus:outline-none shadow-none text-sm transition-colors"
+                className="pl-10 bg-transparent border-0 rounded-none focus:border-blue-500 focus:ring-0 focus:outline-none shadow-none text-sm transition-colors"
                 style={{ outline: 'none', boxShadow: 'none' }}
               />
+              <div className="absolute bottom-0 left-2 right-2 h-px bg-gray-300"></div>
             </div>
           </div>
 
@@ -625,17 +693,28 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           </div>
 
           {/* Footer with Account Button */}
-          <div className="border-t border-gray-200 p-3">
+          <div className="border-t border-gray-200/50 p-3">
             <div className="flex items-center justify-between">
               <Button
                 onClick={onNavigateToAccount}
                 variant="ghost"
-                className="w-full justify-start text-left h-10 px-3 hover:bg-gray-200 transition-colors"
+                className="flex-1 justify-start text-left h-10 px-3 hover:bg-gray-100 transition-colors"
               >
                 <UserIcon className="h-4 w-4 mr-3" />
                 <span className="text-sm font-medium">
-                  {user?.username || user?.firstName || "Account"}
+                  {user?.firstName && user?.lastName 
+                    ? `${user.firstName} ${user.lastName}`
+                    : user?.username || user?.firstName || "Account"}
                 </span>
+              </Button>
+              <Button
+                onClick={onNavigateToSettings}
+                size="sm"
+                variant="ghost"
+                title="Settings"
+                className="h-10 w-10 p-0 hover:bg-gray-100 ml-2"
+              >
+                <SettingsIcon className="h-5 w-5" />
               </Button>
             </div>
           </div>
@@ -643,12 +722,13 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           {/* Resize Handle */}
           {!collapsed && (
             <div
-              className="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-transparent hover:bg-blue-300 transition-colors group"
+              className="absolute top-0 right-0 w-4 h-full cursor-col-resize bg-transparent hover:bg-blue-50/50 transition-colors group rounded-r-2xl"
               onMouseDown={() => setIsResizing(true)}
             >
-              <div className="w-full h-full bg-transparent group-hover:bg-blue-400" />
+              <div className="w-1 h-full bg-transparent group-hover:bg-blue-400 ml-auto rounded-full" />
             </div>
           )}
+          </div>
         </div>
       </div>
 

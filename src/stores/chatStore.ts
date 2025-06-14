@@ -40,11 +40,6 @@ interface GroundingSource {
 }
 
 interface GroundingMetadata {
-  searchQueries?: string[]; // The search queries used
-  groundedSegments?: Array<{
-    text: string;
-    confidence: number;
-  }>; // Grounded text segments with confidence
   sources?: GroundingSource[]; // The sources used for grounding (optional)
   rawData?: any; // Include raw data for debugging
 }

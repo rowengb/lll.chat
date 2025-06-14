@@ -93,6 +93,14 @@
 /* Custom markdown styles */
 .prose {
   color: inherit;
+  overflow-wrap: break-word; /* Break long words */
+  word-break: break-word; /* Additional word breaking */
+}
+
+/* Ensure all prose elements respect container width */
+.prose * {
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
@@ -129,12 +137,16 @@
   width: 100%;
   border-collapse: collapse;
   margin: 1rem 0;
+  table-layout: fixed;
+  word-wrap: break-word;
 }
 
 .prose th, .prose td {
   border: 1px solid #e5e7eb;
   padding: 0.5rem;
   text-align: left;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .prose th {
