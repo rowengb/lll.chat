@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { trpc } from '@/utils/trpc';
 
 interface UnfurlResult {
@@ -40,6 +40,26 @@ export function useUnfurlUrl(
 
   const updateUnfurlMutation = trpc.chat.updateGroundingSourceUnfurl.useMutation();
 
+  // Memoize existingUnfurled to prevent unnecessary re-renders
+  const memoizedExistingUnfurled = useMemo(() => {
+    if (!existingUnfurled) return null;
+    return {
+      title: existingUnfurled.title,
+      description: existingUnfurled.description,
+      image: existingUnfurled.image,
+      favicon: existingUnfurled.favicon,
+      siteName: existingUnfurled.siteName,
+      finalUrl: existingUnfurled.finalUrl,
+    };
+  }, [
+    existingUnfurled?.title,
+    existingUnfurled?.description,
+    existingUnfurled?.image,
+    existingUnfurled?.favicon,
+    existingUnfurled?.siteName,
+    existingUnfurled?.finalUrl,
+  ]);
+
   useEffect(() => {
     if (!url) {
       setData(undefined);
@@ -49,15 +69,15 @@ export function useUnfurlUrl(
     }
 
     // If we have existing unfurled data from the database, use it
-    if (existingUnfurled && (existingUnfurled.title || existingUnfurled.description || existingUnfurled.image)) {
+    if (memoizedExistingUnfurled && (memoizedExistingUnfurled.title || memoizedExistingUnfurled.description || memoizedExistingUnfurled.image)) {
       const existingResult: UnfurlResult = {
         url,
-        title: existingUnfurled.title,
-        description: existingUnfurled.description,
-        image: existingUnfurled.image,
-        favicon: existingUnfurled.favicon,
-        siteName: existingUnfurled.siteName,
-        finalUrl: existingUnfurled.finalUrl,
+        title: memoizedExistingUnfurled.title,
+        description: memoizedExistingUnfurled.description,
+        image: memoizedExistingUnfurled.image,
+        favicon: memoizedExistingUnfurled.favicon,
+        siteName: memoizedExistingUnfurled.siteName,
+        finalUrl: memoizedExistingUnfurled.finalUrl,
       };
       setData(existingResult);
       setLoading(false);
@@ -141,7 +161,7 @@ export function useUnfurlUrl(
     };
 
     unfurlUrl();
-  }, [url, messageId, sourceIndex, existingUnfurled, updateUnfurlMutation]);
+  }, [url, messageId, sourceIndex, memoizedExistingUnfurled]);
 
   return { data, loading, error };
 }

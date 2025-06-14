@@ -22,18 +22,18 @@ export const Logo: React.FC<LogoProps> = ({ size = 'md', className = '', onClick
         onClick={onClick}
         className={`font-inter font-normal ${sizeClasses[size]} ${className} cursor-pointer hover:opacity-80 transition-opacity`}
       >
-        <span className="text-gray-900 opacity-100 font-bold">lll</span>
-        <span className="text-gray-900 opacity-40">.</span>
-        <span className="text-black font-normal">chat</span>
+        <span className="text-foreground opacity-100 font-bold">lll</span>
+        <span className="text-foreground opacity-40">.</span>
+        <span className="text-foreground font-normal">chat</span>
       </button>
     );
   }
 
   return (
     <Link href="/" className={`font-inter font-normal ${sizeClasses[size]} ${className} cursor-pointer hover:opacity-80 transition-opacity`}>
-      <span className="text-gray-900 opacity-100 font-bold">lll</span>
-      <span className="text-gray-900 opacity-40">.</span>
-      <span className="text-black font-normal">chat</span>
+              <span className="text-foreground opacity-100 font-bold">lll</span>
+        <span className="text-foreground opacity-40">.</span>
+              <span className="text-foreground font-normal">chat</span>
     </Link>
   );
 };

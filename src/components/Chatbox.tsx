@@ -51,7 +51,7 @@ const CircularProgress = ({ progress, size = 32, strokeWidth = 3, children }: {
           stroke="currentColor"
           strokeWidth={strokeWidth}
           fill="none"
-          className="text-gray-300"
+          className="text-muted"
         />
         {/* Progress circle */}
         <circle
@@ -63,7 +63,7 @@ const CircularProgress = ({ progress, size = 32, strokeWidth = 3, children }: {
           fill="none"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          className="text-blue-500 transition-all duration-300 ease-out"
+          className="text-primary transition-all duration-300 ease-out"
           strokeLinecap="round"
         />
       </svg>
@@ -79,21 +79,21 @@ const CircularProgress = ({ progress, size = 32, strokeWidth = 3, children }: {
 const PendingLoader = ({ size = 24 }: { size?: number }) => {
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <div className="animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" style={{ width: size, height: size }}></div>
+      <div className="animate-spin rounded-full border-2 border-muted border-t-primary" style={{ width: size, height: size }}></div>
     </div>
   );
 };
 
 // Get file type icon
 const getFileIcon = (type: string, className = "h-4 w-4") => {
-  if (type.startsWith('image/')) return <ImageIcon className={`${className} text-green-600`} />;
-  if (type.startsWith('video/')) return <VideoIcon className={`${className} text-purple-600`} />;
-  if (type.startsWith('audio/')) return <MusicIcon className={`${className} text-orange-600`} />;
-  if (type.includes('pdf')) return <FileTextIcon className={`${className} text-red-600`} />;
-  if (type.includes('document') || type.includes('word')) return <FileTextIcon className={`${className} text-blue-600`} />;
-  if (type.includes('sheet') || type.includes('excel')) return <FileSpreadsheetIcon className={`${className} text-green-600`} />;
-  if (type.includes('text')) return <FileTextIcon className={`${className} text-gray-600`} />;
-  return <FileIcon className={`${className} text-gray-600`} />;
+  if (type.startsWith('image/')) return <ImageIcon className={`${className} text-green-600 dark:text-green-400`} />;
+  if (type.startsWith('video/')) return <VideoIcon className={`${className} text-purple-600 dark:text-purple-400`} />;
+  if (type.startsWith('audio/')) return <MusicIcon className={`${className} text-orange-600 dark:text-orange-400`} />;
+  if (type.includes('pdf')) return <FileTextIcon className={`${className} text-red-600 dark:text-red-400`} />;
+  if (type.includes('document') || type.includes('word')) return <FileTextIcon className={`${className} text-primary`} />;
+  if (type.includes('sheet') || type.includes('excel')) return <FileSpreadsheetIcon className={`${className} text-green-600 dark:text-green-400`} />;
+  if (type.includes('text')) return <FileTextIcon className={`${className} text-muted-foreground`} />;
+  return <FileIcon className={`${className} text-muted-foreground`} />;
 };
 
 // Image preview component
@@ -121,7 +121,7 @@ const ImagePreview = ({ file, onRemove, onClick }: { file: any; onRemove: () => 
   return (
     <div className="relative group">
       <div 
-        className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-300 p-0.5 cursor-pointer hover:border-gray-400 transition-colors"
+        className="w-12 h-12 rounded-lg overflow-hidden bg-muted border border-border p-0.5 cursor-pointer hover:border-border/80 transition-colors"
         onClick={onClick}
       >
         {imageUrl ? (
@@ -132,7 +132,7 @@ const ImagePreview = ({ file, onRemove, onClick }: { file: any; onRemove: () => 
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center rounded-md">
-            <ImageIcon className="h-5 w-5 text-gray-400" />
+            <ImageIcon className="h-5 w-5 text-muted-foreground" />
           </div>
         )}
       </div>
@@ -143,9 +143,9 @@ const ImagePreview = ({ file, onRemove, onClick }: { file: any; onRemove: () => 
           e.stopPropagation();
           onRemove();
         }}
-        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
       >
-        <XIcon className="h-2.5 w-2.5 text-white" />
+        <XIcon className="h-2.5 w-2.5 text-destructive-foreground" />
       </button>
     </div>
   );
@@ -157,9 +157,9 @@ const CompactFileItem = ({ file, onRemove, isLoading = false, onClick }: { file:
     <div className="relative group">
       <div 
         className={`${isLoading ? 'min-w-48' : 'min-w-32'} h-12 rounded-lg border px-3 py-2 transition-all duration-300 ${
-          file.status === 'error' ? 'bg-red-50 border-red-200' : 
-          file.isUploading ? 'bg-blue-50 border-blue-200' : 
-          'bg-gray-50 border-gray-200 hover:border-gray-300 cursor-pointer'
+          file.status === 'error' ? 'bg-destructive/10 border-destructive/20' : 
+          file.isUploading ? 'bg-primary/10 border-primary/20' : 
+          'bg-muted border-border hover:border-border/80 cursor-pointer'
         }`}
         onClick={!file.isUploading ? onClick : undefined}
       >
@@ -168,14 +168,14 @@ const CompactFileItem = ({ file, onRemove, isLoading = false, onClick }: { file:
           <div className="flex-shrink-0">
             {file.isUploading ? (
               file.status === 'error' ? (
-                <div className="h-6 w-6 rounded-full bg-red-500 flex items-center justify-center">
-                  <XIcon className="h-3 w-3 text-white" />
+                <div className="h-6 w-6 rounded-full bg-destructive flex items-center justify-center">
+                  <XIcon className="h-3 w-3 text-destructive-foreground" />
                 </div>
               ) : file.status === 'pending' || file.status === 'validating' ? (
                 <PendingLoader size={24} />
                              ) : file.status === 'done' ? (
-                 <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center animate-pulse">
-                   <svg className="h-3.5 w-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                 <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center animate-pulse">
+                   <svg className="h-3.5 w-3.5 text-primary-foreground" fill="currentColor" viewBox="0 0 20 20">
                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                    </svg>
                  </div>
@@ -189,10 +189,10 @@ const CompactFileItem = ({ file, onRemove, isLoading = false, onClick }: { file:
           
           {/* File info */}
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-900 truncate">
+            <div className="text-sm font-medium text-foreground truncate">
               {file.name}
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-muted-foreground">
               {file.size < 1024 * 1024 
                 ? `${(file.size / 1024).toFixed(0)}KB` 
                 : `${(file.size / 1024 / 1024).toFixed(1)}MB`}
@@ -209,9 +209,9 @@ const CompactFileItem = ({ file, onRemove, isLoading = false, onClick }: { file:
             e.stopPropagation();
             onRemove();
           }}
-          className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-destructive rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
         >
-          <XIcon className="h-2.5 w-2.5 text-white" />
+          <XIcon className="h-2.5 w-2.5 text-destructive-foreground" />
         </button>
       )}
     </div>
@@ -438,15 +438,15 @@ export function Chatbox({
 
   return (
     <div 
-      className={`relative chatbox-stable shadow-xl ${className}`}
+      className={`relative chatbox-stable shadow-xl dark:shadow-2xl dark:shadow-black/50 ${className}`}
       style={{
         transform: 'translateY(-4px)',
         borderRadius: '20px'
       }}
     >
-      {/* Glassmorphic background with subtle white overlay */}
+      {/* Glassmorphic background with subtle overlay */}
       <div 
-        className="absolute inset-0 bg-white/20 backdrop-blur-xl border border-gray-300"
+        className="absolute inset-0 bg-white/20 dark:bg-slate-900/20 backdrop-blur-xl border border-border"
         style={{
           borderRadius: '20px',
           clipPath: 'inset(0 round 20px)'
@@ -495,7 +495,7 @@ export function Chatbox({
               onChange={(e) => onInputChange(e.target.value)}
               placeholder="Type your message..."
               disabled={isLoading}
-              className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none hidden-scrollbar"
+              className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none hidden-scrollbar text-foreground placeholder:text-muted-foreground"
               style={{ 
                 border: 'none', 
                 outline: 'none', 
@@ -515,15 +515,15 @@ export function Chatbox({
           <Button 
             type="submit" 
             disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}
-            className="rounded-xl h-12 w-12 bg-blue-500 hover:bg-blue-600 shadow-sm transition-all"
+            className="rounded-xl h-12 w-12 bg-primary hover:bg-primary/90 shadow-sm transition-all"
             size="sm"
 
           >
-            <ArrowUpIcon className="h-6 w-6" strokeWidth={1.8} strokeLinecap="square" />
+            <ArrowUpIcon className="h-6 w-6 text-primary-foreground" strokeWidth={1.8} strokeLinecap="square" />
           </Button>
         </div>
         
-        <div className="border-t border-gray-100 mt-2 pt-2 flex items-center justify-between">
+        <div className="border-t border-border/50 mt-2 pt-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ModelSelector
               selectedModel={selectedModel}
@@ -538,8 +538,8 @@ export function Chatbox({
                 disabled={isLoading}
                 className={`h-8 px-3 transition-colors border rounded-full ${
                   searchGroundingEnabled 
-                    ? 'text-blue-600 bg-blue-50 border-blue-200 hover:bg-blue-100 hover:border-blue-300' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-gray-100 hover:border-gray-300'
+                    ? 'text-primary bg-primary/10 border-primary/20 hover:bg-primary/20 hover:border-primary/30' 
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border hover:border-border/80'
                 }`}
                 title={searchGroundingEnabled ? "Disable Google Search grounding" : "Enable Google Search grounding"}
               >
@@ -553,7 +553,7 @@ export function Chatbox({
               size="sm"
               onClick={handleAttachClick}
               disabled={isLoading}
-              className="h-8 px-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 border border-gray-100 hover:border-gray-300 transition-colors rounded-full"
+              className="h-8 px-3 text-muted-foreground hover:text-foreground hover:bg-muted border border-border hover:border-border/80 transition-colors rounded-full"
             >
               <PaperclipIcon className="h-4 w-4 mr-1" />
               Attach
@@ -568,7 +568,7 @@ export function Chatbox({
               disabled={isLoading}
             />
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-muted-foreground">
             Press Enter to send
           </div>
         </div>

@@ -224,7 +224,7 @@ export function FileUpload({
       <div
         className={`
           relative border-2 border-dashed rounded-lg p-3 transition-colors cursor-pointer
-          ${isDragging ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
+          ${isDragging ? 'border-primary bg-primary/10' : 'border-border hover:border-border/80'}
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
         onDragOver={handleDragOver}
@@ -242,14 +242,14 @@ export function FileUpload({
           disabled={disabled}
         />
         
-        <div className="flex items-center justify-center space-x-2 text-sm text-gray-600">
+                  <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
           <PaperclipIcon className="h-4 w-4" />
           <span>
             {isUploading ? 'Uploading...' : 'Click or drag files to upload'}
           </span>
         </div>
         
-        <div className="text-xs text-gray-500 text-center mt-1">
+                  <div className="text-xs text-muted-foreground text-center mt-1">
           Max {maxFiles} files, {formatFileSize(maxFileSize)} each
         </div>
       </div>
@@ -261,37 +261,37 @@ export function FileUpload({
           {uploads.map((file) => (
             <div
               key={file.id}
-              className={`flex items-center justify-between p-2 bg-gray-50 rounded-lg border ${file.status === 'error' ? 'border-red-400 bg-red-50' : 'opacity-80'}`}
+              className={`flex items-center justify-between p-2 bg-muted rounded-lg border ${file.status === 'error' ? 'border-destructive bg-destructive/10' : 'opacity-80'}`}
             >
               <div className="flex items-center space-x-2 flex-1 min-w-0">
                 {getFileIcon(file.type)}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">
+                  <div className="text-sm font-medium text-foreground truncate">
                     {file.name}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-muted-foreground">
                     {formatFileSize(file.size)}
                   </div>
-                  <div className="w-full bg-gray-200 rounded h-2 mt-1">
+                  <div className="w-full bg-muted rounded h-2 mt-1">
                     <div
-                      className={`h-2 rounded transition-all ${file.status === 'error' ? 'bg-red-400' : 'bg-blue-500'}`}
+                      className={`h-2 rounded transition-all ${file.status === 'error' ? 'bg-destructive' : 'bg-primary'}`}
                       style={{ width: `${file.progress || 0}%` }}
                     />
                   </div>
-                  <div className={`text-xs mt-1 text-right ${file.status === 'error' ? 'text-red-600' : 'text-blue-600'}`}
+                  <div className={`text-xs mt-1 text-right ${file.status === 'error' ? 'text-destructive' : 'text-primary'}`}
                   >
                     {file.status === 'error' ? (file.error || 'Error') : `${file.progress || 0}%`}
                   </div>
-                  {file.status === 'pending' && <div className="text-xs text-gray-400 mt-1">Waiting...</div>}
-                  {file.status === 'validating' && <div className="text-xs text-gray-400 mt-1">Validating...</div>}
-                  {file.status === 'uploading' && <div className="text-xs text-blue-400 mt-1">Uploading...</div>}
-                  {file.status === 'done' && <div className="text-xs text-green-600 mt-1">Done</div>}
+                  {file.status === 'pending' && <div className="text-xs text-muted-foreground mt-1">Waiting...</div>}
+                  {file.status === 'validating' && <div className="text-xs text-muted-foreground mt-1">Validating...</div>}
+                  {file.status === 'uploading' && <div className="text-xs text-primary/70 mt-1">Uploading...</div>}
+                  {file.status === 'done' && <div className="text-xs text-green-600 dark:text-green-400 mt-1">Done</div>}
                 </div>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0 text-gray-300 cursor-not-allowed"
+                className="h-6 w-6 p-0 text-muted cursor-not-allowed"
                 disabled
               >
                 <XIcon className="h-3 w-3" />
@@ -302,15 +302,15 @@ export function FileUpload({
           {files.map((file) => (
             <div
               key={file.id}
-              className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border"
+              className="flex items-center justify-between p-2 bg-muted rounded-lg border"
             >
               <div className="flex items-center space-x-2 flex-1 min-w-0">
                 {getFileIcon(file.type)}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-gray-900 truncate">
+                  <div className="text-sm font-medium text-foreground truncate">
                     {file.name}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-muted-foreground">
                     {formatFileSize(file.size)}
                   </div>
                 </div>
@@ -322,7 +322,7 @@ export function FileUpload({
                   e.stopPropagation();
                   removeFile(file.id);
                 }}
-                className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                 disabled={disabled}
               >
                 <XIcon className="h-3 w-3" />

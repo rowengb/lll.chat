@@ -386,8 +386,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     
     return (
       <div
-        className={`group relative flex w-full items-center gap-3 rounded-lg p-2 text-left text-sm hover:bg-gray-100 cursor-pointer ${
-          currentThreadId === thread.id ? "bg-gray-100 text-gray-900" : "text-gray-700"
+        className={`group relative flex w-full items-center gap-3 rounded-lg p-2 text-left text-sm hover:bg-muted cursor-pointer ${
+                          currentThreadId === thread.id ? "bg-muted text-foreground" : "text-muted-foreground"
         }`}
         onClick={() => !isEditing && onThreadSelect(thread.id)}
         onContextMenu={(e: React.MouseEvent) => handleRightClick(e, thread.id)}
@@ -426,7 +426,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                     handleRenameCancel();
                   }
                 }}
-                className="flex-1 bg-transparent border-0 border-b border-gray-400 rounded-none focus:border-blue-500 focus:ring-0 focus:outline-none text-sm p-0 h-auto"
+                className="flex-1 bg-transparent border-0 border-b border-border rounded-none focus:border-primary focus:ring-0 focus:outline-none text-sm p-0 h-auto"
                 autoFocus
               />
             ) : (
@@ -441,7 +441,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                       className="flex-shrink-0"
                       title="Go to original conversation"
                     >
-                      <GitBranchIcon className="h-3.5 w-3.5 text-gray-500 hover:text-gray-800 transition-colors cursor-pointer" />
+                      <GitBranchIcon className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer" />
                     </button>
                   )}
                   <span 
@@ -472,7 +472,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                   size="sm"
                   variant="ghost"
                   disabled={updateThread.isLoading}
-                  className={`h-7 w-7 p-0 rounded bg-white/80 backdrop-blur-sm hover:bg-gray-100 border border-gray-200/50 ${isPinned ? 'text-blue-500' : ''} ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`h-7 w-7 p-0 rounded bg-card/80 backdrop-blur-sm hover:bg-muted border border-border/50 ${isPinned ? 'text-primary' : ''} ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title={isPinned ? "Unpin" : "Pin"}
                 >
                   {isPinned ? <PinOffIcon className="h-4 w-4" /> : <PinIcon className="h-4 w-4" />}
@@ -485,7 +485,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                   size="sm"
                   variant="ghost"
                   disabled={deleteThread.isLoading}
-                  className={`h-7 w-7 p-0 rounded bg-white/80 backdrop-blur-sm hover:bg-red-50 hover:text-red-600 border border-gray-200/50 ${deleteThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`h-7 w-7 p-0 rounded bg-card/80 backdrop-blur-sm hover:bg-destructive/10 hover:text-destructive border border-border/50 ${deleteThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title="Delete"
                 >
                   <XIcon className="h-4 w-4" />
@@ -511,7 +511,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
         }}
       >
         <div 
-          className="bg-gray-100 border border-gray-200" 
+          className="bg-muted border border-border" 
           style={{ 
             borderRadius: '0 20px 20px 0',
             padding: '4px'
@@ -523,7 +523,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               size="sm"
               variant="ghost"
               title="Search"
-              className="h-8 w-8 p-0 hover:bg-white rounded-full transition-colors"
+              className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
             >
               <SearchIcon className="h-4 w-4" />
             </Button>
@@ -532,7 +532,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               size="sm"
               variant="ghost"
               title="Expand Sidebar"
-              className="h-8 w-8 p-0 hover:bg-white rounded-full transition-colors"
+              className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
             >
               <PanelLeftIcon className="h-4 w-4" />
             </Button>
@@ -541,7 +541,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               size="sm"
               variant="ghost"
               title="New Chat"
-              className="h-8 w-8 p-0 hover:bg-white rounded-full transition-colors"
+              className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
             >
               <PlusIcon className="h-4.25 w-4.25" />
             </Button>
@@ -560,7 +560,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
         }}
       >
         <div 
-          className="bg-gray-100 border border-gray-200" 
+          className="bg-muted border border-border" 
           style={{ 
             borderRadius: '20px',
             padding: '4px'
@@ -572,7 +572,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               size="sm"
               variant="ghost"
               title="Collapse Sidebar"
-              className="h-8 w-8 p-0 hover:bg-white rounded-full transition-colors"
+              className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
             >
               <PanelLeftIcon className="h-4 w-4" />
             </Button>
@@ -581,7 +581,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               size="sm"
               variant="ghost"
               title="New Chat"
-              className="h-8 w-8 p-0 hover:bg-white rounded-full transition-colors"
+              className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
             >
               <PlusIcon className="h-4.25 w-4.25" />
             </Button>
@@ -602,14 +602,14 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
         }}
       >
         <div 
-          className="h-full relative shadow-xl"
+          className="h-full relative shadow-xl dark:shadow-2xl dark:shadow-black/50"
           style={{
             borderRadius: '20px'
           }}
         >
-          {/* Light grey background with grey border */}
+          {/* Background with border */}
           <div 
-            className="absolute inset-0 bg-gray-50 border border-gray-300"
+            className="absolute inset-0 bg-gray-50/50 dark:bg-gray-950 border border-border"
             style={{
               borderRadius: '20px',
               clipPath: 'inset(0 round 20px)'
@@ -618,10 +618,10 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           {/* Content */}
           <div className="relative z-10 h-full flex flex-col overflow-hidden rounded-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200/50">
+          <div className="flex items-center justify-between p-4 border-b border-border/50">
             <div className="w-20"></div> {/* Spacer for floating buttons */}
             <div className="flex items-center">
-              <div className="bg-gray-100 border border-gray-200 px-3 py-1.5 hover:bg-gray-200 transition-colors cursor-pointer" style={{ borderRadius: '20px' }} onClick={onNavigateToWelcome}>
+              <div className="bg-muted border border-border px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer" style={{ borderRadius: '20px' }} onClick={onNavigateToWelcome}>
                 <Logo size="sm" className="flex-shrink-0" />
               </div>
             </div>
@@ -631,7 +631,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           <div className="px-4 py-3 pb-2">
             <Button
               onClick={handleNewChat}
-              className="w-full bg-gradient-to-b from-blue-500 via-blue-425 to-blue-500 hover:from-blue-600 hover:via-blue-525 hover:to-blue-600 text-white rounded-lg h-10 text-sm font-medium transition-all duration-200"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg h-10 text-sm font-medium transition-all duration-200"
             >
               New Chat
             </Button>
@@ -640,16 +640,16 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           {/* Search Bar */}
           <div className="px-3 pt-2 pb-3">
             <div className="relative">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
                 placeholder="Search chats..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-transparent border-0 rounded-none focus:border-blue-500 focus:ring-0 focus:outline-none shadow-none text-sm transition-colors"
+                className="pl-10 bg-transparent border-0 rounded-none focus:border-primary focus:ring-0 focus:outline-none shadow-none text-sm transition-colors text-foreground placeholder:text-muted-foreground"
                 style={{ outline: 'none', boxShadow: 'none' }}
               />
-              <div className="absolute bottom-0 left-2 right-2 h-px bg-gray-300"></div>
+              <div className="absolute bottom-0 left-2 right-2 h-px bg-border"></div>
             </div>
           </div>
 
@@ -660,8 +660,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               {sortedPinnedThreads.length > 0 && (
                 <div className="mb-4">
                   <div className="flex items-center gap-2 px-1 py-2 mb-2">
-                    <PinIcon className="h-3 w-3 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-500 tracking-wide">
+                    <PinIcon className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground tracking-wide">
                       Pinned
                     </span>
                   </div>
@@ -676,8 +676,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               {/* Regular Threads Section */}
               {sortedUnpinnedThreads.length > 0 && sortedPinnedThreads.length > 0 && (
                 <div className="flex items-center gap-2 px-1 py-2 mb-2">
-                  <MessageSquareIcon className="h-3 w-3 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-500 tracking-wide">
+                  <MessageSquareIcon className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground tracking-wide">
                     Recent
                   </span>
                 </div>
@@ -693,12 +693,12 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           </div>
 
           {/* Footer with Account Button */}
-          <div className="border-t border-gray-200/50 p-3">
+          <div className="border-t border-border/50 p-3">
             <div className="flex items-center justify-between">
               <Button
                 onClick={onNavigateToAccount}
                 variant="ghost"
-                className="flex-1 justify-start text-left h-10 px-3 hover:bg-gray-100 transition-colors"
+                className="flex-1 justify-start text-left h-10 px-3 hover:bg-muted transition-colors"
               >
                 <UserIcon className="h-4 w-4 mr-3" />
                 <span className="text-sm font-medium">
@@ -712,7 +712,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                 size="sm"
                 variant="ghost"
                 title="Settings"
-                className="h-10 w-10 p-0 hover:bg-gray-100 ml-2"
+                className="h-10 w-10 p-0 hover:bg-muted ml-2"
               >
                 <SettingsIcon className="h-5 w-5" />
               </Button>
@@ -722,10 +722,10 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           {/* Resize Handle */}
           {!collapsed && (
             <div
-              className="absolute top-0 right-0 w-4 h-full cursor-col-resize bg-transparent hover:bg-blue-50/50 transition-colors group rounded-r-2xl"
+              className="absolute top-0 right-0 w-4 h-full cursor-col-resize bg-transparent hover:bg-primary/10 transition-colors group rounded-r-2xl"
               onMouseDown={() => setIsResizing(true)}
             >
-              <div className="w-1 h-full bg-transparent group-hover:bg-blue-400 ml-auto rounded-full" />
+              <div className="w-1 h-full bg-transparent group-hover:bg-primary ml-auto rounded-full" />
             </div>
           )}
           </div>
@@ -739,20 +739,20 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           onClick={handleCancelDelete}
         >
           <div 
-            className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6"
+            className="bg-card rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-border"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">
-              <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                <XIcon className="h-5 w-5 text-red-600" />
+              <div className="flex-shrink-0 w-10 h-10 bg-destructive/10 rounded-full flex items-center justify-center">
+                <XIcon className="h-5 w-5 text-destructive" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Delete Conversation</h3>
-                <p className="text-sm text-gray-500">This action cannot be undone</p>
+                <h3 className="text-lg font-semibold text-foreground">Delete Conversation</h3>
+                <p className="text-sm text-muted-foreground">This action cannot be undone</p>
               </div>
             </div>
             
-            <p className="text-gray-700 mb-6">
+            <p className="text-foreground mb-6">
               Are you sure you want to delete "{deleteConfirmation.threadTitle}"? This will permanently remove the conversation and all its messages.
             </p>
             
@@ -768,7 +768,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                 variant="destructive"
                 onClick={handleConfirmDelete}
                 disabled={deleteThread.isLoading}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-destructive hover:bg-destructive/90"
               >
                 {deleteThread.isLoading ? "Deleting..." : "Delete"}
               </Button>
@@ -781,7 +781,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
       {contextMenu && (
         <div
           ref={contextMenuRef}
-          className="fixed z-50 bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-[120px]"
+          className="fixed z-50 bg-card border border-border rounded-md shadow-lg py-1 min-w-[120px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           <button
@@ -789,7 +789,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               const thread = threads?.find(t => t.id === contextMenu.threadId);
               handleRenameStart(contextMenu.threadId, thread?.title || "");
             }}
-            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
           >
             <EditIcon className="h-3 w-3" />
             Rename
@@ -797,7 +797,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           <button
             onClick={() => handlePinThread(contextMenu.threadId)}
             disabled={updateThread.isLoading}
-            className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          className={`w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2 ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <PinIcon className="h-3 w-3" />
             {(threads?.find(t => t.id === contextMenu.threadId) as any)?.pinned ? "Unpin" : "Pin"}

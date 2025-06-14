@@ -6,6 +6,26 @@ import { useRouter } from "next/router";
 import { Toaster } from "react-hot-toast";
 import { ConvexClientProvider } from "@/lib/convex";
 import { ClerkProvider } from "@clerk/nextjs";
+import { dark } from "@clerk/themes";
+import { ThemeProvider, useTheme } from "@/hooks/useTheme";
+
+// Wrapper component that can access the theme
+function ClerkWrapper({ children }: { children: React.ReactNode }) {
+  const { resolvedTheme } = useTheme();
+  
+  return (
+    <ClerkProvider
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      signInFallbackRedirectUrl="/"
+      signUpFallbackRedirectUrl="/"
+      appearance={{
+        baseTheme: resolvedTheme === 'dark' ? dark : undefined
+      }}
+    >
+      {children}
+    </ClerkProvider>
+  );
+}
 
 const MyApp: AppType = ({
   Component,
@@ -21,63 +41,61 @@ const MyApp: AppType = ({
   };
 
   return (
-    <ClerkProvider
-      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      signInFallbackRedirectUrl="/"
-      signUpFallbackRedirectUrl="/"
-    >
-      <div className="h-full min-h-screen bg-white">
-        <ConvexClientProvider>
-          <Component {...pageProps} />
-          <Toaster
-            position="bottom-right"
-            reverseOrder={false}
-            gutter={0}
-            containerStyle={{
-              bottom: 20,
-              right: 20,
-            }}
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background: '#ffffff',
-                color: '#09090b',
-                fontSize: '13px',
-                borderRadius: '6px',
-                padding: '8px 12px',
-                border: '1px solid #e4e4e7',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                fontWeight: '500',
-                minHeight: 'auto',
-                maxWidth: '300px',
-              },
-              success: {
-                iconTheme: {
-                  primary: '#09090b',
-                  secondary: '#ffffff',
-                },
+    <ThemeProvider>
+      <ClerkWrapper>
+        <div className="h-full min-h-screen bg-background text-foreground">
+          <ConvexClientProvider>
+            <Component {...pageProps} />
+            <Toaster
+              position="bottom-right"
+              reverseOrder={false}
+              gutter={0}
+              containerStyle={{
+                bottom: 20,
+                right: 20,
+              }}
+              toastOptions={{
+                duration: 3000,
                 style: {
-                  background: '#ffffff',
-                  color: '#09090b',
-                  border: '1px solid #d4d4d8',
+                  background: 'hsl(var(--background))',
+                  color: 'hsl(var(--foreground))',
+                  fontSize: '13px',
+                  borderRadius: '6px',
+                  padding: '8px 12px',
+                  border: '1px solid hsl(var(--border))',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                  fontWeight: '500',
+                  minHeight: 'auto',
+                  maxWidth: '300px',
                 },
-              },
-              error: {
-                iconTheme: {
-                  primary: '#09090b',
-                  secondary: '#ffffff',
+                success: {
+                  iconTheme: {
+                    primary: 'hsl(var(--foreground))',
+                    secondary: 'hsl(var(--background))',
+                  },
+                  style: {
+                    background: 'hsl(var(--background))',
+                    color: 'hsl(var(--foreground))',
+                    border: '1px solid hsl(var(--border))',
+                  },
                 },
-                style: {
-                  background: '#ffffff',
-                  color: '#09090b',
-                  border: '1px solid #d4d4d8',
+                error: {
+                  iconTheme: {
+                    primary: 'hsl(var(--foreground))',
+                    secondary: 'hsl(var(--background))',
+                  },
+                  style: {
+                    background: 'hsl(var(--background))',
+                    color: 'hsl(var(--foreground))',
+                    border: '1px solid hsl(var(--border))',
+                  },
                 },
-              },
-            }}
-          />
-        </ConvexClientProvider>
-      </div>
-    </ClerkProvider>
+              }}
+            />
+          </ConvexClientProvider>
+        </div>
+      </ClerkWrapper>
+    </ThemeProvider>
   );
 };
 

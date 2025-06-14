@@ -75,7 +75,7 @@ function SourceListItem({
           href={source.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sm text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate"
+                          className="text-sm text-muted-foreground hover:text-primary transition-colors truncate"
         >
           {displayTitle}
           {displaySiteName && displaySiteName !== displayTitle && (
@@ -123,7 +123,7 @@ export function GroundingSources({
     <div className="mt-3" ref={containerRef}>
       <button
         onClick={handleToggle}
-        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm font-medium transition-colors"
+                    className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
       >
         View grounding sources ({sources.length})
       </button>

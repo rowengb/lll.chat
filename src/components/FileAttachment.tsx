@@ -188,7 +188,7 @@ export function FileAttachment({
                 <div className="text-xs text-gray-500">
                   {formatFileSize(file.size)}
                   {canView && (
-                    <span className="ml-2 text-blue-500">• Click to view</span>
+                    <span className="ml-2 text-primary">• Click to view</span>
                   )}
                 </div>
               </div>

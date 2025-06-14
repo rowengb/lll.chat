@@ -1163,7 +1163,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
     return (
       <div 
-        className="fixed top-0 right-0 bottom-0 flex flex-col bg-white"
+        className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900"
         style={{ 
           left: sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
           transition: 'left 0.3s ease-out'
@@ -1180,10 +1180,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   <div className={`text-center transition-all duration-300 ${showWelcomeElements ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
             {/* Welcome Header */}
             <div className="mb-8">
-              <h1 className="text-3xl font-light text-gray-900 mb-4">
+              <h1 className="text-3xl font-light text-foreground mb-4">
                 Welcome to <span className="font-bold">lll</span><span className="font-normal">.chat</span>
               </h1>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                 Start a conversation with AI. Choose from the examples below or type your own message.
               </p>
             </div>
@@ -1196,17 +1196,17 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   <button
                     key={index}
                     onClick={() => handleExampleClick(example.prompt)}
-                    className="group text-left p-4 bg-gradient-to-br from-gray-50/80 to-gray-100/60 backdrop-blur-sm hover:from-gray-100/90 hover:to-gray-150/70 rounded-2xl border border-gray-200/60 hover:border-gray-300/80 shadow-lg shadow-gray-100/50 hover:shadow-xl hover:shadow-gray-200/60 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
+                    className="group text-left p-4 bg-gradient-to-br from-card/80 to-muted/60 dark:from-slate-800/80 dark:to-slate-700/60 backdrop-blur-sm hover:from-muted/90 hover:to-muted/70 dark:hover:from-slate-700/90 dark:hover:to-slate-600/70 rounded-2xl border border-border/60 hover:border-border/80 shadow-lg shadow-muted/20 hover:shadow-xl hover:shadow-muted/30 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="text-gray-600 mt-1 group-hover:text-gray-700 transition-colors">
+                      <div className="text-muted-foreground mt-1 group-hover:text-foreground transition-colors">
                         <IconComponent className="h-5 w-5" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-medium text-gray-900 mb-2 group-hover:text-black transition-colors">
+                        <h3 className="font-medium text-foreground mb-2 group-hover:text-primary transition-colors">
                           {example.title}
                         </h3>
-                        <p className="text-sm text-gray-600 group-hover:text-gray-700 line-clamp-3 transition-colors">
+                        <p className="text-sm text-muted-foreground group-hover:text-foreground line-clamp-3 transition-colors">
                           {example.prompt}
                         </p>
                       </div>
@@ -1217,28 +1217,28 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             </div>
 
             {/* Features highlight */}
-            <div className="bg-gradient-to-r from-gray-50/90 to-gray-100/80 backdrop-blur-sm rounded-2xl border border-gray-200/70 p-6 max-w-2xl mx-auto shadow-lg shadow-gray-100/50 backdrop-saturate-150">
+            <div className="bg-gradient-to-r from-card/90 to-muted/80 dark:from-slate-800/90 dark:to-slate-700/80 backdrop-blur-sm rounded-2xl border border-border/70 p-6 max-w-2xl mx-auto shadow-lg shadow-muted/20 backdrop-saturate-150">
               <div className="grid grid-cols-3 gap-6 text-center">
                 <div>
                   <div className="flex justify-center mb-2">
-                    <ZapIcon className="h-6 w-6 text-gray-600" />
+                    <ZapIcon className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <div className="text-sm font-medium text-gray-900">Lightning Fast</div>
-                  <div className="text-xs text-gray-600">Real-time streaming</div>
+                  <div className="text-sm font-medium text-foreground">Lightning Fast</div>
+                  <div className="text-xs text-muted-foreground">Real-time streaming</div>
                 </div>
                 <div>
                   <div className="flex justify-center mb-2">
-                    <BotIcon className="h-6 w-6 text-gray-600" />
+                    <BotIcon className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <div className="text-sm font-medium text-gray-900">Multiple Models</div>
-                  <div className="text-xs text-gray-600">GPT, Claude, Gemini & more</div>
+                  <div className="text-sm font-medium text-foreground">Multiple Models</div>
+                  <div className="text-xs text-muted-foreground">GPT, Claude, Gemini & more</div>
                 </div>  
                 <div>
                   <div className="flex justify-center mb-2">
-                    <ShieldIcon className="h-6 w-6 text-gray-600" />
+                    <ShieldIcon className="h-6 w-6 text-muted-foreground" />
                   </div>
-                  <div className="text-sm font-medium text-gray-900">BYOK & Privacy</div>
-                  <div className="text-xs text-gray-600">Your keys, your data</div>
+                  <div className="text-sm font-medium text-foreground">BYOK & Privacy</div>
+                  <div className="text-xs text-muted-foreground">Your keys, your data</div>
                 </div>
               </div>
             </div>
@@ -1279,7 +1279,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
   return (
     <div 
-      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white"
+              className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900"
       style={{ 
         left: sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
         transition: 'left 0.3s ease-out'
@@ -1304,16 +1304,16 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                       <div className="w-full max-w-full min-w-0">
                         <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
                     <div
-                            className={`rounded-2xl px-4 max-w-full overflow-hidden min-w-0 ${
+                            className={`rounded-xl px-4 max-w-full overflow-hidden min-w-0 ${
                         message.role === "user"
                                 ? "py-2" 
                                 : "pt-1 pb-1"
                             } ${
                               message.role === "user"
-                                ? "bg-blue-50 text-gray-900 border border-blue-500 shadow-sm"
+                                ? "bg-primary/10 text-foreground border border-primary shadow-sm backdrop-blur-sm dark:bg-primary/30 dark:border-primary/50"
                                 : message.isError
-                                ? "bg-red-50 text-red-900 border border-red-300 shadow-sm"
-                                : "text-gray-900"
+                                ? "bg-destructive/10 text-destructive border border-destructive/30 shadow-sm"
+                                : "text-foreground"
                       }`}
                     >
                       {editingMessageId === message.id ? (
@@ -1321,7 +1321,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           <textarea
                             value={editingContent}
                             onChange={(e) => setEditingContent(e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm resize-none bg-white"
+                            className="w-full p-2 border border-border rounded-lg text-sm resize-none bg-background text-foreground"
                             rows={Math.max(2, editingContent.split('\n').length)}
                             autoFocus
                           />
@@ -1329,7 +1329,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                             <Button
                               onClick={() => handleSaveEdit(message.id)}
                               size="sm"
-                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                              className="bg-primary hover:bg-primary/90 text-primary-foreground"
                             >
                               Save
                             </Button>
@@ -1361,7 +1361,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                 )}
                               </div>
                       ) : (
-                              <div className="prose prose-sm w-full min-w-0 overflow-hidden text-gray-900 text-sm leading-loose">
+                              <div className="prose prose-sm w-full min-w-0 overflow-hidden text-foreground text-sm leading-loose">
                           <ReactMarkdown 
                             remarkPlugins={[remarkGfm]}
                             rehypePlugins={[rehypeHighlight]}
@@ -1370,7 +1370,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                               a: ({ node, ...props }) => (
                                 <a 
                                   {...props} 
-                                  className="text-blue-600 hover:text-blue-800 underline"
+                                  className="text-primary hover:text-primary/80 underline"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                 />
@@ -1383,7 +1383,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                 return isInline ? (
                                   <code 
                                           className="text-gray-100 px-2 py-1 rounded text-xs font-mono" 
-                                          style={{ backgroundColor: '#0C1117' }}
+                                    style={{ backgroundColor: '#0C1117' }}
                                     {...props}
                                   >
                                     {children}
@@ -1397,6 +1397,19 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                       const className = codeElement?.props?.className || '';
                                       const match = /language-(\w+)/.exec(className);
                                       const language = match ? match[1] : undefined;
+                                      
+                                      // If no language detected, it might be a plain pre block
+                                      if (!language && !className) {
+                                        return (
+                                          <pre 
+                                            className="text-gray-100 p-4 rounded-xl overflow-x-auto dark-scrollbar text-xs font-mono w-full min-w-0 my-3" 
+                                            style={{ backgroundColor: '#0C1117' }}
+                                            {...props}
+                                          >
+                                            {children}
+                                          </pre>
+                                        );
+                                      }
                                       
                                       return (
                                         <CodeBlock 
@@ -1447,7 +1460,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
                         {message.role === "assistant" && (
                               <div className="flex items-center gap-1 mr-1">
-                                <div className="flex items-center gap-1 text-sm text-gray-500 px-5">
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground px-5">
                               {getProviderFromModel(message.model)}
                               <span>•</span>
                               <span>{message.model}</span>
@@ -1462,7 +1475,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           variant="ghost"
                           size="sm"
                                   onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
                         >
                                   <RotateCcwIcon className="h-4 w-4" />
                                 </ActionButton>
@@ -1471,7 +1484,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           variant="ghost"
                           size="sm"
                                   onClick={() => handleEditMessage(message.id)}
-                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
                         >
                                   <EditIcon className="h-4 w-4" />
                                 </ActionButton>
@@ -1480,7 +1493,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           variant="ghost"
                           size="sm"
                                   onClick={() => handleCopyMessage(message.content)}
-                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
                                 >
                                   <CopyIcon className="h-4 w-4" />
                                 </ActionButton>
@@ -1492,7 +1505,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleCopyMessage(message.content)}
-                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
                         >
                                   <CopyIcon className="h-4 w-4" />
                                 </ActionButton>
@@ -1501,7 +1514,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           variant="ghost"
                           size="sm"
                                   onClick={() => handleBranchOff(message.id)}
-                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
                                 >
                                   <GitBranchIcon className="h-4 w-4" />
                                 </ActionButton>
@@ -1510,7 +1523,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                                  className="h-8 px-2 text-gray-400 hover:text-gray-600"
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
                         >
                                   <RotateCcwIcon className="h-4 w-4" />
                                 </ActionButton>
@@ -1525,14 +1538,14 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             {isLoading && (
               <div className="flex justify-start">
                       <div className="w-full flex">
-                  <div className="max-w-full rounded-2xl bg-gray-100 px-5 py-3 shadow-sm">
+                  <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
                           <div className="flex items-center space-x-3">
                             <div className="flex items-center space-x-1">
-                              <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500"></div>
-                              <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-100"></div>
-                              <div className="h-2 w-2 animate-pulse rounded-full bg-gray-500 animation-delay-200"></div>
+                              <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"></div>
+                              <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
+                              <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
                             </div>
-                            <span className="text-sm text-gray-500 animate-pulse">AI is thinking...</span>
+                            <span className="text-sm text-muted-foreground animate-pulse">AI is thinking...</span>
                     </div>
                   </div>
                 </div>

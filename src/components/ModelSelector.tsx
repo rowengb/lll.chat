@@ -143,19 +143,19 @@ const getCapabilityIcon = (capability: string) => {
 const getCapabilityColor = (capability: string) => {
   switch (capability) {
     case 'vision':
-      return 'bg-green-100 text-green-600';
+      return 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400';
     case 'web':
-      return 'bg-blue-100 text-blue-600';
+      return 'bg-primary/10 text-primary';
     case 'documents':
-      return 'bg-purple-100 text-purple-600';
+      return 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400';
     case 'reasoning':
-      return 'bg-orange-100 text-orange-600';
+      return 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
     case 'experimental':
-      return 'bg-yellow-100 text-yellow-600';
+      return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400';
     case 'image-generation':
-      return 'bg-pink-100 text-pink-600';
+      return 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400';
     default:
-      return 'bg-gray-100 text-gray-600';
+      return 'bg-muted text-muted-foreground';
   }
 };
 
@@ -194,13 +194,13 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
 
   // Define filter categories based on the image
   const filterCategories = [
-    { id: 'fast', name: 'Fast', icon: ZapIcon, color: 'bg-yellow-100 text-yellow-600' },
-    { id: 'vision', name: 'Vision', icon: EyeIcon, color: 'bg-green-100 text-green-600' },
-    { id: 'web', name: 'Search', icon: GlobeIcon, color: 'bg-blue-100 text-blue-600' },
-    { id: 'documents', name: 'PDFs', icon: FileTextIcon, color: 'bg-purple-100 text-purple-600' },
-    { id: 'reasoning', name: 'Reasoning', icon: BrainIcon, color: 'bg-orange-100 text-orange-600' },
-    { id: 'experimental', name: 'Effort Control', icon: FlaskConical, color: 'bg-yellow-100 text-yellow-600' },
-    { id: 'image-generation', name: 'Image Generation', icon: SparklesIcon, color: 'bg-pink-100 text-pink-600' },
+    { id: 'fast', name: 'Fast', icon: ZapIcon, color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' },
+    { id: 'vision', name: 'Vision', icon: EyeIcon, color: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' },
+    { id: 'web', name: 'Search', icon: GlobeIcon, color: 'bg-primary/10 text-primary' },
+    { id: 'documents', name: 'PDFs', icon: FileTextIcon, color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' },
+    { id: 'reasoning', name: 'Reasoning', icon: BrainIcon, color: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' },
+    { id: 'experimental', name: 'Effort Control', icon: FlaskConical, color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' },
+    { id: 'image-generation', name: 'Image Generation', icon: SparklesIcon, color: 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400' },
   ];
 
   // Function to check if model matches filter criteria
@@ -316,9 +316,9 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
             setIsOpen(true);
           }
         }}
-        className={`w-full justify-between h-auto font-normal text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors ${
+        className={`w-full justify-between h-auto font-normal text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors ${
           size === 'lg' ? 'px-4 py-3' : 'px-2 py-1'
-        } ${isOpen ? 'bg-gray-100 text-gray-900' : ''}`}
+        } ${isOpen ? 'bg-muted text-foreground' : ''}`}
       >
         <div className={`flex items-center ${size === 'lg' ? 'gap-3' : 'gap-1.5'}`}>
           <div className="flex-shrink-0">
@@ -329,7 +329,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
           <span className={`font-medium ${size === 'lg' ? 'text-base' : 'text-sm'}`}>
             {selectedModelData?.name}
           </span>
-          <span className={`text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md ${
+          <span className={`text-muted-foreground bg-muted px-2 py-0.5 rounded-md ${
             size === 'lg' ? 'text-sm' : 'text-xs'
           }`}>
             {selectedModelData?.provider}
@@ -356,17 +356,17 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
       </Button>
 
       {isOpen && (
-        <div className={`absolute bottom-full left-0 z-50 mb-2 rounded-2xl border border-gray-200 bg-white shadow-2xl transition-all duration-300 ease-in-out ${showAll ? 'w-[600px]' : 'w-[420px]'} ${isClosing ? 'animate-out fade-out duration-300' : 'animate-in fade-in duration-300'}`}>
+        <div className={`absolute bottom-full left-0 z-50 mb-2 rounded-2xl border border-border bg-card shadow-2xl transition-all duration-300 ease-in-out ${showAll ? 'w-[600px]' : 'w-[420px]'} ${isClosing ? 'animate-out fade-out duration-300' : 'animate-in fade-in duration-300'}`}>
           {/* Fixed Search Bar */}
-          <div className="flex-shrink-0 p-2 border-b border-gray-100 rounded-t-2xl bg-white">
+          <div className="flex-shrink-0 p-2 border-b border-border/50 rounded-t-2xl bg-card">
             <div className="relative">
-              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 type="text"
                 placeholder="Search models..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-1.5 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-foreground placeholder:text-muted-foreground"
               />
             </div>
           </div>
@@ -378,15 +378,15 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
               <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent" style={{scrollbarGutter: 'stable'}}>
                 {/* Favorites Section */}
                 <div className="p-4">
-                  <h3 className="font-medium text-gray-900 mb-4 flex items-center gap-2">
+                  <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
                     <StarIcon className="h-4 w-4 text-yellow-500" />
                     Favorites
                   </h3>
                   <div className="grid grid-cols-4 gap-3">
                     {filteredModels.filter(model => model.isFavorite).length === 0 ? (
                       <div className="col-span-4 flex flex-col items-center justify-center py-8 text-center">
-                        <StarIcon className="h-8 w-8 text-gray-300 mb-2" />
-                        <p className="text-sm text-gray-500">No favorite models match your filters</p>
+                        <StarIcon className="h-8 w-8 text-muted mb-2" />
+                        <p className="text-sm text-muted-foreground">No favorite models match your filters</p>
                       </div>
                     ) : (
                       filteredModels.filter(model => model.isFavorite).map((model: ModelData) => {
@@ -404,28 +404,28 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                           disabled={disabled}
                           className={`relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
                             disabled 
-                              ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' 
+                              ? 'opacity-50 cursor-not-allowed border-border bg-muted' 
                               : selectedModel === model.id 
-                                ? 'border-blue-500 bg-blue-50 hover:border-blue-200 hover:bg-blue-50' 
-                                : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50'
+                                ? 'border-primary bg-primary/10 hover:border-primary/80 hover:bg-primary/10' 
+                                : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
                           }`}
                         >
                           <div className="flex flex-col items-center gap-2 justify-between h-full">
                             <div className="flex flex-col items-center gap-2">
-                              <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl text-xl font-medium">
+                              <div className="flex items-center justify-center w-12 h-12 bg-muted rounded-xl text-xl font-medium">
                                 {getProviderIcon(model.provider, model.name, 'lg')}
                               </div>
                               <div className="text-center">
                                 {model.displayNameTop && model.displayNameBottom ? (
                                   <>
-                                    <div className="font-medium text-sm text-gray-900">{model.displayNameTop}</div>
-                                    <div className="font-medium text-sm text-gray-900">{model.displayNameBottom}</div>
+                                    <div className="font-medium text-sm text-foreground">{model.displayNameTop}</div>
+                                    <div className="font-medium text-sm text-foreground">{model.displayNameBottom}</div>
                                   </>
                                 ) : (
-                                  <div className="font-medium text-sm text-gray-900">{model.name}</div>
+                                  <div className="font-medium text-sm text-foreground">{model.name}</div>
                                 )}
                                 {model.subtitle && (
-                                  <div className="text-xs text-gray-500 mt-0.5">
+                                  <div className="text-xs text-muted-foreground mt-0.5">
                                     {model.subtitle}
                                   </div>
                                 )}
@@ -445,22 +445,22 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                           </div>
                           {model.capabilities.includes('experimental') && (
                             <div className="absolute top-2 left-2" title="Experimental">
-                              <FlaskConical className="h-4 w-4 text-gray-400" />
+                              <FlaskConical className="h-4 w-4 text-muted-foreground" />
                             </div>
                           )}
                           {selectedModel === model.id && (
-                            <CheckIcon className="absolute top-2 right-2 h-4 w-4 text-blue-500" />
+                            <CheckIcon className="absolute top-2 right-2 h-4 w-4 text-primary" />
                           )}
                           {(model.provider === 'anthropic' || model.provider === 'openai') && !disabled && (
                             <div className="absolute top-2 right-2">
-                              <span className="bg-yellow-100 text-yellow-700 px-1 py-0.5 rounded flex items-center">
+                              <span className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-1 py-0.5 rounded flex items-center">
                                 <ZapIcon className="h-3 w-3" />
                               </span>
                             </div>
                           )}
                           {disabled && (
                             <div className="absolute top-2 right-2">
-                              <KeyIcon className="h-4 w-4 text-gray-400" />
+                              <KeyIcon className="h-4 w-4 text-muted-foreground" />
                             </div>
                           )}
                         </button>
@@ -471,13 +471,13 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                 </div>
 
                 {/* Others Section */}
-                <div className="p-4 border-t border-gray-100">
-                  <h3 className="font-medium text-gray-900 mb-4">Others</h3>
+                <div className="p-4 border-t border-border/50">
+                  <h3 className="font-medium text-foreground mb-4">Others</h3>
                   <div className="grid grid-cols-4 gap-3">
                     {filteredModels.filter(model => !model.isFavorite).length === 0 ? (
                       <div className="col-span-4 flex flex-col items-center justify-center py-8 text-center">
-                        <FilterIcon className="h-8 w-8 text-gray-300 mb-2" />
-                        <p className="text-sm text-gray-500">No other models match your filters</p>
+                        <FilterIcon className="h-8 w-8 text-muted mb-2" />
+                        <p className="text-sm text-muted-foreground">No other models match your filters</p>
                       </div>
                     ) : (
                       filteredModels.filter(model => !model.isFavorite).map((model: ModelData) => {
@@ -495,28 +495,28 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                           disabled={disabled}
                           className={`relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
                             disabled 
-                              ? 'opacity-50 cursor-not-allowed border-gray-200 bg-gray-50' 
+                              ? 'opacity-50 cursor-not-allowed border-border bg-muted' 
                               : selectedModel === model.id 
-                                ? 'border-blue-500 bg-blue-50 hover:border-blue-200 hover:bg-blue-50' 
-                                : 'border-gray-200 bg-white hover:border-blue-200 hover:bg-blue-50'
+                                ? 'border-primary bg-primary/10 hover:border-primary/80 hover:bg-primary/10' 
+                                : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
                           }`}
                         >
                           <div className="flex flex-col items-center gap-2 justify-between h-full">
                             <div className="flex flex-col items-center gap-2">
-                              <div className="flex items-center justify-center w-12 h-12 bg-gray-100 rounded-xl text-xl font-medium">
+                              <div className="flex items-center justify-center w-12 h-12 bg-muted rounded-xl text-xl font-medium">
                                 {getProviderIcon(model.provider, model.name, 'lg')}
                               </div>
                               <div className="text-center">
                                 {model.displayNameTop && model.displayNameBottom ? (
                                   <>
-                                    <div className="font-medium text-sm text-gray-900">{model.displayNameTop}</div>
-                                    <div className="font-medium text-sm text-gray-900">{model.displayNameBottom}</div>
+                                    <div className="font-medium text-sm text-foreground">{model.displayNameTop}</div>
+                                    <div className="font-medium text-sm text-foreground">{model.displayNameBottom}</div>
                                   </>
                                 ) : (
-                                  <div className="font-medium text-sm text-gray-900">{model.name}</div>
+                                  <div className="font-medium text-sm text-foreground">{model.name}</div>
                                 )}
                                 {model.subtitle && (
-                                  <div className="text-xs text-gray-500 mt-0.5">
+                                  <div className="text-xs text-muted-foreground mt-0.5">
                                     {model.subtitle}
                                   </div>
                                 )}
@@ -536,15 +536,15 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                           </div>
                           {model.capabilities.includes('experimental') && (
                             <div className="absolute top-2 left-2" title="Experimental">
-                              <FlaskConical className="h-4 w-4 text-gray-400" />
+                              <FlaskConical className="h-4 w-4 text-muted-foreground" />
                             </div>
                           )}
                           {selectedModel === model.id && (
-                            <CheckIcon className="absolute top-2 right-2 h-4 w-4 text-blue-500" />
+                            <CheckIcon className="absolute top-2 right-2 h-4 w-4 text-primary" />
                           )}
                           {disabled && (
                             <div className="absolute top-2 right-2">
-                              <KeyIcon className="h-4 w-4 text-gray-400" />
+                              <KeyIcon className="h-4 w-4 text-muted-foreground" />
                             </div>
                           )}
                         </button>
@@ -556,12 +556,12 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
               </div>
 
               {/* Fixed Bottom Bar */}
-              <div className="flex-shrink-0 bg-white border-t border-gray-100 p-2 rounded-b-2xl">
+              <div className="flex-shrink-0 bg-card border-t border-border/50 p-2 rounded-b-2xl">
                 <div className="flex items-center justify-between">
                   <button 
                     type="button"
                     onClick={() => setShowAll(false)}
-                    className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+                    className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 px-3 py-1.5 rounded-lg transition-colors"
                   >
                     <ChevronLeftIcon className="h-4 w-4" />
                     <StarIcon className="h-4 w-4" />
@@ -574,13 +574,13 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                       onClick={() => setShowFilters(!showFilters)}
                       className={`p-1.5 rounded-lg transition-colors ${
                         showFilters || selectedFilters.length > 0 
-                          ? 'bg-blue-100 text-blue-600' 
-                          : 'hover:bg-gray-100 text-gray-600'
+                                                      ? 'bg-primary/10 text-primary' 
+                          : 'hover:bg-muted text-muted-foreground'
                       }`}
                     >
                       <FilterIcon className="h-4 w-4" />
                       {selectedFilters.length > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                                                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
                           {selectedFilters.length}
                         </span>
                       )}
@@ -597,12 +597,12 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                 <div className="p-2">
                   {displayedModels.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <FilterIcon className="h-8 w-8 text-gray-300 mb-2" />
-                      <p className="text-sm text-gray-500 mb-1">No models match your filters</p>
+                      <FilterIcon className="h-8 w-8 text-muted mb-2" />
+                      <p className="text-sm text-muted-foreground mb-1">No models match your filters</p>
                       <button
                         type="button"
                         onClick={clearFilters}
-                        className="text-xs text-blue-600 hover:text-blue-800"
+                        className="text-xs text-primary hover:text-primary/80"
                       >
                         Clear filters
                       </button>
@@ -623,30 +623,30 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                         disabled={disabled}
                         className={`flex w-full items-center justify-between px-3 py-3 text-left rounded-lg transition-colors group ${
                           disabled 
-                            ? 'opacity-50 cursor-not-allowed bg-gray-50' 
-                            : 'hover:bg-gray-50'
+                            ? 'opacity-50 cursor-not-allowed bg-muted' 
+                            : 'hover:bg-muted'
                         }`}
                       >
                         <div className="flex items-center gap-3 flex-1">
-                          <div className="relative flex items-center justify-center w-8 h-8 bg-gray-100 rounded-lg text-sm font-medium text-gray-700">
+                          <div className="relative flex items-center justify-center w-8 h-8 bg-muted rounded-lg text-sm font-medium text-muted-foreground">
                             {getProviderIcon(model.provider, model.name)}
                             {model.capabilities.includes('experimental') && (
                               <div className="absolute -top-1 -left-1" title="Experimental">
-                                <FlaskConical className="h-3 w-3 text-gray-400" />
+                                <FlaskConical className="h-3 w-3 text-muted-foreground" />
                               </div>
                             )}
                           </div>
                           
                           <div className="flex flex-col flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-900 text-sm">{model.name}</span>
+                              <span className="font-medium text-foreground text-sm">{model.name}</span>
                               {model.subtitle && (
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-muted-foreground">
                                   {model.subtitle}
                                 </span>
                               )}  
                               {model.provider === 'openai' && model.name.includes('GPT') && (
-                                <span className="bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-md flex items-center">
+                                <span className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-1.5 py-0.5 rounded-md flex items-center">
                                   <ZapIcon className="h-3 w-3" />
                                 </span>
                               )}
@@ -667,12 +667,12 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                         </div>
 
                         {selectedModel === model.id && (
-                          <CheckIcon className="h-4 w-4 text-blue-500 ml-2" />
+                                                      <CheckIcon className="h-4 w-4 text-primary ml-2" />
                         )}
                         
                         {disabled && (
                           <div className="flex items-center gap-1 ml-2">
-                            <KeyIcon className="h-4 w-4 text-gray-400" />
+                                                          <KeyIcon className="h-4 w-4 text-muted-foreground" />
                           </div>
                         )}
                       </button>
@@ -683,13 +683,13 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
               </div>
 
               {/* Fixed Bottom Bar */}
-              <div className="flex-shrink-0 bg-white border-t border-gray-100 p-2 rounded-b-2xl">
+              <div className="flex-shrink-0 bg-card border-t border-border/50 p-2 rounded-b-2xl">
                 <div className="flex items-center justify-between">
                   {!showAll && filteredModels.length > 7 ? (
                     <button
                       type="button"
                       onClick={() => setShowAll(true)}
-                      className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+                      className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 px-3 py-1.5 rounded-lg transition-colors"
                     >
                       <ChevronUpIcon className="h-4 w-4" />
                       Show all
@@ -704,13 +704,13 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                       onClick={() => setShowFilters(!showFilters)}
                       className={`p-1.5 rounded-lg transition-colors ${
                         showFilters || selectedFilters.length > 0 
-                          ? 'bg-blue-100 text-blue-600' 
-                          : 'hover:bg-gray-100 text-gray-600'
+                                                      ? 'bg-primary/10 text-primary' 
+                          : 'hover:bg-muted text-muted-foreground'
                       }`}
                     >
                       <FilterIcon className="h-4 w-4" />
                       {selectedFilters.length > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                                                  <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-4 w-4 flex items-center justify-center">
                           {selectedFilters.length}
                         </span>
                       )}
@@ -725,15 +725,15 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
 
       {/* Filter Modal - positioned as sibling outside dropdown */}
       {isOpen && showFilters && (
-        <div ref={filterModalRef} className="absolute bg-white border border-gray-200 rounded-xl shadow-xl p-3 w-48 z-[70] animate-in fade-in duration-300"
+        <div ref={filterModalRef} className="absolute bg-card border border-border rounded-xl shadow-xl p-3 w-48 z-[70] animate-in fade-in duration-300"
              style={getFilterModalPosition()}>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-medium text-gray-900">Filters</h3>
+            <h3 className="text-base font-medium text-foreground">Filters</h3>
             {selectedFilters.length > 0 && (
               <button
                 type="button"
                 onClick={clearFilters}
-                className="text-xs text-blue-600 hover:text-blue-800"
+                                        className="text-xs text-primary hover:text-primary/80"
               >
                 Clear
               </button>
@@ -750,18 +750,18 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
                   onClick={() => toggleFilter(category.id)}
                   className={`flex items-center gap-2 p-1.5 rounded text-left transition-colors ${
                     isSelected 
-                      ? 'bg-blue-50 border border-blue-200' 
-                      : 'hover:bg-gray-50 border border-transparent'
+                      ? 'bg-primary/10 border border-primary/20' 
+                      : 'hover:bg-muted border border-transparent'
                   }`}
                 >
                   <div className={`p-1 rounded ${category.color}`}>
                     <Icon className="h-4 w-4" />
                   </div>
-                  <span className="text-sm font-medium text-gray-900">
+                  <span className="text-sm font-medium text-foreground">
                     {category.name}
                   </span>
                   {isSelected && (
-                    <CheckIcon className="h-4 w-4 text-blue-600 ml-auto" />
+                    <CheckIcon className="h-4 w-4 text-primary ml-auto" />
                   )}
                 </button>
               );
