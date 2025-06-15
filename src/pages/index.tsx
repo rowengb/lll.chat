@@ -760,8 +760,7 @@ const Home: NextPage = () => {
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
             <div className="text-center mb-16">
               <div className="flex justify-center mb-6">
-                <div className="flex items-center gap-3 bg-card rounded-2xl p-4 shadow-sm border border-border">
-                  <Waves className="h-10 w-10 text-foreground" />
+                <div className="flex items-center bg-card rounded-2xl p-4 shadow-sm border border-border">
                   <Logo size="xl" />
                 </div>
               </div>
