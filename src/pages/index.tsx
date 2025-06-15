@@ -15,7 +15,7 @@ import { ModelSelector, getProviderIcon } from "@/components/ModelSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 import Logo from '../components/Logo';
-import { SidebarSkeleton, MainChatSkeleton, ChatboxSkeleton } from '../components/skeletons';
+
 import { trpc } from "@/utils/trpc";
 
 
@@ -32,6 +32,9 @@ const Home: NextPage = () => {
   const router = useRouter();
   const [selectedModel, setSelectedModel] = useState<string | null>(null); // Start with null to indicate loading
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  // Add state to track model choice for new chats (before thread is created)
+  const [newChatModelChoice, setNewChatModelChoice] = useState<string | null>(null);
+  
   // Add SPA state management for authenticated users
   const [currentView, setCurrentView] = useState<'welcome' | 'chat' | 'settings' | 'account'>('welcome');
   
@@ -106,9 +109,13 @@ const Home: NextPage = () => {
       if (view === 'chat' && threadId && typeof threadId === 'string') {
         setCurrentView('chat');
         setCurrentThreadId(threadId);
+        // Clear new chat model choice when navigating to existing thread
+        setNewChatModelChoice(null);
       } else if (view === 'settings') {
         setCurrentView('settings');
         setCurrentThreadId(null);
+        // Clear new chat model choice when going to settings
+        setNewChatModelChoice(null);
         // Handle tab parameter for settings page
         if (tab === 'api-keys') {
           setActiveSettingsTab('api-keys');
@@ -119,10 +126,13 @@ const Home: NextPage = () => {
         // Direct account page access - redirect to settings with account tab
         setCurrentView('settings');
         setCurrentThreadId(null);
+        // Clear new chat model choice when going to account
+        setNewChatModelChoice(null);
         setActiveSettingsTab('account');
       } else {
         setCurrentView('welcome');
         setCurrentThreadId(null);
+        // Don't clear newChatModelChoice here - user might be coming back to welcome to create new chat
       }
     }
   }, [router.query, user]);
@@ -135,16 +145,30 @@ const Home: NextPage = () => {
         model: (currentThread as any).model, 
         lastModel: currentThread.lastModel, 
         threadModel, 
-        currentSelectedModel: selectedModel 
+        currentSelectedModel: selectedModel,
+        newChatModelChoice 
       });
       if (threadModel && threadModel !== selectedModel) {
         console.log(`🔄 [MODEL] Switching to thread model: ${threadModel} (was: ${selectedModel})`);
         setSelectedModel(threadModel);
+        // Clear new chat model choice since we're in an existing thread
+        setNewChatModelChoice(null);
       }
     } else if (currentThreadId) {
-      console.log(`⚠️ [MODEL] No thread data found for threadId: ${currentThreadId}`);
+      // Thread ID exists but no thread data yet - this happens during thread creation
+      // Don't change the model here! Let it stay as the user selected it
+      console.log(`⚠️ [MODEL] No thread data found for threadId: ${currentThreadId} - preserving current model: ${selectedModel}`);
+    } else if (!currentThreadId) {
+      // We're in welcome view (new chat) - use newChatModelChoice if available, otherwise use default
+      if (newChatModelChoice && newChatModelChoice !== selectedModel) {
+        console.log(`🆕 [MODEL] Using new chat model choice: ${newChatModelChoice} (was: ${selectedModel})`);
+        setSelectedModel(newChatModelChoice);
+      } else if (!newChatModelChoice && bestDefaultModel?.modelId && selectedModel !== bestDefaultModel.modelId) {
+        console.log(`🏠 [MODEL] Resetting to default model for new chat: ${bestDefaultModel.modelId} (was: ${selectedModel})`);
+        setSelectedModel(bestDefaultModel.modelId);
+      }
     }
-  }, [currentThread, currentThreadId]); // Also depend on currentThreadId to ensure it triggers on thread changes
+  }, [currentThread, currentThreadId, newChatModelChoice, bestDefaultModel]); // Remove selectedModel from dependencies to prevent infinite loops
 
   // Settings page useEffect hooks
 
@@ -337,6 +361,12 @@ const Home: NextPage = () => {
   };
 
   const handleNewChat = () => {
+    // Clear any previous new chat model choice and reset to default
+    setNewChatModelChoice(null);
+    // Reset to default model for new chat
+    if (bestDefaultModel?.modelId) {
+      setSelectedModel(bestDefaultModel.modelId);
+    }
     navigateToWelcome();
   };
 
@@ -360,6 +390,10 @@ const Home: NextPage = () => {
         console.error('Failed to update thread model:', error);
         // Don't show error to user as this is not critical
       }
+    } else {
+      // We're in welcome view (new chat) - store the model choice for when thread is created
+      console.log(`🆕 [MODEL] Storing new chat model choice: ${modelId}`);
+      setNewChatModelChoice(modelId);
     }
   };
 
@@ -403,7 +437,7 @@ const Home: NextPage = () => {
               transition: 'margin-left 0.2s ease-in-out'
             }}
           >
-            <div className="text-lg text-gray-500">Loading chat...</div>
+            <LoadingDots text="Loading chat" size="lg" />
           </div>
         );
       case 'settings':
@@ -708,13 +742,9 @@ const Home: NextPage = () => {
           <link rel="manifest" href="/site.webmanifest" />
         </Head>
         
-        {/* Simple loading skeleton with main layout shapes */}
-        <main className="h-screen flex">
-          <SidebarSkeleton />
-          <div className="flex-1 flex flex-col">
-            <MainChatSkeleton />
-            <ChatboxSkeleton />
-      </div>
+        {/* Simple loading text */}
+        <main className="h-screen flex items-center justify-center">
+          <LoadingDots text="Loading" size="lg" />
         </main>
       </>
     );
