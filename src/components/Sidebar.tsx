@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { PlusIcon, MessageSquareIcon, SettingsIcon, ChevronLeftIcon, MenuIcon, SearchIcon, TrashIcon, PinIcon, MoreVerticalIcon, EditIcon, Waves, UserIcon, LogOutIcon, GitBranchIcon, XIcon, PinOffIcon, PanelLeftIcon } from "lucide-react";
+import { PlusIcon, MessageSquareIcon, SettingsIcon, ChevronLeftIcon, SearchIcon, TrashIcon, PinIcon, MoreVerticalIcon, EditIcon, Waves, UserIcon, LogOutIcon, GitBranchIcon, XIcon, PinOffIcon, PanelLeftIcon } from "lucide-react";
 import { useRouter } from "next/router";
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -38,10 +38,270 @@ interface SidebarProps {
   onWidthChange?: (width: number) => void;
 }
 
+interface MobileSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentThreadId: string | null;
+  onThreadSelect: (threadId: string) => void;
+  onNewChat?: () => void;
+  onNavigateToSettings?: () => void;
+  onNavigateToAccount?: () => void;
+  onNavigateToWelcome?: () => void;
+}
+
 interface ContextMenu {
   threadId: string;
   x: number;
   y: number;
+}
+
+// Mobile Sidebar Component
+function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome }: MobileSidebarProps) {
+  const { user } = useUser();
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const { data: threads } = trpc.chat.getThreads.useQuery(undefined, {
+    refetchOnWindowFocus: true,
+    staleTime: 5000,
+    refetchInterval: 30000,
+  });
+  const { data: models } = trpc.models.getModels.useQuery();
+
+  // Filter threads based on search query
+  const filteredThreads = threads?.filter(thread => 
+    thread.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    thread.model?.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
+
+  // Separate pinned and unpinned threads
+  const pinnedThreads = filteredThreads.filter(thread => (thread as any).pinned);
+  const unpinnedThreads = filteredThreads.filter(thread => !(thread as any).pinned);
+
+  // Sort each category by creation date (newest first)
+  const sortedPinnedThreads = [...pinnedThreads].sort((a, b) => 
+    (b as any)._creationTime - (a as any)._creationTime
+  );
+  const sortedUnpinnedThreads = [...unpinnedThreads].sort((a, b) => 
+    (b as any)._creationTime - (a as any)._creationTime
+  );
+
+  const ThreadItem = ({ thread, isPinned }: { thread: any; isPinned: boolean }) => {
+    const provider = getProviderFromModel(thread.model, models);
+    const modelName = getModelNameFromId(thread.model, models);
+    
+    return (
+      <div
+        className={`group relative flex w-full items-center gap-3 rounded-lg p-3 text-left text-sm hover:bg-muted cursor-pointer ${
+          currentThreadId === thread.id ? "bg-muted text-foreground" : "text-muted-foreground"
+        }`}
+        onClick={() => onThreadSelect(thread.id)}
+      >
+        <div className="flex-shrink-0 h-4 w-4 flex items-center justify-center">
+          {getProviderIcon(provider, modelName)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-foreground truncate">
+            {thread.title || `${thread.model} conversation`}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {new Date((thread as any)._creationTime).toLocaleDateString()}
+          </div>
+        </div>
+        {isPinned && (
+          <PinIcon className="h-3 w-3 text-primary flex-shrink-0" />
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      {/* Mobile Sidebar Overlay */}
+      <div className={`sm:hidden fixed inset-0 z-50 ${
+        isOpen ? 'pointer-events-auto' : 'pointer-events-none'
+      }`}>
+        {/* Backdrop - Blur only */}
+        <div 
+          className={`fixed inset-0 backdrop-blur-md transition-opacity duration-200 ease-out ${
+            isOpen ? 'opacity-100' : 'opacity-0'
+          }`}
+          onClick={onClose}
+        />
+        
+        {/* Sidebar Panel with floating design */}
+        <div 
+          className={`fixed transition-opacity duration-300 ease-out ${
+            isOpen ? 'opacity-100' : 'opacity-0'
+          }`}
+          style={{
+            top: '24px',
+            left: '24px',
+            right: '24px',
+            maxHeight: 'calc(100vh - 100px)',
+            minHeight: 'auto'
+          }}
+        >
+          <div 
+            className="relative shadow-xl dark:shadow-2xl dark:shadow-black/50 max-h-full"
+            style={{
+              borderRadius: '20px'
+            }}
+          >
+            {/* Background with border */}
+            <div 
+              className="absolute inset-0 bg-gray-50/50 dark:bg-gray-950 border border-border"
+              style={{
+                borderRadius: '20px',
+                clipPath: 'inset(0 round 20px)'
+              }}
+            />
+            
+            {/* Content */}
+            <div className="relative z-10 flex flex-col overflow-hidden rounded-2xl">
+              {/* Floating buttons inside mobile sidebar */}
+              <div 
+                className="absolute z-50 transition-opacity duration-200 ease-out opacity-100"
+                style={{
+                  top: '16px',
+                  left: '16px'
+                }}
+              >
+                <div 
+                  className="bg-muted border border-border" 
+                  style={{ 
+                    borderRadius: '20px',
+                    padding: '4px'
+                  }}
+                >
+                  <div className="flex gap-1">
+                    <Button
+                      onClick={onClose}
+                      size="sm"
+                      variant="ghost"
+                      title="Collapse Sidebar"
+                      className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+                    >
+                      <PanelLeftIcon className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      onClick={onNewChat}
+                      size="sm"
+                      variant="ghost"
+                      title="New Chat"
+                      className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+                    >
+                      <PlusIcon className="h-4.25 w-4.25" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Header */}
+              <div className="flex items-center justify-end p-4 border-b border-border/50">
+                <div className="flex items-center">
+                  <div className="bg-muted border border-border px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer" style={{ borderRadius: '20px' }} onClick={onNavigateToWelcome}>
+                    <Logo size="sm" className="flex-shrink-0" />
+                  </div>
+                </div>
+              </div>
+
+              {/* New Chat Button */}
+              <div className="px-4 py-3 pb-2">
+                <Button
+                  onClick={onNewChat}
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg h-10 text-sm font-medium transition-all duration-200"
+                >
+                  New Chat
+                </Button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="px-3 pt-2 pb-3">
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search chats..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 bg-transparent border-0 rounded-none focus:border-primary focus:ring-0 focus:outline-none shadow-none text-sm transition-colors text-foreground placeholder:text-muted-foreground"
+                    style={{ outline: 'none', boxShadow: 'none' }}
+                  />
+                  <div className="absolute bottom-0 left-2 right-2 h-px bg-border"></div>
+                </div>
+              </div>
+
+              {/* Thread List */}
+              <div className="overflow-y-auto hidden-scrollbar max-h-[50vh] min-h-0">
+                <div className="px-3 py-2">
+                  {/* Pinned Threads Section */}
+                  {sortedPinnedThreads.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 px-1 py-2 mb-2">
+                        <PinIcon className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-sm font-medium text-muted-foreground tracking-wide">
+                          Pinned
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {sortedPinnedThreads.map((thread) => (
+                          <ThreadItem key={thread.id} thread={thread} isPinned={true} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Regular Threads Section */}
+                  {sortedUnpinnedThreads.length > 0 && sortedPinnedThreads.length > 0 && (
+                    <div className="flex items-center gap-2 px-1 py-2 mb-2">
+                      <MessageSquareIcon className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground tracking-wide">
+                        Recent
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Unpinned Threads */}
+                  <div className="space-y-1">
+                    {sortedUnpinnedThreads.map((thread) => (
+                      <ThreadItem key={thread.id} thread={thread} isPinned={false} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer with Account Button */}
+              <div className="border-t border-border/50 p-3">
+                <div className="flex items-center justify-between">
+                  <Button
+                    onClick={onNavigateToAccount}
+                    variant="ghost"
+                    className="flex-1 justify-start text-left h-10 px-3 hover:bg-muted transition-colors"
+                  >
+                    <UserIcon className="h-4 w-4 mr-3" />
+                    <span className="text-sm font-medium">
+                      {user?.firstName && user?.lastName 
+                        ? `${user.firstName} ${user.lastName}`
+                        : user?.username || user?.firstName || "Account"}
+                    </span>
+                  </Button>
+                  <Button
+                    onClick={onNavigateToSettings}
+                    size="sm"
+                    variant="ghost"
+                    title="Settings"
+                    className="h-10 w-10 p-0 hover:bg-muted ml-2"
+                  >
+                    <SettingsIcon className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }
 
 export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, collapsed, onToggleCollapse, onWidthChange }: SidebarProps) {
@@ -502,7 +762,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     <>
       {/* Floating buttons - Collapsed state (with search) */}
       <div 
-        className={`fixed z-50 transition-opacity duration-200 ease-out ${
+        className={`hidden sm:block fixed z-50 transition-opacity duration-200 ease-out ${
           collapsed && !isTransitioning ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{
@@ -551,7 +811,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
 
       {/* Floating buttons - Expanded state (no search) */}
       <div 
-        className={`fixed z-50 transition-opacity duration-200 ease-out ${
+        className={`hidden sm:block fixed z-50 transition-opacity duration-200 ease-out ${
           !collapsed && !isTransitioning ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{
@@ -593,7 +853,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
       <div 
         className={`fixed z-40 flex flex-col transition-all duration-300 ease-out ${
           collapsed ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'
-        }`}
+        } hidden sm:flex`}
         style={{ 
           width: `${sidebarWidth - 48}px`, // Subtract padding from both sides (24px each)
           top: '24px', // Match chatbox spacing (24px from top)
@@ -776,6 +1036,33 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           </div>
         </div>
       )}
+
+      {/* Mobile Sidebar */}
+      <MobileSidebar
+        isOpen={!collapsed}
+        onClose={() => onToggleCollapse()}
+        currentThreadId={currentThreadId}
+        onThreadSelect={(threadId: string) => {
+          onThreadSelect(threadId);
+          onToggleCollapse(); // Close sidebar after selection
+        }}
+        onNewChat={() => {
+          onNewChat?.();
+          onToggleCollapse(); // Close sidebar after new chat
+        }}
+        onNavigateToSettings={() => {
+          onNavigateToSettings?.();
+          onToggleCollapse(); // Close sidebar after navigation
+        }}
+        onNavigateToAccount={() => {
+          onNavigateToAccount?.();
+          onToggleCollapse(); // Close sidebar after navigation
+        }}
+        onNavigateToWelcome={() => {
+          onNavigateToWelcome?.();
+          onToggleCollapse(); // Close sidebar after navigation
+        }}
+      />
 
       {/* Context Menu */}
       {contextMenu && (

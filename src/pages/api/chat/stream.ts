@@ -29,6 +29,12 @@ const getModelProvider = (model?: string) => {
   return { provider: "openai", model };
 };
 
+// Check if a model is for image generation
+const isImageGenerationModel = (model?: string) => {
+  if (!model) return false;
+  return model.includes("image") || model.includes("dall-e") || model === "gpt-image-1";
+};
+
 // Helper to get or create user in Convex
 const getOrCreateConvexUser = async (clerkUserId: string) => {
   let user = await convex.query(api.users.getByAuthId, { authId: clerkUserId });
@@ -261,7 +267,79 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(`🤖 [LLL.CHAT] Sending ${aiMessages.length} messages to AI (${processedFiles.length} files processed)`);
 
-    // Create AI client and stream response
+    // Check if this is an image generation request
+    if (isImageGenerationModel(model)) {
+      console.log(`🎨 [LLL.CHAT] Image generation request detected for model: ${model}`);
+      
+      // Extract the prompt from the last user message
+      const lastMessage = messages[messages.length - 1];
+      const prompt = lastMessage?.content || "A beautiful image";
+      
+      console.log(`🎨 [LLL.CHAT] Generating image with prompt: "${prompt}"`);
+      
+      try {
+        // Generate image using OpenAI DALL-E API
+        const imageResponse = await fetch("https://api.openai.com/v1/images/generations", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "dall-e-3",
+            prompt: prompt,
+            n: 1,
+            size: "1024x1024",
+            quality: "standard",
+            response_format: "url"
+          }),
+        });
+
+        if (!imageResponse.ok) {
+          throw new Error(`Image generation failed: ${imageResponse.status} ${imageResponse.statusText}`);
+        }
+
+        const imageData = await imageResponse.json();
+        const imageUrl = imageData.data[0]?.url;
+        
+        if (!imageUrl) {
+          throw new Error("No image URL returned from API");
+        }
+
+        console.log(`🎨 [LLL.CHAT] Image generated successfully: ${imageUrl}`);
+
+        // Save the image to Convex storage
+        console.log(`🎨 [LLL.CHAT] Saving image to Convex storage...`);
+        const imageFileId = await convex.action(api.files.saveImageFromUrl, {
+          imageUrl,
+          userId: convexUser._id,
+        });
+        
+        console.log(`🎨 [LLL.CHAT] Image saved to Convex with file ID: ${imageFileId}`);
+
+        // Generate a message ID for this response
+        const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Send the image result
+        res.write(`f:{"messageId":"${messageId}"}\n`);
+        res.write(`f:{"imageGenerated":true,"imageFileId":"${imageFileId}"}\n`);
+        res.write(`d:{"message":"Image generated successfully!"}\n`);
+        res.write(`f:{"finished":true}\n`);
+        res.end();
+        
+        console.log(`🎨 [LLL.CHAT] Image generation completed in ${Date.now() - aiCallStart}ms`);
+        return;
+        
+      } catch (error) {
+        console.error(`❌ [LLL.CHAT] Image generation error:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        res.write(`f:{"error":"Image generation failed: ${errorMessage}"}\n`);
+        res.end();
+        return;
+      }
+    }
+
+    // Create AI client and stream response for text models
     const aiClient = getAiClient(modelData.provider, apiKey);
     const stream = await aiClient.createChatCompletion({
       messages: aiMessages,

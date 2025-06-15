@@ -487,8 +487,8 @@ export function Chatbox({
           </div>
         )}
         
-        <div className="flex items-center gap-3">
-          <div className="textarea-container">
+        <div className="flex flex-row items-center gap-3">
+          <div className="textarea-container flex-1">
             <textarea
               ref={inputRef as any}
               value={input}
@@ -523,41 +523,45 @@ export function Chatbox({
           </Button>
         </div>
         
-        <div className="border-t border-border/50 mt-2 pt-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ModelSelector
-              selectedModel={selectedModel}
-              onModelChange={onModelChange}
-            />
-            {supportsGrounding && onSearchGroundingChange && (
+        <div className="border-t border-border/50 mt-2 pt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+          <div className="flex flex-row items-center gap-2">
+            <div className="flex-1 sm:flex-initial sm:w-auto">
+              <ModelSelector
+                selectedModel={selectedModel}
+                onModelChange={onModelChange}
+              />
+            </div>
+            <div className="flex items-center gap-1.5">
+              {supportsGrounding && onSearchGroundingChange && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onSearchGroundingChange(!searchGroundingEnabled)}
+                  disabled={isLoading}
+                  className={`h-7 transition-colors border rounded-full ${
+                    searchGroundingEnabled 
+                      ? 'text-primary bg-primary/10 border-primary/20 hover:bg-primary/20 hover:border-primary/30' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border hover:border-border/80'
+                  } px-5 sm:px-3`}
+                  title={searchGroundingEnabled ? "Disable Google Search grounding" : "Enable Google Search grounding"}
+                >
+                  <GlobeIcon className="h-3.5 w-3.5" />
+                  <span className="ml-1 hidden sm:inline">Search</span>
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => onSearchGroundingChange(!searchGroundingEnabled)}
+                onClick={handleAttachClick}
                 disabled={isLoading}
-                className={`h-8 px-3 transition-colors border rounded-full ${
-                  searchGroundingEnabled 
-                    ? 'text-primary bg-primary/10 border-primary/20 hover:bg-primary/20 hover:border-primary/30' 
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border hover:border-border/80'
-                }`}
-                title={searchGroundingEnabled ? "Disable Google Search grounding" : "Enable Google Search grounding"}
+                className="h-7 text-muted-foreground hover:text-foreground hover:bg-muted border border-border hover:border-border/80 transition-colors rounded-full px-5 sm:px-3"
               >
-                <GlobeIcon className="h-4 w-4 mr-1" />
-                Search
+                <PaperclipIcon className="h-3.5 w-3.5" />
+                <span className="ml-1 hidden sm:inline">Attach</span>
               </Button>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={handleAttachClick}
-              disabled={isLoading}
-              className="h-8 px-3 text-muted-foreground hover:text-foreground hover:bg-muted border border-border hover:border-border/80 transition-colors rounded-full"
-            >
-              <PaperclipIcon className="h-4 w-4 mr-1" />
-              Attach
-            </Button>
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -567,9 +571,6 @@ export function Chatbox({
               className="hidden"
               disabled={isLoading}
             />
-          </div>
-          <div className="text-xs text-muted-foreground">
-            Press Enter to send
           </div>
         </div>
       </form>

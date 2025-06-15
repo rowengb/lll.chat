@@ -16,6 +16,7 @@ export const createMessage = mutation({
       confidence: v.optional(v.number()),
     }))),
     attachments: v.optional(v.array(v.id("files"))),
+    imageFileId: v.optional(v.id("files")),
   },
   handler: async (ctx, args) => {
     const messageId = await ctx.db.insert("messages", {
@@ -27,6 +28,7 @@ export const createMessage = mutation({
       isGrounded: args.isGrounded,
       groundingSources: args.groundingSources,
       attachments: args.attachments,
+      imageFileId: args.imageFileId,
     });
     
     return messageId;
@@ -60,6 +62,7 @@ export const createMany = mutation({
         snippet: v.optional(v.string()),
         confidence: v.optional(v.number()),
       }))),
+      imageFileId: v.optional(v.id("files")),
     })),
   },
   handler: async (ctx, args) => {
@@ -86,6 +89,7 @@ export const createAssistantMessage = mutation({
       snippet: v.optional(v.string()),
       confidence: v.optional(v.number()),
     }))),
+    imageFileId: v.optional(v.id("files")),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("messages", {
@@ -97,6 +101,7 @@ export const createAssistantMessage = mutation({
       attachments: args.attachments,
       isGrounded: args.isGrounded,
       groundingSources: args.groundingSources,
+      imageFileId: args.imageFileId,
     });
   },
 });

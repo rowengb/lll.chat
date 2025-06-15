@@ -21,6 +21,7 @@ interface Message {
   isGrounded?: boolean; // Indicates if response was grounded with Google Search
   groundingMetadata?: GroundingMetadata; // Google Search grounding metadata
   attachments?: FileAttachment[];
+  imageFileId?: string; // Reference to generated image file in Convex storage
 }
 
 interface GroundingSource {

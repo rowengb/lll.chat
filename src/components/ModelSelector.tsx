@@ -356,7 +356,11 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
       </Button>
 
       {isOpen && (
-        <div className={`absolute bottom-full left-0 z-50 mb-2 rounded-2xl border border-border bg-card shadow-2xl transition-all duration-300 ease-in-out ${showAll ? 'w-[600px]' : 'w-[420px]'} ${isClosing ? 'animate-out fade-out duration-300' : 'animate-in fade-in duration-300'}`}>
+        <div className={`z-50 mb-2 rounded-2xl border border-border bg-card shadow-2xl transition-opacity duration-300 ease-in-out ${isClosing ? 'opacity-0' : 'opacity-100'} ${
+          showAll 
+            ? 'w-[600px] max-w-[90vw]' 
+            : 'w-[420px] max-w-[90vw]'
+        } fixed left-1/2 -translate-x-1/2 bottom-32 sm:absolute sm:bottom-full sm:left-0 sm:translate-x-0`}>
           {/* Fixed Search Bar */}
           <div className="flex-shrink-0 p-2 border-b border-border/50 rounded-t-2xl bg-card">
             <div className="relative">
@@ -373,7 +377,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
 
           {showAll ? (
             // Grid View - Show All
-            <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{height: '850px'}}>
+            <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{height: window.innerWidth < 640 ? 'calc(100vh - 300px)' : '850px', maxHeight: window.innerWidth < 640 ? 'calc(100vh - 300px)' : '850px'}}>
               {/* Scrollable Content Area */}
               <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent" style={{scrollbarGutter: 'stable'}}>
                 {/* Favorites Section */}
@@ -591,7 +595,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
             </div>
           ) : (
             // List View - Default
-            <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{height: '450px'}}>
+            <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{height: window.innerWidth < 640 ? 'calc(100vh - 500px)' : '450px', maxHeight: window.innerWidth < 640 ? 'calc(100vh - 500px)' : '450px'}}>
               {/* Scrollable Content Area */}
               <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent" style={{scrollbarGutter: 'stable'}}>
                 <div className="p-2">
@@ -725,8 +729,13 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
 
       {/* Filter Modal - positioned as sibling outside dropdown */}
       {isOpen && showFilters && (
-        <div ref={filterModalRef} className="absolute bg-card border border-border rounded-xl shadow-xl p-3 w-48 z-[70] animate-in fade-in duration-300"
-             style={getFilterModalPosition()}>
+        <div ref={filterModalRef} className={`bg-card border border-border rounded-xl shadow-xl p-3 w-48 z-[70] transition-opacity duration-300 ease-in-out opacity-100 fixed right-2 sm:absolute sm:left-auto sm:right-auto`}
+             style={{
+               bottom: typeof window !== 'undefined' && window.innerWidth < 640 ? '185px' : (size === 'lg' ? '60px' : '40px'),
+               ...(typeof window !== 'undefined' && window.innerWidth >= 640 && {
+                 left: showAll ? '608px' : '428px'
+               })
+             }}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-medium text-foreground">Filters</h3>
             {selectedFilters.length > 0 && (

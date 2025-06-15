@@ -45,6 +45,8 @@ export default defineSchema({
       unfurledFinalUrl: v.optional(v.string()), // Final URL after redirects
       unfurledAt: v.optional(v.number()), // Timestamp when unfurled
     }))),
+    // Image generation fields
+    imageFileId: v.optional(v.id("files")), // Reference to generated image file in Convex storage
   }).index("by_thread", ["threadId"]).index("by_user", ["userId"]),
 
   files: defineTable({

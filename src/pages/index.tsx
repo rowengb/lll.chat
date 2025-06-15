@@ -366,6 +366,7 @@ const Home: NextPage = () => {
               onModelChange={handleModelChange}
               sidebarCollapsed={sidebarCollapsed}
               sidebarWidth={sidebarWidth}
+              onToggleSidebar={toggleSidebar}
             />
           );
         }
@@ -648,6 +649,7 @@ const Home: NextPage = () => {
               onModelChange={handleModelChange}
               sidebarCollapsed={sidebarCollapsed}
               sidebarWidth={sidebarWidth}
+              onToggleSidebar={toggleSidebar}
             />
           );
         }

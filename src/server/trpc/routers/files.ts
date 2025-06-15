@@ -120,4 +120,25 @@ export const filesRouter = createTRPCRouter({
         threadId: input.threadId as Id<"threads">,
       });
     }),
+
+  saveImageFromUrl: protectedProcedure
+    .input(z.object({
+      imageUrl: z.string(),
+      messageId: z.string().optional(),
+      threadId: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      return await convex.action(api.files.saveImageFromUrl, {
+        imageUrl: input.imageUrl,
+        userId: convexUser._id,
+        messageId: input.messageId ? input.messageId as Id<"messages"> : undefined,
+        threadId: input.threadId ? input.threadId as Id<"threads"> : undefined,
+      });
+    }),
 }); 

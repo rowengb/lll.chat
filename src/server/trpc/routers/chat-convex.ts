@@ -156,6 +156,7 @@ export const chatConvexRouter = createTRPCRouter({
         snippet: z.string().optional(),
         confidence: z.number().optional(),
       })).optional(),
+      imageFileId: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -182,6 +183,7 @@ export const chatConvexRouter = createTRPCRouter({
             userId: convexUser._id,
             isGrounded: input.isGrounded,
             groundingSources: input.groundingSources,
+            imageFileId: input.imageFileId ? input.imageFileId as Id<"files"> : undefined,
           },
         ],
       });
@@ -214,6 +216,7 @@ export const chatConvexRouter = createTRPCRouter({
         snippet: z.string().optional(),
         confidence: z.number().optional(),
       })).optional(),
+      imageFileId: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -230,6 +233,7 @@ export const chatConvexRouter = createTRPCRouter({
         userId: convexUser._id,
         isGrounded: input.isGrounded,
         groundingSources: input.groundingSources,
+        imageFileId: input.imageFileId ? input.imageFileId as Id<"files"> : undefined,
       });
 
       return { 

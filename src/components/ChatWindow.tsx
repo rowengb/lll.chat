@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { ArrowUpIcon, CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, Waves, PenToolIcon, CodeIcon, BrainIcon, LightbulbIcon, BarChartIcon, ChefHatIcon, ZapIcon, BotIcon, ShieldIcon, PaperclipIcon, XIcon } from "lucide-react";
+import { ArrowUpIcon, CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, Waves, PenToolIcon, CodeIcon, BrainIcon, LightbulbIcon, BarChartIcon, ChefHatIcon, ZapIcon, BotIcon, ShieldIcon, PaperclipIcon, XIcon, SearchIcon, PanelLeftIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/utils/trpc";
 import ReactMarkdown from 'react-markdown';
@@ -17,14 +17,16 @@ import { FileAttachment, FileAttachmentData } from './FileAttachment';
 import { Chatbox } from './Chatbox';
 import { FileAttachmentWithUrl } from './FileAttachmentWithUrl';
 import { GroundingSources } from './GroundingSources';
+import { MessageImage } from './MessageImage';
+import { ImageSkeleton } from './ImageSkeleton';
 
 // Shared layout CSS for perfect alignment
 const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
 const sharedGridClasses = "grid grid-cols-[1fr_min(900px,100%)_1fr] px-6";
 
 // Slightly wider chatbox for visual hierarchy
-const chatboxLayoutClasses = "max-w-[85%] w-full mx-auto";
-const chatboxGridClasses = "grid grid-cols-[1fr_min(900px,100%)_1fr] gap-4 px-4";
+const chatboxLayoutClasses = "max-w-[800px] w-full mx-auto";
+const chatboxGridClasses = "grid grid-cols-[1fr_min(800px,100%)_1fr] gap-4 px-4";
 
 interface ChatWindowProps {
   threadId: string | null;
@@ -33,6 +35,7 @@ interface ChatWindowProps {
   onModelChange: (model: string) => void;
   sidebarCollapsed: boolean;
   sidebarWidth: number;
+  onToggleSidebar?: () => void;
 }
 
 interface Message {
@@ -46,6 +49,7 @@ interface Message {
   isGrounded?: boolean; // Indicates if response was grounded with Google Search
   groundingMetadata?: GroundingMetadata; // Google Search grounding metadata
   attachments?: FileAttachmentData[];
+  imageFileId?: string; // Reference to generated image file in Convex storage
 }
 
 interface GroundingSource {
@@ -68,7 +72,7 @@ interface GroundingMetadata {
   sources?: GroundingSource[]; // The sources used for grounding (optional)
 }
 
-const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth }: ChatWindowProps) => {
+const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth, onToggleSidebar }: ChatWindowProps) => {
   const [input, setInput] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -523,6 +527,20 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     return modelData?.provider || "openai";
   };
 
+  // Helper function to detect if model is for image generation
+  const isImageGenerationModel = (modelId?: string | null) => {
+    if (!modelId || !allModels) {
+      console.log(`🎨 [DEBUG] Image model check: modelId=${modelId}, allModels=${!!allModels}`);
+      return false;
+    }
+    
+    const modelData = allModels.find(m => m.id === modelId);
+    console.log(`🎨 [DEBUG] Model data for ${modelId}:`, modelData);
+    const hasImageCapability = modelData?.capabilities?.includes('image-generation') || false;
+    console.log(`🎨 [DEBUG] Has image capability: ${hasImageCapability}`);
+    return hasImageCapability;
+  };
+
   // Auto-resize textarea
   const adjustTextareaHeight = () => {
     const textarea = inputRef.current;
@@ -716,6 +734,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       let messageId = "";
       let isGrounded = false;
       let groundingMetadata: GroundingMetadata | undefined = undefined;
+      let imageGenerated = false;
+      let imageFileId = "";
 
       console.log(`[STREAM] Starting to read stream...`);
 
@@ -770,6 +790,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                     
                     console.log(`🔍 [STREAM] Processed grounding metadata:`, groundingMetadata);
                   }
+                }
+                if (metadata.imageGenerated) {
+                  imageGenerated = true;
+                  imageFileId = metadata.imageFileId || "";
+                  console.log(`🎨 [STREAM] Image generated with file ID: ${imageFileId}`);
                 }
                 if (metadata.error) {
                   console.error(`[STREAM] API Error: ${metadata.error}`);
@@ -831,6 +856,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   userAttachments: files.map(file => file.id),
                   isGrounded,
                   groundingSources: groundingMetadata?.sources && groundingMetadata.sources.length > 0 ? groundingMetadata.sources : undefined,
+                  imageFileId: imageGenerated ? imageFileId : undefined,
                 });
 
                 // Update file associations if there are files
@@ -878,7 +904,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                       content: fullContent, 
                       model: selectedModel, 
                       isGrounded,
-                      groundingMetadata: groundingMetadata
+                      groundingMetadata: groundingMetadata,
+                      imageFileId: imageGenerated ? imageFileId : undefined
                     };
                   } else if (msg.role === "user" && msg.isOptimistic) {
                     // Mark user message as non-optimistic too
@@ -1163,12 +1190,64 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
     return (
       <div 
-        className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900"
+        className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900 left-0 sm:left-auto"
         style={{ 
-          left: sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
+          left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
           transition: 'left 0.3s ease-out'
         }}
       >
+        {/* Mobile Menu Button - Only show when sidebar is collapsed */}
+        <div className={`sm:hidden fixed z-50 ${sidebarCollapsed ? 'block' : 'hidden'}`}>
+          <div 
+            className="absolute"
+            style={{
+              top: '24px',
+              left: '0px'
+            }}
+          >
+            <div 
+              className="bg-muted border border-border" 
+              style={{ 
+                borderRadius: '0 20px 20px 0',
+                padding: '4px'
+              }}
+            >
+              <div className="flex flex-col gap-1">
+                <Button
+                  onClick={() => {/* TODO: Add search functionality */}}
+                  size="sm"
+                  variant="ghost"
+                  title="Search"
+                  className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+                >
+                  <SearchIcon className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={onToggleSidebar}
+                  size="sm"
+                  variant="ghost"
+                  title="Expand Sidebar"
+                  className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+                >
+                  <PanelLeftIcon className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={() => {
+                    // Handle new chat - navigate to home/welcome
+                    window.location.href = '/';
+                  }}
+                  size="sm"
+                  variant="ghost"
+                  title="New Chat"
+                  className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+                >
+                  <PlusIcon className="h-4.25 w-4.25" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Welcome Content Area with proper scrolling container for chatbox alignment */}
         <div className="flex-1 overflow-hidden relative">
           <div className="h-full overflow-y-auto">
@@ -1188,32 +1267,74 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               </p>
             </div>
 
-            {/* Example Prompts Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-              {examplePrompts.map((example, index) => {
-                const IconComponent = example.icon;
-                return (
-                  <button
-                    key={index}
-                    onClick={() => handleExampleClick(example.prompt)}
-                    className="group text-left p-4 bg-gradient-to-br from-card/80 to-muted/60 dark:from-slate-800/80 dark:to-slate-700/60 backdrop-blur-sm hover:from-muted/90 hover:to-muted/70 dark:hover:from-slate-700/90 dark:hover:to-slate-600/70 rounded-2xl border border-border/60 hover:border-border/80 shadow-lg shadow-muted/20 hover:shadow-xl hover:shadow-muted/30 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="text-muted-foreground mt-1 group-hover:text-foreground transition-colors">
-                        <IconComponent className="h-5 w-5" />
+            {/* Example Prompts Carousel */}
+            <div className="mb-8">
+              {/* Desktop: Grid layout */}
+              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {examplePrompts.map((example, index) => {
+                  const IconComponent = example.icon;
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => handleExampleClick(example.prompt)}
+                      className="group text-left p-4 bg-gradient-to-br from-card/80 to-muted/60 dark:from-slate-800/80 dark:to-slate-700/60 backdrop-blur-sm hover:from-muted/90 hover:to-muted/70 dark:hover:from-slate-700/90 dark:hover:to-slate-600/70 rounded-2xl border border-border/60 hover:border-border/80 shadow-lg shadow-muted/20 hover:shadow-xl hover:shadow-muted/30 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="text-muted-foreground mt-1 group-hover:text-foreground transition-colors">
+                          <IconComponent className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-medium text-foreground mb-2 group-hover:text-primary transition-colors">
+                            {example.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground group-hover:text-foreground line-clamp-3 transition-colors">
+                            {example.prompt}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-foreground mb-2 group-hover:text-primary transition-colors">
-                          {example.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground group-hover:text-foreground line-clamp-3 transition-colors">
-                          {example.prompt}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              {/* Mobile: Horizontal scrolling carousel */}
+              <div className="md:hidden relative">
+                <div className="overflow-x-auto scrollbar-hide w-screen relative" style={{ left: '50%', right: '50%', marginLeft: '-50vw', marginRight: '-50vw' }}>
+                  <div className="flex gap-3 pb-2 pl-4 pr-4" style={{ width: 'max-content' }}>
+                    {examplePrompts.map((example, index) => {
+                      const IconComponent = example.icon;
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => handleExampleClick(example.prompt)}
+                          className="group text-left p-4 bg-gradient-to-br from-card/80 to-muted/60 dark:from-slate-800/80 dark:to-slate-700/60 backdrop-blur-sm hover:from-muted/90 hover:to-muted/70 dark:hover:from-slate-700/90 dark:hover:to-slate-600/70 rounded-2xl border border-border/60 hover:border-border/80 shadow-lg shadow-muted/20 hover:shadow-xl hover:shadow-muted/30 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
+                          style={{ width: '240px', flexShrink: 0 }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="text-muted-foreground mt-1 group-hover:text-foreground transition-colors">
+                              <IconComponent className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-medium text-foreground mb-2 group-hover:text-primary transition-colors">
+                                {example.title}
+                              </h3>
+                              <p className="text-sm text-muted-foreground group-hover:text-foreground line-clamp-3 transition-colors">
+                                {example.prompt}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {/* Left fade gradient */}
+                <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white dark:from-slate-900 to-transparent pointer-events-none z-10" style={{ left: '50%', marginLeft: '-50vw' }}></div>
+                
+                {/* Right fade gradient */}
+                <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white dark:from-slate-900 to-transparent pointer-events-none z-10" style={{ right: '50%', marginRight: '-50vw' }}></div>
+              </div>
             </div>
 
             {/* Features highlight */}
@@ -1250,8 +1371,27 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           </div>
           
           {/* Chatbox - Using shared component */}
-          <div className="absolute bottom-6 left-0 z-20 right-0">
-            <div className={chatboxGridClasses}>
+          <div className="absolute bottom-6 left-0 z-20 right-0 sm:left-0 sm:right-0">
+            <div className="px-4 sm:hidden">
+              {/* Mobile: Center middle chatbox */}
+              <div className="max-w-[95%] w-full mx-auto">
+                <Chatbox
+                  input={input}
+                  onInputChange={handleInputChange}
+                  onSubmit={handleSubmit}
+                  uploadedFiles={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                  isLoading={isLoading}
+                  inputRef={inputRef}
+                  searchGroundingEnabled={searchGroundingEnabled}
+                  onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
+                />
+              </div>
+            </div>
+            <div className={`hidden sm:block ${chatboxGridClasses}`}>
+              {/* Desktop: Original layout */}
               <div></div>
               <div className="w-full">
                 <div className={chatboxLayoutClasses}>
@@ -1277,14 +1417,66 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     );
   }
 
-  return (
+        return (
     <div 
-              className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900"
+              className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900 left-0 sm:left-auto"
       style={{ 
-        left: sidebarCollapsed ? '0px' : `${sidebarWidth}px`,
+        left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
         transition: 'left 0.3s ease-out'
       }}
     >
+      {/* Mobile Menu Button - Only show when sidebar is collapsed */}
+      <div className={`sm:hidden fixed z-50 ${sidebarCollapsed ? 'block' : 'hidden'}`}>
+        <div 
+          className="absolute"
+          style={{
+            top: '24px',
+            left: '0px'
+          }}
+        >
+          <div 
+            className="bg-muted border border-border" 
+            style={{ 
+              borderRadius: '0 20px 20px 0',
+              padding: '4px'
+            }}
+          >
+            <div className="flex flex-col gap-1">
+              <Button
+                onClick={() => {/* TODO: Add search functionality */}}
+                size="sm"
+                variant="ghost"
+                title="Search"
+                className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+              >
+                <SearchIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                onClick={onToggleSidebar}
+                size="sm"
+                variant="ghost"
+                title="Expand Sidebar"
+                className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+              >
+                <PanelLeftIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                onClick={() => {
+                  // Handle new chat - navigate to home/welcome
+                  window.location.href = '/';
+                }}
+                size="sm"
+                variant="ghost"
+                title="New Chat"
+                className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+              >
+                <PlusIcon className="h-4.25 w-4.25" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Messages + Chatbox Area */}
       <div className="flex-1 overflow-hidden relative">
         <CustomScrollbar 
@@ -1452,6 +1644,13 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                     onToggle={handleGroundingSourcesToggle}
                                   />
                                 )}
+                                
+                                {/* Show generated images for assistant messages */}
+                                {message.role === "assistant" && message.imageFileId && (
+                                  <div className="mt-4">
+                                    <MessageImage fileId={message.imageFileId} />
+                                  </div>
+                                )}
                         </div>
                       )}
                     </div>
@@ -1536,20 +1735,28 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             ))}
             
             {isLoading && (
-              <div className="flex justify-start">
-                      <div className="w-full flex">
-                  <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
-                          <div className="flex items-center space-x-3">
-                            <div className="flex items-center space-x-1">
-                              <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"></div>
-                              <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
-                              <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
-                            </div>
-                            <span className="text-sm text-muted-foreground animate-pulse">AI is thinking...</span>
+              (() => {
+                const isImageModel = isImageGenerationModel(selectedModel);
+                console.log(`🎨 [DEBUG] Loading state: isLoading=${isLoading}, selectedModel=${selectedModel}, isImageModel=${isImageModel}`);
+                return isImageModel ? (
+                  <ImageSkeleton />
+                ) : (
+                  <div className="flex justify-start">
+                    <div className="w-full flex">
+                      <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-1">
+                            <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"></div>
+                            <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
+                            <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
+                          </div>
+                          <span className="text-sm text-muted-foreground animate-pulse">AI is thinking...</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()
             )}
             
             <div ref={messagesEndRef} />
@@ -1561,8 +1768,27 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         </CustomScrollbar>
         
         {/* Chatbox - Using shared component */}
-        <div className="absolute bottom-6 left-0 z-20" style={{ right: `${scrollbarWidth}px` }}>
-          <div className={chatboxGridClasses}>
+        <div className="absolute bottom-6 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+          <div className="px-4 sm:hidden">
+            {/* Mobile: Center middle chatbox */}
+            <div className="max-w-[95%] w-full mx-auto">
+              <Chatbox
+                input={input}
+                onInputChange={handleInputChange}
+                onSubmit={handleSubmit}
+                uploadedFiles={uploadedFiles}
+                onFilesChange={setUploadedFiles}
+                selectedModel={selectedModel}
+                onModelChange={onModelChange}
+                isLoading={isLoading}
+                inputRef={inputRef}
+                searchGroundingEnabled={searchGroundingEnabled}
+                onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
+              />
+            </div>
+          </div>
+          <div className={`hidden sm:block ${chatboxGridClasses}`}>
+            {/* Desktop: Original layout */}
             <div></div>
             <div className="w-full">
               <div className={chatboxLayoutClasses}>
