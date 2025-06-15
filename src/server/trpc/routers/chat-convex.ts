@@ -142,6 +142,8 @@ export const chatConvexRouter = createTRPCRouter({
       }));
     }),
 
+
+
   saveStreamedMessage: protectedProcedure
     .input(z.object({ 
       threadId: z.string(),
@@ -156,7 +158,8 @@ export const chatConvexRouter = createTRPCRouter({
         snippet: z.string().optional(),
         confidence: z.number().optional(),
       })).optional(),
-      imageFileId: z.string().optional(),
+      imageUrl: z.string().optional(),
+      imageData: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -183,7 +186,8 @@ export const chatConvexRouter = createTRPCRouter({
             userId: convexUser._id,
             isGrounded: input.isGrounded,
             groundingSources: input.groundingSources,
-            imageFileId: input.imageFileId ? input.imageFileId as Id<"files"> : undefined,
+            imageUrl: input.imageUrl,
+            imageData: input.imageData,
           },
         ],
       });
@@ -216,7 +220,8 @@ export const chatConvexRouter = createTRPCRouter({
         snippet: z.string().optional(),
         confidence: z.number().optional(),
       })).optional(),
-      imageFileId: z.string().optional(),
+      imageUrl: z.string().optional(),
+      imageData: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -233,7 +238,8 @@ export const chatConvexRouter = createTRPCRouter({
         userId: convexUser._id,
         isGrounded: input.isGrounded,
         groundingSources: input.groundingSources,
-        imageFileId: input.imageFileId ? input.imageFileId as Id<"files"> : undefined,
+        imageUrl: input.imageUrl,
+        imageData: input.imageData,
       });
 
       return { 
@@ -478,5 +484,25 @@ export const chatConvexRouter = createTRPCRouter({
       const result = await convex.mutation(api.messages.cleanupOldGroundingFields, {});
 
       return result;
+    }),
+
+  updateMessageImageFile: protectedProcedure
+    .input(z.object({
+      messageId: z.string(),
+      imageFileId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      await convex.mutation(api.messages.updateMessageImageFile, {
+        messageId: input.messageId as Id<"messages">,
+        imageFileId: input.imageFileId as Id<"files">,
+      });
+
+      return { success: true };
     }),
 }); 

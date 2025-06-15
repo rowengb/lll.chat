@@ -46,7 +46,9 @@ export default defineSchema({
       unfurledAt: v.optional(v.number()), // Timestamp when unfurled
     }))),
     // Image generation fields
-    imageFileId: v.optional(v.id("files")), // Reference to generated image file in Convex storage
+    imageUrl: v.optional(v.string()), // Generated image URL (temporary, will be replaced by imageFileId)
+    imageFileId: v.optional(v.id("files")), // Stored image file ID in Convex
+    imageData: v.optional(v.string()), // Base64 encoded image data
   }).index("by_thread", ["threadId"]).index("by_user", ["userId"]),
 
   files: defineTable({

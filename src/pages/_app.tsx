@@ -47,11 +47,11 @@ const MyApp: AppType = ({
           <ConvexClientProvider>
             <Component {...pageProps} />
             <Toaster
-              position="bottom-right"
+              position="top-right"
               reverseOrder={false}
               gutter={0}
               containerStyle={{
-                bottom: 20,
+                top: 20,
                 right: 20,
               }}
               toastOptions={{
@@ -60,7 +60,7 @@ const MyApp: AppType = ({
                   background: 'hsl(var(--background))',
                   color: 'hsl(var(--foreground))',
                   fontSize: '13px',
-                  borderRadius: '6px',
+                  borderRadius: '20px',
                   padding: '8px 12px',
                   border: '1px solid hsl(var(--border))',
                   boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',

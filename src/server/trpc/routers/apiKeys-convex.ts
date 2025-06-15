@@ -138,4 +138,28 @@ export const apiKeysConvexRouter = createTRPCRouter({
 
       return hasKeys;
     }),
+
+  // Check if user has any API keys at all
+  hasAnyApiKeys: protectedProcedure.query(async ({ ctx }) => {
+    const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+    if (!convexUser) {
+      return false;
+    }
+
+    const apiKeys = await convex.query(api.apiKeys.getByUser, {
+      userId: convexUser._id,
+    });
+
+    // Check if user has at least one valid API key (non-empty)
+    return apiKeys.some(key => {
+      try {
+        const decryptedKey = decryptApiKey(key.keyValue);
+        return decryptedKey && decryptedKey.trim().length > 0;
+      } catch (error) {
+        console.error(`Error decrypting key for provider ${key.provider}:`, error);
+        return false;
+      }
+    });
+  }),
 }); 

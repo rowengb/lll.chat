@@ -1,40 +1,44 @@
 import React from 'react';
-import { ImageIcon } from 'lucide-react';
 
-export const ImageSkeleton: React.FC = () => {
+interface ImageSkeletonProps {
+  className?: string;
+}
+
+export const ImageSkeleton: React.FC<ImageSkeletonProps> = ({ className = "" }) => {
+  console.log("🎨 [ImageSkeleton] Rendering skeleton loader");
   return (
-    <div className="flex justify-start">
-      <div className="w-full flex">
-        <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
-          <div className="flex flex-col space-y-3">
-            {/* Image placeholder */}
-            <div className="relative w-64 h-64 bg-gradient-to-br from-muted-foreground/10 to-muted-foreground/20 rounded-2xl border-2 border-dashed border-muted-foreground/30 flex items-center justify-center overflow-hidden">
-              {/* Animated shimmer effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse" />
-              
-              {/* Image icon */}
-              <div className="flex flex-col items-center space-y-2 text-muted-foreground/50">
-                <ImageIcon className="h-8 w-8" />
-                <div className="text-sm font-medium">Generating image...</div>
-              </div>
-              
-              {/* Animated dots overlay */}
-              <div className="absolute bottom-3 left-3 flex items-center space-x-1">
-                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground/40"></div>
-                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground/40 animation-delay-100"></div>
-                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground/40 animation-delay-200"></div>
-              </div>
-            </div>
-            
-            {/* Status text */}
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-              <div className="flex items-center space-x-1">
-                <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground"></div>
-                <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
-                <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
-              </div>
-              <span className="animate-pulse">Creating your image with AI...</span>
-            </div>
+    <div className={`relative max-w-lg group ${className}`}>
+      <div className="relative bg-muted rounded-lg overflow-hidden" style={{ width: '300px', height: '300px', maxWidth: '300px', maxHeight: '300px' }}>
+        {/* Pulsating background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted/60 animate-pulse" />
+        
+        {/* Shimmer effect */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" 
+             style={{ backgroundSize: '200% 100%' }} />
+        
+        {/* Center icon */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-muted-foreground/50 animate-pulse">
+            <svg 
+              className="w-12 h-12" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                strokeWidth={1.5} 
+                d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" 
+              />
+            </svg>
+          </div>
+        </div>
+        
+        {/* Loading text */}
+        <div className="absolute bottom-4 left-4 right-4">
+          <div className="text-xs text-muted-foreground/70 text-center animate-pulse">
+            Generating image...
           </div>
         </div>
       </div>

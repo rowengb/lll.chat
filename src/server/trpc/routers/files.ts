@@ -62,6 +62,64 @@ export const filesRouter = createTRPCRouter({
       });
     }),
 
+  saveImageFromUrl: protectedProcedure
+    .input(z.object({
+      imageUrl: z.string(),
+      messageId: z.string().optional(),
+      threadId: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const convexUser = await getOrCreateConvexUser(ctx.userId);
+        if (!convexUser) {
+          throw new Error("Failed to get or create user");
+        }
+
+        // Download the image
+        const response = await fetch(input.imageUrl);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.statusText}`);
+        }
+
+        const imageBlob = await response.blob();
+        
+        // Generate upload URL
+        const uploadUrl = await convex.mutation(api.files.generateUploadUrl, {});
+        
+        // Upload the image to Convex storage
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'image/png',
+          },
+          body: imageBlob,
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error(`Failed to upload image: ${uploadResponse.statusText}`);
+        }
+
+        const { storageId } = await uploadResponse.json();
+
+        // Create file record
+        const fileName = `generated-image-${Date.now()}.png`;
+        const fileId = await convex.mutation(api.files.createFile, {
+          name: fileName,
+          type: 'image/png',
+          size: imageBlob.size,
+          storageId: storageId as Id<"_storage">,
+          userId: convexUser._id,
+          messageId: input.messageId ? input.messageId as Id<"messages"> : undefined,
+          threadId: input.threadId ? input.threadId as Id<"threads"> : undefined,
+        });
+
+        return fileId;
+      } catch (error) {
+        console.error("Failed to save image from URL:", error);
+        throw new Error("Failed to save image to storage");
+      }
+    }),
+
   getFile: protectedProcedure
     .input(z.object({ fileId: z.string() }))
     .query(async ({ input }) => {
@@ -118,27 +176,6 @@ export const filesRouter = createTRPCRouter({
         fileIds: input.fileIds.map(id => id as Id<"files">),
         messageId: input.messageId as Id<"messages">,
         threadId: input.threadId as Id<"threads">,
-      });
-    }),
-
-  saveImageFromUrl: protectedProcedure
-    .input(z.object({
-      imageUrl: z.string(),
-      messageId: z.string().optional(),
-      threadId: z.string().optional(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const convexUser = await getOrCreateConvexUser(ctx.userId);
-
-      if (!convexUser) {
-        throw new Error("Failed to get or create user");
-      }
-
-      return await convex.action(api.files.saveImageFromUrl, {
-        imageUrl: input.imageUrl,
-        userId: convexUser._id,
-        messageId: input.messageId ? input.messageId as Id<"messages"> : undefined,
-        threadId: input.threadId ? input.threadId as Id<"threads"> : undefined,
       });
     }),
 }); 

@@ -2,13 +2,12 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { ArrowUpIcon, CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, Waves, PenToolIcon, CodeIcon, BrainIcon, LightbulbIcon, BarChartIcon, ChefHatIcon, ZapIcon, BotIcon, ShieldIcon, PaperclipIcon, XIcon, SearchIcon, PanelLeftIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/utils/trpc";
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
+
 import { ModelSelector, getProviderIcon } from "./ModelSelector";
 import toast from "react-hot-toast";
 import Logo from './Logo';
 import { useChatStore } from "../stores/chatStore";
+import { useImageStore } from "../stores/imageStore";
 import { CustomScrollbar } from './CustomScrollbar';
 import { ActionButton } from './ActionButton';
 import { CodeBlock } from './CodeBlock';
@@ -19,6 +18,9 @@ import { FileAttachmentWithUrl } from './FileAttachmentWithUrl';
 import { GroundingSources } from './GroundingSources';
 import { MessageImage } from './MessageImage';
 import { ImageSkeleton } from './ImageSkeleton';
+import { isImageGenerationModel } from '../utils/modelUtils';
+import { ChunkedMarkdown } from './ChunkedMarkdown';
+import { ApiKeyWarningBanner } from './ApiKeyWarningBanner';
 
 // Shared layout CSS for perfect alignment
 const sharedLayoutClasses = "max-w-[80%] w-full mx-auto";
@@ -36,6 +38,8 @@ interface ChatWindowProps {
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   onToggleSidebar?: () => void;
+  currentView?: string; // Add currentView prop
+  onNavigateToSettings?: () => void; // Add navigation prop
 }
 
 interface Message {
@@ -49,7 +53,7 @@ interface Message {
   isGrounded?: boolean; // Indicates if response was grounded with Google Search
   groundingMetadata?: GroundingMetadata; // Google Search grounding metadata
   attachments?: FileAttachmentData[];
-  imageFileId?: string; // Reference to generated image file in Convex storage
+  imageUrl?: string; // For generated images
 }
 
 interface GroundingSource {
@@ -72,7 +76,7 @@ interface GroundingMetadata {
   sources?: GroundingSource[]; // The sources used for grounding (optional)
 }
 
-const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth, onToggleSidebar }: ChatWindowProps) => {
+const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth, onToggleSidebar, currentView, onNavigateToSettings }: ChatWindowProps) => {
   const [input, setInput] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -86,6 +90,15 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   const previousThreadId = useRef<string | null>(null);
   const scrollLocked = useRef<boolean>(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  
+  // API Key warning banner state
+  const [shouldShakeBanner, setShouldShakeBanner] = useState(false);
+  
+  // Check if user has any API keys
+  const { data: hasAnyApiKeys } = trpc.apiKeys.hasAnyApiKeys.useQuery();
+  
+  // Show banner if user has no API keys and not on settings page
+  const shouldShowBanner = hasAnyApiKeys === false && currentView !== 'settings';
   
   // Use global chat store instead of local state
   const { 
@@ -103,11 +116,35 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     getDisplayMessages
   } = useChatStore();
   
+  // Image store for tracking image loading states
+  const { getImageState } = useImageStore();
+  
+  // Effect to clear loading state when image generation is complete and image is loaded
+  useEffect(() => {
+    if (!isLoading || !threadId) return;
+    
+    // Check if we're loading for an image generation model
+    if (!isImageGenerationModel(selectedModel)) return;
+    
+    // Find the current streaming message with an image URL
+    const currentMessages = getMessages(threadId);
+    const streamingMessage = currentMessages.find(msg => msg.isOptimistic && msg.imageUrl && msg.imageUrl !== "GENERATING");
+    
+    if (streamingMessage?.imageUrl) {
+      const { isLoaded } = getImageState(streamingMessage.imageUrl);
+      if (isLoaded) {
+        console.log(`🎨 [ChatWindow] Image loaded in store, clearing loading state`);
+        setLoading(null, false);
+      }
+    }
+  }, [isLoading, threadId, selectedModel, getMessages, getImageState, setLoading]);
+  
   // Simple approach: get messages directly and let smooth transitions handle the rest
   const localMessages = getMessages(threadId || '');
   
   // Ref to track streaming state and prevent race conditions
   const isStreamingRef = useRef(false);
+  const lastStreamCompletedAt = useRef<number>(0);
   
   const { data: serverMessages, refetch: refetchMessages } = trpc.chat.getMessages.useQuery(
     { threadId: threadId || "" },
@@ -131,6 +168,32 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
   // T3.chat style: Show welcome elements dynamically based on input content
   const showWelcomeElements = !threadId && input.trim() === "";
+
+  // Function to trigger shake animation
+  const triggerShakeAnimation = () => {
+    setShouldShakeBanner(true);
+    setTimeout(() => setShouldShakeBanner(false), 500); // Reset after animation duration
+  };
+  
+  // Function to navigate to settings
+  const navigateToSettings = () => {
+    // Use the parent's navigation function if available, otherwise fallback to window.location
+    if (onNavigateToSettings) {
+      onNavigateToSettings();
+    } else {
+      window.location.href = '/?view=settings&tab=api-keys';
+    }
+  };
+
+  // Auto-focus input on component mount for immediate typing
+  useEffect(() => {
+    // Small delay to ensure DOM is fully rendered
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []); // Empty dependency array means this runs once on mount
 
   // Handle input changes - just update input, welcome visibility is reactive
   const handleInputChange = (value: string) => {
@@ -158,12 +221,21 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           }
         });
       }
+      
+      // Auto-focus input when switching threads
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 200); // Slightly longer delay to ensure thread transition is complete
     }
   }, [threadId, messagesContainer]);
 
-  // Simple server message sync
+  // Smart server message sync - preserves local state when it has more recent data
   useEffect(() => {
     if (isLoading || isStreamingRef.current || !threadId || !serverMessages) return;
+    
+    // Prevent server sync immediately after streaming completes to avoid race conditions
+    const timeSinceLastStream = Date.now() - lastStreamCompletedAt.current;
+    if (timeSinceLastStream < 500) return; // Wait 500ms after streaming completes
     
     const currentMessages = getMessages(threadId);
     const hasOptimistic = currentMessages.some(msg => msg.isOptimistic);
@@ -197,9 +269,30 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           type: 'unknown',
           size: 0,
         })) : undefined,
+        // Map image URL from server response
+        imageUrl: msg.imageUrl,
       }));
       
-      setMessages(threadId, serverMsgs);
+      // Smart merge: preserve local data that might be more recent than server data
+      const mergedMessages = serverMsgs.map(serverMsg => {
+        const localMsg = currentMessages.find(local => local.id === serverMsg.id);
+        if (localMsg && !localMsg.isOptimistic) {
+          // If local message has imageUrl but server doesn't, preserve local imageUrl
+          // This handles race conditions where local state is updated before server sync
+          return {
+            ...serverMsg,
+            imageUrl: localMsg.imageUrl || serverMsg.imageUrl,
+            groundingMetadata: localMsg.groundingMetadata || serverMsg.groundingMetadata,
+          };
+        }
+        return serverMsg;
+      });
+      
+      // Only update if messages have actually changed to prevent unnecessary re-renders
+      const hasChanged = JSON.stringify(currentMessages) !== JSON.stringify(mergedMessages);
+      if (hasChanged) {
+        setMessages(threadId, mergedMessages);
+      }
       
       // Fast smooth scroll to bottom after loading
       if (isInitialLoad && messagesContainer) {
@@ -290,6 +383,23 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // Immediate scroll function for streaming - pinned to bottom in real-time
+  const scrollToBottomImmediate = () => {
+    // Use instant behavior for immediate pinning during streaming
+    messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+  };
+
+  // Aggressive scroll function that ensures we stay pinned to bottom
+  const scrollToBottomPinned = () => {
+    if (messagesContainer) {
+      // Force scroll to absolute bottom immediately
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    } else {
+      // Fallback to scrollIntoView
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+    }
+  };
+
   // Handler for when grounding sources are toggled
   const handleGroundingSourcesToggle = (isExpanded: boolean, elementRef: HTMLDivElement | null) => {
     if (!elementRef || !messagesContainer) return;
@@ -343,8 +453,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       toast.success("Message copied to clipboard");
     } catch (error) {
       console.error("Failed to copy message:", error);
-              toast.dismiss();
-        toast.error("Failed to copy message");
+      toast.dismiss();
+      toast.error("Failed to copy message");
     }
   };
 
@@ -353,6 +463,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
     try {
       setLoading(threadId, true);
+      
+      // Auto-focus input when AI starts thinking so user can immediately type next message
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
       
       // Find the message index
       const currentMessages = getMessages(threadId);
@@ -426,32 +541,37 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         setMessages(threadId, messagesToKeep);
       }
 
-             // Create new user message with edited content and get AI response
-       if (threadId) {
-         // Add optimistic user message for the edited content
-         const optimisticUserMessage: Message = {
-           id: `temp-edit-${Date.now()}`,
-           content: editingContent.trim(),
-           role: "user",
-           createdAt: new Date(),
-           isOptimistic: true,
-         };
-         
-         addMessage(threadId, optimisticUserMessage);
-         setLoading(threadId, true);
-         
-         // Stream the AI response (this will save both user and assistant messages)
-         await streamResponse(threadId, editingContent.trim());
+      // Create new user message with edited content and get AI response
+      if (threadId) {
+        // Add optimistic user message for the edited content
+        const optimisticUserMessage: Message = {
+          id: `temp-edit-${Date.now()}`,
+          content: editingContent.trim(),
+          role: "user",
+          createdAt: new Date(),
+          isOptimistic: true,
+        };
+        
+        addMessage(threadId, optimisticUserMessage);
+        setLoading(threadId, true);
+        
+        // Auto-focus input when AI starts thinking so user can immediately type next message
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 50);
+        
+        // Stream the AI response (this will save both user and assistant messages)
+        await streamResponse(threadId, editingContent.trim());
       }
 
       setEditingMessageId(null);
       setEditingContent("");
-              toast.dismiss();
+      toast.dismiss();
       toast.success("Message edited and conversation updated");
     } catch (error) {
       console.error("Failed to save edit:", error);
-              toast.dismiss();
-        toast.error("Failed to save edit");
+      toast.dismiss();
+      toast.error("Failed to save edit");
     }
   };
 
@@ -460,8 +580,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     setEditingContent("");
   };
 
-
-
   // Helper function to send a message programmatically and get AI response
   const sendMessageProgrammatically = async (content: string) => {
     if (!threadId) return;
@@ -469,12 +587,18 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     let optimisticUserMessage: Message | undefined;
     try {
       setLoading(threadId, true);
+      
+      // Auto-focus input when AI starts thinking so user can immediately type next message
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+      
       addMessage(threadId, optimisticUserMessage = {
         id: `temp-user-${Date.now()}`,
         content,
-      role: "user",
-      createdAt: new Date(),
-      isOptimistic: true,
+        role: "user",
+        createdAt: new Date(),
+        isOptimistic: true,
       });
 
       // Stream the response
@@ -498,6 +622,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     let optimisticMessage: Message | undefined;
     try {
       setLoading(threadId, true);
+      
+      // Auto-focus input when AI starts thinking so user can immediately type next message
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+      
       addMessage(threadId, optimisticMessage = {
         id: `temp-user-${Date.now()}`,
         content,
@@ -525,20 +655,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     
     const modelData = allModels.find(m => m.id === modelId);
     return modelData?.provider || "openai";
-  };
-
-  // Helper function to detect if model is for image generation
-  const isImageGenerationModel = (modelId?: string | null) => {
-    if (!modelId || !allModels) {
-      console.log(`🎨 [DEBUG] Image model check: modelId=${modelId}, allModels=${!!allModels}`);
-      return false;
-    }
-    
-    const modelData = allModels.find(m => m.id === modelId);
-    console.log(`🎨 [DEBUG] Model data for ${modelId}:`, modelData);
-    const hasImageCapability = modelData?.capabilities?.includes('image-generation') || false;
-    console.log(`🎨 [DEBUG] Has image capability: ${hasImageCapability}`);
-    return hasImageCapability;
   };
 
   // Auto-resize textarea
@@ -576,6 +692,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     e.preventDefault();
     if (!input.trim() && uploadedFiles.length === 0) return;
 
+    // Check if user has API keys before allowing submission
+    if (hasAnyApiKeys === false) {
+      triggerShakeAnimation();
+      return;
+    }
+
     const messageContent = input.trim();
     const messageFiles = uploadedFiles.map(file => ({
       id: file.id,
@@ -588,6 +710,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     
     setInput("");
     setUploadedFiles([]);
+
+    // Auto-focus the input after submission so user can immediately type next message
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100); // Small delay to ensure DOM updates are complete
 
     try {
       if (!threadId) {
@@ -603,16 +730,21 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         // Start streaming setup BEFORE URL change to prevent clearing messages
         setLoading(newThread.id, true);
         isStreamingRef.current = true; // Protect from useEffect clearing messages
+        
+        // Auto-focus input when AI starts thinking so user can immediately type next message
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 50);
 
         // Create optimistic user message FIRST
-    const optimisticUserMessage: Message = {
+        const optimisticUserMessage: Message = {
           id: `temp-user-${Date.now()}`,
-      content: messageContent,
-      role: "user",
-      createdAt: new Date(),
-      isOptimistic: true,
+          content: messageContent,
+          role: "user",
+          createdAt: new Date(),
+          isOptimistic: true,
           attachments: messageFiles.length > 0 ? messageFiles : undefined,
-    };
+        };
 
         // Add optimistic user message BEFORE URL change
         addMessage(newThread.id, optimisticUserMessage);
@@ -633,6 +765,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       } else {
         // We're already on a thread page - stream immediately
         setLoading(threadId, true);
+        
+        // Auto-focus input when AI starts thinking so user can immediately type next message
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 50);
         
         // Remove any error messages before adding new user message
         const currentMessages = getMessages(threadId);
@@ -659,7 +796,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
         }, 0);
 
-      // Start streaming response
+        // Start streaming response
         await streamResponse(threadId, messageContent, messageFiles);
       }
       
@@ -680,12 +817,16 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       createdAt: new Date(),
       isOptimistic: true,
     };
+    
+    console.log(`🎨 [STREAM] Created optimistic message for model ${selectedModel}, isImageGen: ${isImageGenerationModel(selectedModel)}`);
 
     addMessage(threadId, optimisticAssistantMessage);
     
     // Immediately scroll to bottom after adding assistant message
     setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
+      scrollToBottomPinned();
+      // Also focus input so user can start typing next message while AI responds
+      inputRef.current?.focus();
     }, 0);
     
     // Mark as streaming to prevent server sync interference
@@ -735,7 +876,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       let isGrounded = false;
       let groundingMetadata: GroundingMetadata | undefined = undefined;
       let imageGenerated = false;
-      let imageFileId = "";
+      let imageUrl = "";
 
       console.log(`[STREAM] Starting to read stream...`);
 
@@ -789,12 +930,29 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                     };
                     
                     console.log(`🔍 [STREAM] Processed grounding metadata:`, groundingMetadata);
+                    
+                    // Auto-scroll to bottom when grounding sources are added
+                    setTimeout(() => {
+                      scrollToBottomPinned();
+                    }, 100); // Slight delay to ensure grounding sources are rendered
                   }
                 }
                 if (metadata.imageGenerated) {
                   imageGenerated = true;
-                  imageFileId = metadata.imageFileId || "";
-                  console.log(`🎨 [STREAM] Image generated with file ID: ${imageFileId}`);
+                  imageUrl = metadata.imageUrl || "";
+                  console.log(`🎨 [STREAM] Image generated: ${imageUrl}`);
+                  
+                  // Update the streaming message with the image URL immediately
+                  updateStreamingMessage(threadId, optimisticAssistantMessage.id, { imageUrl });
+                  
+                  // Auto-scroll to bottom when image is generated to keep it visible
+                  setTimeout(() => {
+                    scrollToBottomPinned();
+                  }, 100); // Slight delay to ensure image element is rendered
+                  
+                  // Don't clear loading state yet - wait for image to actually load
+                  // The loading state will be cleared when the image loads in MessageImage component
+                  console.log(`🎨 [STREAM] Image URL received, keeping loading state until image loads`);
                 }
                 if (metadata.error) {
                   console.error(`[STREAM] API Error: ${metadata.error}`);
@@ -832,12 +990,22 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 console.log(`[STREAM] Content chunk: "${contentChunk}" (total: ${fullContent.length} chars)`);
                 
                 // Hide loading animation on first content chunk (TTFB complete)
-                if (fullContent.length > 0) {
+                // But keep loading for image generation models until image is generated
+                if (fullContent.length > 0 && !isImageGenerationModel(selectedModel)) {
                   setLoading(null, false);
                 }
                 
                 // Update the streaming message immediately
-                updateStreamingMessage(threadId, optimisticAssistantMessage.id, fullContent);
+                updateStreamingMessage(threadId, optimisticAssistantMessage.id, { content: fullContent });
+                
+                // Auto-scroll to bottom during streaming to keep the live text visible (immediate)
+                scrollToBottomPinned();
+                
+                // Keep input focused during streaming so user can immediately type next message
+                // Only focus if not already focused to avoid interrupting user typing
+                if (document.activeElement !== inputRef.current) {
+                  inputRef.current?.focus();
+                }
               } catch (e) {
                 console.error('[STREAM] Failed to parse content chunk:', e);
               }
@@ -847,16 +1015,19 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 const doneData = JSON.parse(line.slice(2));
                 console.log(`[STREAM] Stream done, final content length: ${fullContent.length}, server reported: ${doneData.length || 'unknown'}`);
                 
+                // For image generation, use the message from the done signal if no content was accumulated
+                const finalContent = imageGenerated && !fullContent ? (doneData.message || "") : fullContent;
+                
                 // Stream complete - save to DB and clean up
                 const savedMessages = await saveStreamedMessage.mutateAsync({
                   threadId,
                   userContent: content,
-                  assistantContent: fullContent,
+                  assistantContent: finalContent,
                   model: selectedModel,
                   userAttachments: files.map(file => file.id),
                   isGrounded,
                   groundingSources: groundingMetadata?.sources && groundingMetadata.sources.length > 0 ? groundingMetadata.sources : undefined,
-                  imageFileId: imageGenerated ? imageFileId : undefined,
+                  imageUrl: imageGenerated ? imageUrl : undefined,
                 });
 
                 // Update file associations if there are files
@@ -901,11 +1072,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                     return { 
                       ...msg, 
                       isOptimistic: false, 
-                      content: fullContent, 
+                      content: finalContent, 
                       model: selectedModel, 
                       isGrounded,
                       groundingMetadata: groundingMetadata,
-                      imageFileId: imageGenerated ? imageFileId : undefined
+                      imageUrl: imageGenerated ? imageUrl : undefined
                     };
                   } else if (msg.role === "user" && msg.isOptimistic) {
                     // Mark user message as non-optimistic too
@@ -915,8 +1086,15 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 }).filter(msg => !msg.isOptimistic);
                 setMessages(threadId, updatedMessages);
                 isStreamingRef.current = false; // Clear streaming flag
+                lastStreamCompletedAt.current = Date.now(); // Track when streaming completed
                 setStreaming(null, false);
                 setLoading(null, false);
+                
+                // Auto-focus input after streaming completes so user can immediately type next message
+                setTimeout(() => {
+                  inputRef.current?.focus();
+                }, 200); // Slightly longer delay to ensure all UI updates are complete
+                
                 return;
               } catch (e) {
                 console.error('[STREAM] Failed to parse done signal:', e);
@@ -950,6 +1128,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       setStreaming(null, false);
       setLoading(null, false); // Clear loading on error
       
+      // Auto-focus input after error so user can immediately type next message
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 200);
+      
       // Don't throw the error - we've handled it by showing it in the chat
     }
   };
@@ -969,6 +1152,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     // Mark as streaming to prevent server sync interference
     isStreamingRef.current = true;
     setStreaming(threadId, true);
+    
+    // Auto-focus input when AI starts thinking so user can immediately type next message
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
 
     try {
       // Get conversation history for streaming (exclude optimistic and error messages)
@@ -1044,8 +1232,15 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 ).filter(msg => !msg.isOptimistic);
                 setMessages(threadId, updatedMessages);
                 isStreamingRef.current = false; // Clear streaming flag
+                lastStreamCompletedAt.current = Date.now(); // Track when streaming completed
                 setStreaming(null, false);
                 setLoading(null, false);
+                
+                // Auto-focus input after streaming completes so user can immediately type next message
+                setTimeout(() => {
+                  inputRef.current?.focus();
+                }, 200); // Slightly longer delay to ensure all UI updates are complete
+                
                 return;
               }
 
@@ -1060,7 +1255,16 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   }
                   
                   // Update the streaming message immediately for real-time feel
-                  updateStreamingMessage(threadId, optimisticAssistantMessage.id, fullContent);
+                  updateStreamingMessage(threadId, optimisticAssistantMessage.id, { content: fullContent });
+                  
+                  // Auto-scroll to bottom during streaming to keep the live text visible (immediate)
+                  scrollToBottomPinned();
+                  
+                  // Keep input focused during streaming so user can immediately type next message
+                  // Only focus if not already focused to avoid interrupting user typing
+                  if (document.activeElement !== inputRef.current) {
+                    inputRef.current?.focus();
+                  }
                 }
               } catch (e) {
                 // Ignore JSON parse errors
@@ -1081,6 +1285,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       isStreamingRef.current = false; // Clear streaming flag on error
       setStreaming(null, false);
       setLoading(null, false); // Clear loading on error
+      
+      // Auto-focus input after error so user can immediately type next message
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 200);
+      
       throw error;
     }
   };
@@ -1090,6 +1300,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
     try {
       setLoading(threadId, true);
+      
+      // Auto-focus input when AI starts thinking so user can immediately type next message
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
       
       // Find the message index
       const currentMessages = getMessages(threadId);
@@ -1196,6 +1411,14 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           transition: 'left 0.3s ease-out'
         }}
       >
+        {/* API Key Warning Banner */}
+        {shouldShowBanner && (
+          <ApiKeyWarningBanner
+            onNavigateToSettings={navigateToSettings}
+            isDismissible={false}
+            shouldShake={shouldShakeBanner}
+          />
+        )}
         {/* Mobile Menu Button - Only show when sidebar is collapsed */}
         <div className={`sm:hidden fixed z-50 ${sidebarCollapsed ? 'block' : 'hidden'}`}>
           <div 
@@ -1257,117 +1480,117 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 <div className={sharedLayoutClasses}>
                   {/* Welcome elements that hide/show based on input - T3.chat style */}
                   <div className={`text-center transition-all duration-300 ${showWelcomeElements ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
-            {/* Welcome Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-light text-foreground mb-4">
-                Welcome to <span className="font-bold">lll</span><span className="font-normal">.chat</span>
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Start a conversation with AI. Choose from the examples below or type your own message.
-              </p>
-            </div>
+                    {/* Welcome Header */}
+                    <div className="mb-8">
+                      <h1 className="text-3xl font-light text-foreground mb-4">
+                        Welcome to <span className="font-bold">lll</span><span className="font-normal">.chat</span>
+                      </h1>
+                      <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                        Start a conversation with AI. Choose from the examples below or type your own message.
+                      </p>
+                    </div>
 
-            {/* Example Prompts Carousel */}
-            <div className="mb-8">
-              {/* Desktop: Grid layout */}
-              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {examplePrompts.map((example, index) => {
-                  const IconComponent = example.icon;
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => handleExampleClick(example.prompt)}
-                      className="group text-left p-4 bg-gradient-to-br from-card/80 to-muted/60 dark:from-slate-800/80 dark:to-slate-700/60 backdrop-blur-sm hover:from-muted/90 hover:to-muted/70 dark:hover:from-slate-700/90 dark:hover:to-slate-600/70 rounded-2xl border border-border/60 hover:border-border/80 shadow-lg shadow-muted/20 hover:shadow-xl hover:shadow-muted/30 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="text-muted-foreground mt-1 group-hover:text-foreground transition-colors">
-                          <IconComponent className="h-5 w-5" />
+                    {/* Example Prompts Carousel */}
+                    <div className="mb-8">
+                      {/* Desktop: Grid layout */}
+                      <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {examplePrompts.map((example, index) => {
+                          const IconComponent = example.icon;
+                          return (
+                            <button
+                              key={index}
+                              onClick={() => handleExampleClick(example.prompt)}
+                              className="group text-left p-4 bg-gradient-to-br from-card/80 to-muted/60 dark:from-slate-800/80 dark:to-slate-700/60 backdrop-blur-sm hover:from-muted/90 hover:to-muted/70 dark:hover:from-slate-700/90 dark:hover:to-slate-600/70 rounded-2xl border border-border/60 hover:border-border/80 shadow-lg shadow-muted/20 hover:shadow-xl hover:shadow-muted/30 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="text-muted-foreground mt-1 group-hover:text-foreground transition-colors">
+                                  <IconComponent className="h-5 w-5" />
+                                </div>
+                                <div className="flex-1">
+                                  <h3 className="font-medium text-foreground mb-2 group-hover:text-primary transition-colors">
+                                    {example.title}
+                                  </h3>
+                                  <p className="text-sm text-muted-foreground group-hover:text-foreground line-clamp-3 transition-colors">
+                                    {example.prompt}
+                                  </p>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Mobile: Horizontal scrolling carousel */}
+                      <div className="md:hidden relative">
+                        <div className="overflow-x-auto scrollbar-hide w-screen relative" style={{ left: '50%', right: '50%', marginLeft: '-50vw', marginRight: '-50vw' }}>
+                          <div className="flex gap-3 pb-2 pl-4 pr-4" style={{ width: 'max-content' }}>
+                            {examplePrompts.map((example, index) => {
+                              const IconComponent = example.icon;
+                              return (
+                                <button
+                                  key={index}
+                                  onClick={() => handleExampleClick(example.prompt)}
+                                  className="group text-left p-4 bg-gradient-to-br from-card/80 to-muted/60 dark:from-slate-800/80 dark:to-slate-700/60 backdrop-blur-sm hover:from-muted/90 hover:to-muted/70 dark:hover:from-slate-700/90 dark:hover:to-slate-600/70 rounded-2xl border border-border/60 hover:border-border/80 shadow-lg shadow-muted/20 hover:shadow-xl hover:shadow-muted/30 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
+                                  style={{ width: '240px', flexShrink: 0 }}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <div className="text-muted-foreground mt-1 group-hover:text-foreground transition-colors">
+                                      <IconComponent className="h-5 w-5" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <h3 className="font-medium text-foreground mb-2 group-hover:text-primary transition-colors">
+                                        {example.title}
+                                      </h3>
+                                      <p className="text-sm text-muted-foreground group-hover:text-foreground line-clamp-3 transition-colors">
+                                        {example.prompt}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-medium text-foreground mb-2 group-hover:text-primary transition-colors">
-                            {example.title}
-                          </h3>
-                          <p className="text-sm text-muted-foreground group-hover:text-foreground line-clamp-3 transition-colors">
-                            {example.prompt}
-                          </p>
+                        
+                        {/* Left fade gradient */}
+                        <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white dark:from-slate-900 to-transparent pointer-events-none z-10" style={{ left: '50%', marginLeft: '-50vw' }}></div>
+                        
+                        {/* Right fade gradient */}
+                        <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white dark:from-slate-900 to-transparent pointer-events-none z-10" style={{ right: '50%', marginRight: '-50vw' }}></div>
+                      </div>
+                    </div>
+
+                    {/* Features highlight */}
+                    <div className="bg-gradient-to-r from-card/90 to-muted/80 dark:from-slate-800/90 dark:to-slate-700/80 backdrop-blur-sm rounded-2xl border border-border/70 p-6 max-w-2xl mx-auto shadow-lg shadow-muted/20 backdrop-saturate-150">
+                      <div className="grid grid-cols-3 gap-6 text-center">
+                        <div>
+                          <div className="flex justify-center mb-2">
+                            <ZapIcon className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <div className="text-sm font-medium text-foreground">Lightning Fast</div>
+                          <div className="text-xs text-muted-foreground">Real-time streaming</div>
+                        </div>
+                        <div>
+                          <div className="flex justify-center mb-2">
+                            <BotIcon className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <div className="text-sm font-medium text-foreground">Multiple Models</div>
+                          <div className="text-xs text-muted-foreground">GPT, Claude, Gemini & more</div>
+                        </div>  
+                        <div>
+                          <div className="flex justify-center mb-2">
+                            <ShieldIcon className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <div className="text-sm font-medium text-foreground">BYOK & Privacy</div>
+                          <div className="text-xs text-muted-foreground">Your keys, your data</div>
                         </div>
                       </div>
-                    </button>
-                  );
-                })}
-              </div>
-              
-              {/* Mobile: Horizontal scrolling carousel */}
-              <div className="md:hidden relative">
-                <div className="overflow-x-auto scrollbar-hide w-screen relative" style={{ left: '50%', right: '50%', marginLeft: '-50vw', marginRight: '-50vw' }}>
-                  <div className="flex gap-3 pb-2 pl-4 pr-4" style={{ width: 'max-content' }}>
-                    {examplePrompts.map((example, index) => {
-                      const IconComponent = example.icon;
-                      return (
-                        <button
-                          key={index}
-                          onClick={() => handleExampleClick(example.prompt)}
-                          className="group text-left p-4 bg-gradient-to-br from-card/80 to-muted/60 dark:from-slate-800/80 dark:to-slate-700/60 backdrop-blur-sm hover:from-muted/90 hover:to-muted/70 dark:hover:from-slate-700/90 dark:hover:to-slate-600/70 rounded-2xl border border-border/60 hover:border-border/80 shadow-lg shadow-muted/20 hover:shadow-xl hover:shadow-muted/30 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
-                          style={{ width: '240px', flexShrink: 0 }}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="text-muted-foreground mt-1 group-hover:text-foreground transition-colors">
-                              <IconComponent className="h-5 w-5" />
-                            </div>
-                            <div className="flex-1">
-                              <h3 className="font-medium text-foreground mb-2 group-hover:text-primary transition-colors">
-                                {example.title}
-                              </h3>
-                              <p className="text-sm text-muted-foreground group-hover:text-foreground line-clamp-3 transition-colors">
-                                {example.prompt}
-                              </p>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                
-                {/* Left fade gradient */}
-                <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-white dark:from-slate-900 to-transparent pointer-events-none z-10" style={{ left: '50%', marginLeft: '-50vw' }}></div>
-                
-                {/* Right fade gradient */}
-                <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-white dark:from-slate-900 to-transparent pointer-events-none z-10" style={{ right: '50%', marginRight: '-50vw' }}></div>
-              </div>
-            </div>
-
-            {/* Features highlight */}
-            <div className="bg-gradient-to-r from-card/90 to-muted/80 dark:from-slate-800/90 dark:to-slate-700/80 backdrop-blur-sm rounded-2xl border border-border/70 p-6 max-w-2xl mx-auto shadow-lg shadow-muted/20 backdrop-saturate-150">
-              <div className="grid grid-cols-3 gap-6 text-center">
-                <div>
-                  <div className="flex justify-center mb-2">
-                    <ZapIcon className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="text-sm font-medium text-foreground">Lightning Fast</div>
-                  <div className="text-xs text-muted-foreground">Real-time streaming</div>
-                </div>
-                <div>
-                  <div className="flex justify-center mb-2">
-                    <BotIcon className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="text-sm font-medium text-foreground">Multiple Models</div>
-                  <div className="text-xs text-muted-foreground">GPT, Claude, Gemini & more</div>
-                </div>  
-                <div>
-                  <div className="flex justify-center mb-2">
-                    <ShieldIcon className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <div className="text-sm font-medium text-foreground">BYOK & Privacy</div>
-                  <div className="text-xs text-muted-foreground">Your keys, your data</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
                     </div>
-              <div></div>
                   </div>
+                </div>
+              </div>
+              <div></div>
+            </div>
           </div>
           
           {/* Chatbox - Using shared component */}
@@ -1387,6 +1610,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   inputRef={inputRef}
                   searchGroundingEnabled={searchGroundingEnabled}
                   onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
+                  onModelSelectorClick={triggerShakeAnimation}
                 />
               </div>
             </div>
@@ -1401,14 +1625,15 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                     onSubmit={handleSubmit}
                     uploadedFiles={uploadedFiles}
                     onFilesChange={setUploadedFiles}
-                      selectedModel={selectedModel}
-                      onModelChange={onModelChange}
+                    selectedModel={selectedModel}
+                    onModelChange={onModelChange}
                     isLoading={isLoading}
                     inputRef={inputRef}
                     searchGroundingEnabled={searchGroundingEnabled}
                     onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
-                    />
-                    </div>
+                    onModelSelectorClick={triggerShakeAnimation}
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -1417,14 +1642,22 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     );
   }
 
-        return (
+  return (
     <div 
-              className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900 left-0 sm:left-auto"
+      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900 left-0 sm:left-auto"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
         transition: 'left 0.3s ease-out'
       }}
     >
+      {/* API Key Warning Banner */}
+      {shouldShowBanner && (
+        <ApiKeyWarningBanner
+          onNavigateToSettings={navigateToSettings}
+          isDismissible={false}
+          shouldShake={shouldShakeBanner}
+        />
+      )}
       {/* Mobile Menu Button - Only show when sidebar is collapsed */}
       <div className={`sm:hidden fixed z-50 ${sidebarCollapsed ? 'block' : 'hidden'}`}>
         <div 
@@ -1488,16 +1721,16 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             <div className="w-full">
               <div className={sharedLayoutClasses} id="messages-container">
                 <div className="space-y-0">
-            {localMessages?.filter(message => 
-              // Filter out empty optimistic assistant messages
-              !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
-            ).map((message: Message) => (
+                  {localMessages?.filter(message => 
+                    // Filter out empty optimistic assistant messages
+                    !(message.isOptimistic && message.role === "assistant" && !message.content.trim())
+                  ).map((message: Message) => (
                     <div key={message.id} className="flex justify-start">
                       <div className="w-full max-w-full min-w-0">
                         <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
-                    <div
+                          <div
                             className={`rounded-xl px-4 max-w-full overflow-hidden min-w-0 ${
-                        message.role === "user"
+                              message.role === "user"
                                 ? "py-2" 
                                 : "pt-1 pb-1"
                             } ${
@@ -1506,39 +1739,39 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                 : message.isError
                                 ? "bg-destructive/10 text-destructive border border-destructive/30 shadow-sm"
                                 : "text-foreground"
-                      }`}
-                    >
-                      {editingMessageId === message.id ? (
-                        <div className="space-y-2">
-                          <textarea
-                            value={editingContent}
-                            onChange={(e) => setEditingContent(e.target.value)}
-                            className="w-full p-2 border border-border rounded-lg text-sm resize-none bg-background text-foreground"
-                            rows={Math.max(2, editingContent.split('\n').length)}
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => handleSaveEdit(message.id)}
-                              size="sm"
-                              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              onClick={handleCancelEdit}
-                              size="sm"
-                              variant="outline"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : message.role === "user" ? (
+                            }`}
+                          >
+                            {editingMessageId === message.id ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  value={editingContent}
+                                  onChange={(e) => setEditingContent(e.target.value)}
+                                  className="w-full p-2 border border-border rounded-lg text-sm resize-none bg-background text-foreground"
+                                  rows={Math.max(2, editingContent.split('\n').length)}
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    onClick={() => handleSaveEdit(message.id)}
+                                    size="sm"
+                                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    onClick={handleCancelEdit}
+                                    size="sm"
+                                    variant="outline"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : message.role === "user" ? (
                               <div>
-                        <p className="whitespace-pre-wrap text-sm leading-loose">
-                          {message.content}
-                        </p>
+                                <p className="whitespace-pre-wrap text-sm leading-loose">
+                                  {message.content}
+                                </p>
                                 {/* Display file attachments for user messages */}
                                 {message.attachments && message.attachments.length > 0 && (
                                   <div className="mt-2 inline-block">
@@ -1552,89 +1785,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                   </div>
                                 )}
                               </div>
-                      ) : (
-                              <div className="prose prose-sm w-full min-w-0 overflow-hidden text-foreground text-sm leading-loose">
-                          <ReactMarkdown 
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight]}
-                            components={{
-                              // Customize link styling
-                              a: ({ node, ...props }) => (
-                                <a 
-                                  {...props} 
-                                  className="text-primary hover:text-primary/80 underline"
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                            ) : (
+                              <div>
+                                <ChunkedMarkdown 
+                                  content={message.content}
+                                  chunkSize={75}
                                 />
-                              ),
-                              // Customize code block styling
-                              code: ({ node, className, children, ...props }) => {
-                                const match = /language-(\w+)/.exec(className || '');
-                                const isInline = !match;
-                                
-                                return isInline ? (
-                                  <code 
-                                          className="text-gray-100 px-2 py-1 rounded text-xs font-mono" 
-                                    style={{ backgroundColor: '#0C1117' }}
-                                    {...props}
-                                  >
-                                    {children}
-                                  </code>
-                                      ) : null; // Block code will be handled by pre
-                              },
-                                    // Style pre blocks with copy functionality
-                                    pre: ({ node, children, ...props }) => {
-                                      // Extract language from the code element
-                                      const codeElement = children as any;
-                                      const className = codeElement?.props?.className || '';
-                                      const match = /language-(\w+)/.exec(className);
-                                      const language = match ? match[1] : undefined;
-                                      
-                                      // If no language detected, it might be a plain pre block
-                                      if (!language && !className) {
-                                        return (
-                                          <pre 
-                                            className="text-gray-100 p-4 rounded-xl overflow-x-auto dark-scrollbar text-xs font-mono w-full min-w-0 my-3" 
-                                            style={{ backgroundColor: '#0C1117' }}
-                                            {...props}
-                                          >
-                                            {children}
-                                          </pre>
-                                        );
-                                      }
-                                      
-                                      return (
-                                        <CodeBlock 
-                                          className={className}
-                                          language={language}
-                                        >
-                                          {codeElement?.props?.children || children}
-                                        </CodeBlock>
-                                      );
-                                    },
-                              // Style lists
-                              ul: ({ node, ...props }) => (
-                                <ul 
-                                  className="list-disc list-outside space-y-1 my-2 ml-4 pl-2"
-                                  {...props}
-                                />
-                              ),
-                              ol: ({ node, ...props }) => (
-                                <ol 
-                                  className="list-decimal list-outside space-y-1 my-2 ml-4 pl-2"
-                                  {...props}
-                                />
-                              ),
-                              li: ({ node, ...props }) => (
-                                <li 
-                                  className="text-sm leading-loose"
-                                  {...props}
-                                />
-                              ),
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
                                 
                                 {/* Show grounding sources for assistant messages */}
                                 {message.role === "assistant" && message.groundingMetadata && (
@@ -1646,51 +1802,51 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                 )}
                                 
                                 {/* Show generated images for assistant messages */}
-                                {message.role === "assistant" && message.imageFileId && (
+                                {message.role === "assistant" && message.imageUrl && (
                                   <div className="mt-4">
-                                    <MessageImage fileId={message.imageFileId} />
+                                    <MessageImage imageUrl={message.imageUrl} />
                                   </div>
                                 )}
-                        </div>
-                      )}
-                    </div>
+                              </div>
+                            )}
+                          </div>
 
                           {/* Message Actions - Always render to prevent layout shift, but hide for error messages */}
                           <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
-                        {message.role === "assistant" && (
+                            {message.role === "assistant" && (
                               <div className="flex items-center gap-1 mr-1">
                                 <div className="flex items-center gap-1 text-sm text-muted-foreground px-5">
-                              {getProviderFromModel(message.model)}
-                              <span>•</span>
-                              <span>{message.model}</span>
-                            </div>
-                          </div>
-                        )}
-                        
+                                  {getProviderFromModel(message.model)}
+                                  <span>•</span>
+                                  <span>{message.model}</span>
+                                </div>
+                              </div>
+                            )}
+                            
                             {message.role === "user" ? (
                               // User message actions: retry, edit, copy
                               <>
                                 <ActionButton
-                          variant="ghost"
-                          size="sm"
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleRetryMessage(message.id, message.role === "user")}
                                   className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                        >
+                                >
                                   <RotateCcwIcon className="h-4 w-4" />
                                 </ActionButton>
                         
                                 <ActionButton
-                          variant="ghost"
-                          size="sm"
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleEditMessage(message.id)}
                                   className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                        >
+                                >
                                   <EditIcon className="h-4 w-4" />
                                 </ActionButton>
                         
                                 <ActionButton
-                          variant="ghost"
-                          size="sm"
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleCopyMessage(message.content)}
                                   className="h-8 px-2 text-muted-foreground hover:text-foreground"
                                 >
@@ -1705,13 +1861,13 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                   size="sm"
                                   onClick={() => handleCopyMessage(message.content)}
                                   className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                        >
+                                >
                                   <CopyIcon className="h-4 w-4" />
                                 </ActionButton>
                         
                                 <ActionButton
-                          variant="ghost"
-                          size="sm"
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleBranchOff(message.id)}
                                   className="h-8 px-2 text-muted-foreground hover:text-foreground"
                                 >
@@ -1723,48 +1879,52 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                   size="sm"
                                   onClick={() => handleRetryMessage(message.id, message.role === "user")}
                                   className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                        >
+                                >
                                   <RotateCcwIcon className="h-4 w-4" />
                                 </ActionButton>
                               </>
-                    )}
+                            )}
                           </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-            
-            {isLoading && (
-              (() => {
-                const isImageModel = isImageGenerationModel(selectedModel);
-                console.log(`🎨 [DEBUG] Loading state: isLoading=${isLoading}, selectedModel=${selectedModel}, isImageModel=${isImageModel}`);
-                return isImageModel ? (
-                  <ImageSkeleton />
-                ) : (
-                  <div className="flex justify-start">
-                    <div className="w-full flex">
-                      <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
-                        <div className="flex items-center space-x-3">
-                          <div className="flex items-center space-x-1">
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"></div>
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
-                            <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
-                          </div>
-                          <span className="text-sm text-muted-foreground animate-pulse">AI is thinking...</span>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })()
-            )}
+                  ))}
             
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
-      </div>
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="w-full flex">
+                        {isImageGenerationModel(selectedModel) ? (
+                          // Show image skeleton for image generation models - match exact layout of final image
+                          <div className="w-full">
+                            <div className="px-4">
+                              <div className="mt-4">
+                                <ImageSkeleton />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          // Show regular loading indicator for text models
+                          <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center space-x-1">
+                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"></div>
+                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
+                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
+                              </div>
+                              <span className="text-sm text-muted-foreground animate-pulse">AI is thinking...</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+            
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+            </div>
             <div></div>
-                  </div>
+          </div>
         </CustomScrollbar>
         
         {/* Chatbox - Using shared component */}
@@ -1772,20 +1932,21 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           <div className="px-4 sm:hidden">
             {/* Mobile: Center middle chatbox */}
             <div className="max-w-[95%] w-full mx-auto">
-              <Chatbox
-                input={input}
-                onInputChange={handleInputChange}
-                onSubmit={handleSubmit}
-                uploadedFiles={uploadedFiles}
-                onFilesChange={setUploadedFiles}
-                selectedModel={selectedModel}
-                onModelChange={onModelChange}
-                isLoading={isLoading}
-                inputRef={inputRef}
-                searchGroundingEnabled={searchGroundingEnabled}
-                onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
-              />
-            </div>
+                              <Chatbox
+                  input={input}
+                  onInputChange={handleInputChange}
+                  onSubmit={handleSubmit}
+                  uploadedFiles={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                  isLoading={isLoading}
+                  inputRef={inputRef}
+                  searchGroundingEnabled={searchGroundingEnabled}
+                  onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
+                  onModelSelectorClick={triggerShakeAnimation}
+                />
+              </div>
           </div>
           <div className={`hidden sm:block ${chatboxGridClasses}`}>
             {/* Desktop: Original layout */}
@@ -1798,14 +1959,15 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   onSubmit={handleSubmit}
                   uploadedFiles={uploadedFiles}
                   onFilesChange={setUploadedFiles}
-                    selectedModel={selectedModel}
-                    onModelChange={onModelChange}
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
                   isLoading={isLoading}
                   inputRef={inputRef}
                   searchGroundingEnabled={searchGroundingEnabled}
                   onSearchGroundingChange={(enabled) => setSearchGroundingEnabled(enabled)}
-                  />
-                  </div>
+                  onModelSelectorClick={triggerShakeAnimation}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -1816,17 +1978,17 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
 // Memoize the component with custom comparison to prevent unnecessary re-renders
 export const ChatWindow = React.memo(ChatWindowComponent, (prevProps, nextProps) => {
-// During transitions, prevent re-renders by returning true (props are "equal")
-const { isTransitioning } = useChatStore.getState();
-if (isTransitioning) {
-  return true; // Prevent re-render during transitions
-}
+  // During transitions, prevent re-renders by returning true (props are "equal")
+  const { isTransitioning } = useChatStore.getState();
+  if (isTransitioning) {
+    return true; // Prevent re-render during transitions
+  }
 
-// Normal comparison for other cases
-return (
-  prevProps.threadId === nextProps.threadId &&
-  prevProps.selectedModel === nextProps.selectedModel &&
-  prevProps.sidebarCollapsed === nextProps.sidebarCollapsed &&
-  prevProps.sidebarWidth === nextProps.sidebarWidth
-);
+  // Normal comparison for other cases
+  return (
+    prevProps.threadId === nextProps.threadId &&
+    prevProps.selectedModel === nextProps.selectedModel &&
+    prevProps.sidebarCollapsed === nextProps.sidebarCollapsed &&
+    prevProps.sidebarWidth === nextProps.sidebarWidth
+  );
 });

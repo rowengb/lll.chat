@@ -1,38 +1,39 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DownloadIcon, ExternalLinkIcon, EyeIcon } from 'lucide-react';
-import { trpc } from '@/utils/trpc';
+import { ImageSkeleton } from './ImageSkeleton';
+import { useImageStore } from '@/stores/imageStore';
+import { FileViewerModal } from './FileViewerModal';
+import { FileAttachmentData } from './FileAttachment';
 
 interface MessageImageProps {
-  imageUrl?: string;
-  fileId?: string;
+  imageUrl: string;
   alt?: string;
 }
 
-export const MessageImage: React.FC<MessageImageProps> = ({ imageUrl, fileId, alt = "Generated image" }) => {
-  // Fetch file data from Convex if fileId is provided
-  const { data: fileData } = trpc.files.getFile.useQuery(
-    { fileId: fileId! },
-    { enabled: !!fileId }
-  );
-
-  const finalImageUrl = imageUrl || fileData?.url;
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+export const MessageImage: React.FC<MessageImageProps> = ({ imageUrl, alt = "Generated image" }) => {
+  const { getImageState, setImageLoaded, setImageError } = useImageStore();
+  const { isLoaded, hasError } = getImageState(imageUrl);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleImageLoad = () => {
-    setIsLoading(false);
+    console.log("🎨 [MessageImage] Image fully loaded, updating store");
+    setImageLoaded(imageUrl);
   };
 
   const handleImageError = () => {
-    setIsLoading(false);
-    setHasError(true);
+    console.log("🎨 [MessageImage] Image failed to load, updating store");
+    setImageError(imageUrl);
   };
 
-  const handleDownload = async () => {
-    if (!finalImageUrl) return;
+  const handleImageClick = () => {
+    setIsModalOpen(true);
+  };
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening modal when clicking download
     try {
-      const response = await fetch(finalImageUrl);
+      const response = await fetch(imageUrl);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -47,18 +48,10 @@ export const MessageImage: React.FC<MessageImageProps> = ({ imageUrl, fileId, al
     }
   };
 
-  const handleOpenInNewTab = () => {
-    if (!finalImageUrl) return;
-    window.open(finalImageUrl, '_blank');
+  const handleOpenInNewTab = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening modal when clicking open in new tab
+    window.open(imageUrl, '_blank');
   };
-
-  if (!finalImageUrl) {
-    return (
-      <div className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg p-4 max-w-md">
-        <p className="text-gray-700 dark:text-gray-300 text-sm">Loading image...</p>
-      </div>
-    );
-  }
 
   if (hasError) {
     return (
@@ -68,45 +61,84 @@ export const MessageImage: React.FC<MessageImageProps> = ({ imageUrl, fileId, al
     );
   }
 
+  // Show skeleton while generating OR while the actual image is loading
+  if (imageUrl === "GENERATING" || !isLoaded) {
+    console.log("🎨 [MessageImage] Showing skeleton - generating:", imageUrl === "GENERATING", "loaded:", isLoaded);
+    return (
+      <>
+        <ImageSkeleton />
+        {/* Preload the actual image in the background when we have a real URL */}
+        {imageUrl !== "GENERATING" && (
+          <img
+            src={imageUrl}
+            alt={alt}
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+            className="hidden"
+          />
+        )}
+      </>
+    );
+  }
+
+  // Create a file object for the FileViewerModal
+  const fileData: FileAttachmentData = {
+    id: `generated-image-${Date.now()}`,
+    name: `generated-image-${Date.now()}.png`,
+    type: 'image/png',
+    size: 0, // We don't know the size, but it's not critical for viewing
+    url: imageUrl,
+  };
+
+  // Only show the actual image when it's fully loaded
   return (
-    <div className="relative max-w-lg group">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    <>
+      <div className="relative max-w-lg group/image cursor-pointer" onClick={handleImageClick}>
+        <img
+          src={imageUrl}
+          alt={alt}
+          className="w-full h-auto max-h-[300px] object-contain rounded-lg"
+        />
+        
+        {/* Overlay with view hint */}
+        <div className="absolute inset-0 bg-black/0 group-hover/image:bg-black/20 transition-colors rounded-lg flex items-center justify-center">
+          <div className="opacity-0 group-hover/image:opacity-100 transition-opacity">
+            <div className="bg-white/90 backdrop-blur-sm rounded-full p-3">
+              <EyeIcon className="h-6 w-6 text-gray-700" />
+            </div>
+          </div>
         </div>
-      )}
-      
-      <img
-        src={finalImageUrl}
-        alt={alt}
-        onLoad={handleImageLoad}
-        onError={handleImageError}
-        className={`w-full h-auto rounded-lg shadow-lg transition-opacity duration-300 ${
-          isLoading ? 'opacity-0' : 'opacity-100'
-        }`}
-      />
-      
-      {/* Action buttons - shown on hover */}
-      <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={handleDownload}
-          className="h-8 w-8 p-0 bg-black/60 hover:bg-black/80 text-white border-0"
-          title="Download image"
-        >
-          <DownloadIcon className="h-3 w-3" />
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={handleOpenInNewTab}
-          className="h-8 w-8 p-0 bg-black/60 hover:bg-black/80 text-white border-0"
-          title="Open in new tab"
-        >
-          <ExternalLinkIcon className="h-3 w-3" />
-        </Button>
+        
+        {/* Action buttons - shown on hover */}
+        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover/image:opacity-100 transition-opacity duration-200">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleDownload}
+            className="h-8 w-8 p-0 bg-black/60 hover:bg-black/80 text-white border-0"
+            title="Download image"
+          >
+            <DownloadIcon className="h-3 w-3" />
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleOpenInNewTab}
+            className="h-8 w-8 p-0 bg-black/60 hover:bg-black/80 text-white border-0"
+            title="Open in new tab"
+          >
+            <ExternalLinkIcon className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
-    </div>
+
+      {/* File Viewer Modal */}
+      <FileViewerModal
+        file={fileData}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        canDelete={false}
+      />
+    </>
   );
 }; 

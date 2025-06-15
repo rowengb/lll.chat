@@ -23,6 +23,7 @@ interface ChatboxProps {
   className?: string;
   searchGroundingEnabled?: boolean;
   onSearchGroundingChange?: (enabled: boolean) => void;
+  onModelSelectorClick?: () => void;
 }
 
 // Circular progress component
@@ -230,7 +231,8 @@ export function Chatbox({
   inputRef,
   className = "",
   searchGroundingEnabled = true,
-  onSearchGroundingChange
+  onSearchGroundingChange,
+  onModelSelectorClick
 }: ChatboxProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -529,6 +531,7 @@ export function Chatbox({
               <ModelSelector
                 selectedModel={selectedModel}
                 onModelChange={onModelChange}
+                onClick={onModelSelectorClick}
               />
             </div>
             <div className="flex items-center gap-1.5">

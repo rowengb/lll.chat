@@ -1,7 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
-import { api } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import { mutation, query } from "./_generated/server";
 
 export const generateUploadUrl = mutation({
   args: {},
@@ -32,6 +30,8 @@ export const createFile = mutation({
     });
   },
 });
+
+
 
 export const getFile = query({
   args: { fileId: v.id("files") },
@@ -144,60 +144,5 @@ export const updateFileAssociations = mutation({
       });
     }
     return { success: true };
-  },
-});
-
-export const saveImageFromUrl = action({
-  args: {
-    imageUrl: v.string(),
-    userId: v.id("users"),
-    messageId: v.optional(v.id("messages")),
-    threadId: v.optional(v.id("threads")),
-  },
-  handler: async (ctx, args): Promise<string> => {
-    try {
-      // Download the image from the URL
-      const response = await fetch(args.imageUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.statusText}`);
-      }
-
-      const arrayBuffer = await response.arrayBuffer();
-      
-      // Generate an upload URL for storing in Convex
-      const uploadUrl: string = await ctx.runMutation(api.files.generateUploadUrl, {});
-      
-      // Upload the image data to Convex storage
-      const uploadResponse: Response = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'image/png',
-        },
-        body: arrayBuffer,
-      });
-      
-      if (!uploadResponse.ok) {
-        throw new Error(`Failed to upload to storage: ${uploadResponse.statusText}`);
-      }
-      
-      const { storageId }: { storageId: Id<"_storage"> } = await uploadResponse.json();
-
-      // Create a file record in the database
-      const fileId: string = await ctx.runMutation(api.files.createFile, {
-        name: `generated-image-${Date.now()}.png`,
-        type: 'image/png',
-        size: arrayBuffer.byteLength,
-        storageId,
-        userId: args.userId,
-        messageId: args.messageId,
-        threadId: args.threadId,
-      });
-
-      return fileId;
-    } catch (error) {
-      console.error("Error saving image from URL:", error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      throw new Error(`Failed to save image: ${errorMessage}`);
-    }
   },
 }); 

@@ -21,7 +21,8 @@ interface Message {
   isGrounded?: boolean; // Indicates if response was grounded with Google Search
   groundingMetadata?: GroundingMetadata; // Google Search grounding metadata
   attachments?: FileAttachment[];
-  imageFileId?: string; // Reference to generated image file in Convex storage
+  imageUrl?: string; // For image generation results
+  imageData?: string; // For base64 image data
 }
 
 interface GroundingSource {
@@ -70,7 +71,7 @@ interface ChatStore {
   // Actions
   setMessages: (threadId: string, messages: Message[]) => void;
   addMessage: (threadId: string, message: Message) => void;
-  updateStreamingMessage: (threadId: string, messageId: string, content: string) => void;
+  updateStreamingMessage: (threadId: string, messageId: string, updates: Partial<Message>) => void;
   setStreaming: (threadId: string | null, isStreaming: boolean) => void;
   setLoading: (threadId: string | null, isLoading: boolean) => void;
   clearThread: (threadId: string) => void;
@@ -145,12 +146,12 @@ export const useChatStore = create<ChatStore>()(
     });
   },
   
-  updateStreamingMessage: (threadId: string, messageId: string, content: string) => {
+  updateStreamingMessage: (threadId: string, messageId: string, updates: Partial<Message>) => {
     set((state) => ({
       messagesByThread: {
         ...state.messagesByThread,
         [threadId]: (state.messagesByThread[threadId] || []).map(msg =>
-          msg.id === messageId ? { ...msg, content } : msg
+          msg.id === messageId ? { ...msg, ...updates } : msg
         ),
       },
     }));

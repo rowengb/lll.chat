@@ -16,7 +16,9 @@ export const createMessage = mutation({
       confidence: v.optional(v.number()),
     }))),
     attachments: v.optional(v.array(v.id("files"))),
+    imageUrl: v.optional(v.string()),
     imageFileId: v.optional(v.id("files")),
+    imageData: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const messageId = await ctx.db.insert("messages", {
@@ -28,7 +30,9 @@ export const createMessage = mutation({
       isGrounded: args.isGrounded,
       groundingSources: args.groundingSources,
       attachments: args.attachments,
+      imageUrl: args.imageUrl,
       imageFileId: args.imageFileId,
+      imageData: args.imageData,
     });
     
     return messageId;
@@ -62,7 +66,8 @@ export const createMany = mutation({
         snippet: v.optional(v.string()),
         confidence: v.optional(v.number()),
       }))),
-      imageFileId: v.optional(v.id("files")),
+      imageUrl: v.optional(v.string()),
+      imageData: v.optional(v.string()),
     })),
   },
   handler: async (ctx, args) => {
@@ -89,7 +94,9 @@ export const createAssistantMessage = mutation({
       snippet: v.optional(v.string()),
       confidence: v.optional(v.number()),
     }))),
+    imageUrl: v.optional(v.string()),
     imageFileId: v.optional(v.id("files")),
+    imageData: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("messages", {
@@ -101,7 +108,9 @@ export const createAssistantMessage = mutation({
       attachments: args.attachments,
       isGrounded: args.isGrounded,
       groundingSources: args.groundingSources,
+      imageUrl: args.imageUrl,
       imageFileId: args.imageFileId,
+      imageData: args.imageData,
     });
   },
 });
@@ -204,16 +213,29 @@ export const updateGroundingSourceUnfurl = mutation({
     // Update the grounding source with unfurled data
     if (message.groundingSources && message.groundingSources[sourceIndex]) {
       const updatedSources = [...message.groundingSources];
-      updatedSources[sourceIndex] = {
-        ...updatedSources[sourceIndex],
-        unfurledTitle: unfurledData.title,
-        unfurledDescription: unfurledData.description,
-        unfurledImage: unfurledData.image,
-        unfurledFavicon: unfurledData.favicon,
-        unfurledSiteName: unfurledData.siteName,
-        unfurledFinalUrl: unfurledData.finalUrl,
+      const currentSource = updatedSources[sourceIndex];
+      
+      // Double-check that currentSource exists (TypeScript safety)
+      if (!currentSource) {
+        return { success: false, error: "Source not found" };
+      }
+      
+      // Ensure required fields are preserved and create updated source
+      const updatedSource = {
+        title: currentSource.title, // Required field - preserve original
+        url: currentSource.url, // Required field - preserve original
+        snippet: currentSource.snippet,
+        confidence: currentSource.confidence,
+        unfurledTitle: unfurledData.title !== undefined ? unfurledData.title : currentSource.unfurledTitle,
+        unfurledDescription: unfurledData.description !== undefined ? unfurledData.description : currentSource.unfurledDescription,
+        unfurledImage: unfurledData.image !== undefined ? unfurledData.image : currentSource.unfurledImage,
+        unfurledFavicon: unfurledData.favicon !== undefined ? unfurledData.favicon : currentSource.unfurledFavicon,
+        unfurledSiteName: unfurledData.siteName !== undefined ? unfurledData.siteName : currentSource.unfurledSiteName,
+        unfurledFinalUrl: unfurledData.finalUrl !== undefined ? unfurledData.finalUrl : currentSource.unfurledFinalUrl,
         unfurledAt: Date.now(),
       };
+      
+      updatedSources[sourceIndex] = updatedSource;
       
       await ctx.db.patch(messageId, {
         groundingSources: updatedSources,
@@ -461,5 +483,51 @@ export const nuclearCleanupDeprecatedFields = mutation({
       deletedMessages: deletedCount,
       recreatedMessages: recreatedCount
     };
+  },
+});
+
+export const updateMessageImageFile = mutation({
+  args: {
+    messageId: v.id("messages"),
+    imageFileId: v.id("files"),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db.patch(args.messageId, {
+      imageFileId: args.imageFileId,
+    });
+  },
+});
+
+export const getMessagesWithImages = query({
+  args: { threadId: v.id("threads") },
+  handler: async (ctx, args) => {
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_thread", (q) => q.eq("threadId", args.threadId))
+      .order("asc")
+      .collect();
+
+    // Resolve image file URLs for messages that have imageFileId
+    const messagesWithImages = await Promise.all(
+      messages.map(async (message) => {
+        if (message.imageFileId) {
+          // Get the stored image file
+          const imageFile = await ctx.db.get(message.imageFileId);
+          if (imageFile) {
+            const imageUrl = await ctx.storage.getUrl(imageFile.storageId);
+            return {
+              ...message,
+              imageUrl: imageUrl || message.imageUrl, // Use stored image URL, fallback to original
+            };
+          }
+        }
+        return {
+          ...message,
+          imageUrl: message.imageUrl || undefined, // Convert null to undefined
+        };
+      })
+    );
+
+    return messagesWithImages;
   },
 }); 

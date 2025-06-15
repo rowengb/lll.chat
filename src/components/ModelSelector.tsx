@@ -7,6 +7,7 @@ interface ModelSelectorProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
   size?: 'sm' | 'lg';
+  onClick?: () => void;
 }
 
 // Type definition for model data from Convex
@@ -159,7 +160,7 @@ const getCapabilityColor = (capability: string) => {
   }
 };
 
-export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: ModelSelectorProps) {
+export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onClick }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -310,6 +311,14 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
         type="button"
         variant="ghost"
         onClick={() => {
+          // Check if user has any API keys
+          const hasAnyApiKey = apiKeys && Object.values(apiKeys).some(key => key && key.trim().length > 0);
+          
+          if (!hasAnyApiKey && onClick) {
+            onClick(); // Trigger shake animation
+            return;
+          }
+          
           if (isOpen) {
             closeDropdown();
           } else {
@@ -377,7 +386,10 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
 
           {showAll ? (
             // Grid View - Show All
-            <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{height: window.innerWidth < 640 ? 'calc(100vh - 300px)' : '850px', maxHeight: window.innerWidth < 640 ? 'calc(100vh - 300px)' : '850px'}}>
+            <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{
+              height: window.innerWidth < 640 ? 'min(550px, calc(100vh - 200px))' : '850px', 
+              maxHeight: window.innerWidth < 640 ? 'min(550px, calc(100vh - 200px))' : 'min(850px, calc(100vh - 100px))'
+            }}>
               {/* Scrollable Content Area */}
               <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent" style={{scrollbarGutter: 'stable'}}>
                 {/* Favorites Section */}
@@ -595,7 +607,10 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm' }: Mod
             </div>
           ) : (
             // List View - Default
-            <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{height: window.innerWidth < 640 ? 'calc(100vh - 500px)' : '450px', maxHeight: window.innerWidth < 640 ? 'calc(100vh - 500px)' : '450px'}}>
+            <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{
+              height: window.innerWidth < 640 ? 'min(450px, calc(100vh - 200px))' : '450px', 
+              maxHeight: window.innerWidth < 640 ? 'min(450px, calc(100vh - 200px))' : 'min(450px, calc(100vh - 100px))'
+            }}>
               {/* Scrollable Content Area */}
               <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent" style={{scrollbarGutter: 'stable'}}>
                 <div className="p-2">

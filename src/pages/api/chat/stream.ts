@@ -157,6 +157,134 @@ const formatFileSize = (bytes: number): string => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+// Generate context-aware prompt for image generation
+const generateContextAwarePrompt = (messages: any[]): string => {
+  if (!messages || messages.length === 0) {
+    return "A beautiful image";
+  }
+
+  const lastMessage = messages[messages.length - 1];
+  const lastUserPrompt = (lastMessage?.content as string) || "";
+
+  // If the last prompt is already detailed and specific, use it as-is
+  if (lastUserPrompt.length > 50 && !containsVagueReferences(lastUserPrompt)) {
+    return lastUserPrompt;
+  }
+
+  // Look for context in recent conversation (last 10 messages)
+  const recentMessages = messages.slice(-10);
+  let contextualContent = "";
+  let mainSubject = "";
+
+  // Extract key topics and subjects from recent conversation
+  for (let i = recentMessages.length - 2; i >= 0; i--) { // Skip the last message (image request)
+    const message = recentMessages[i];
+    if (message?.content && typeof message.content === 'string') {
+      const content = message.content.toLowerCase();
+      
+      // Look for specific subjects that could be visualized
+      const subjects = extractVisualSubjects(content);
+      if (subjects.length > 0) {
+        mainSubject = subjects[0]; // Use the first/most relevant subject
+        contextualContent = message.content; // Already checked it's a string above
+        break;
+      }
+    }
+  }
+
+  // If we found contextual content, create a comprehensive prompt
+  if (mainSubject && contextualContent) {
+    // Handle vague references in the last message
+    let enhancedPrompt = lastUserPrompt;
+    
+    // Replace vague references with specific context
+    enhancedPrompt = enhancedPrompt.replace(/\b(this|that|it)\b/gi, mainSubject);
+    enhancedPrompt = enhancedPrompt.replace(/^(generate an image of|create an image of|make an image of|draw)\s*/i, "");
+    
+    // If the prompt is still vague, create a descriptive prompt
+    if (enhancedPrompt.trim().length < 20 || containsVagueReferences(enhancedPrompt)) {
+      return `A detailed visual representation of ${mainSubject}, high quality, professional illustration`;
+    }
+    
+    return enhancedPrompt.trim();
+  }
+
+  // Fallback: try to extract any meaningful content from recent messages
+  const fallbackContext = extractFallbackContext(recentMessages);
+  if (fallbackContext) {
+    return `A visual representation of ${fallbackContext}, artistic, high quality`;
+  }
+
+  // Final fallback
+  return lastUserPrompt || "A beautiful, artistic image";
+};
+
+// Helper function to check if text contains vague references
+const containsVagueReferences = (text: string): boolean => {
+  const vaguePatterns = [
+    /\b(this|that|it|these|those)\b/i,
+    /^(generate|create|make|draw)\s*(an?\s*)?(image|picture|photo)\s*(of)?\s*$/i,
+    /^(show me|give me)\s/i
+  ];
+  
+  return vaguePatterns.some(pattern => pattern.test(text));
+};
+
+// Helper function to extract visual subjects from text
+const extractVisualSubjects = (text: string): string[] => {
+  const subjects: string[] = [];
+  
+  // Look for specific topics that can be visualized
+  const visualPatterns = [
+    // Scientific concepts
+    /\b(theory of relativity|quantum mechanics|DNA|molecule|atom|solar system|galaxy|black hole)\b/gi,
+    // Objects and things
+    /\b(car|house|tree|mountain|ocean|city|building|bridge|flower|animal)\b/gi,
+    // Abstract concepts that can be visualized
+    /\b(love|peace|war|freedom|justice|happiness|sadness|anger|fear)\b/gi,
+    // Art and design
+    /\b(painting|sculpture|architecture|design|pattern|mandala|geometric)\b/gi,
+    // Nature
+    /\b(landscape|sunset|sunrise|forest|desert|beach|waterfall|volcano)\b/gi,
+    // Technology
+    /\b(robot|AI|computer|smartphone|rocket|spaceship|laboratory)\b/gi
+  ];
+
+  for (const pattern of visualPatterns) {
+    const matches = text.match(pattern);
+    if (matches) {
+      subjects.push(...matches.map(match => match.toLowerCase()));
+    }
+  }
+
+  // Remove duplicates and return
+  return [...new Set(subjects)];
+};
+
+// Helper function to extract fallback context from messages
+const extractFallbackContext = (messages: any[]): string | null => {
+  for (let i = messages.length - 2; i >= 0; i--) {
+    const message = messages[i];
+    if (message?.content && typeof message.content === 'string') {
+      const content = message.content;
+      
+      // Look for any noun phrases that could be visualized
+      const nounPhrases = content.match(/\b[A-Z][a-z]+(?:\s+[a-z]+)*\b/g);
+      if (nounPhrases && nounPhrases.length > 0) {
+        return nounPhrases[0];
+      }
+      
+      // Look for any capitalized words (potential proper nouns)
+      const capitalizedWords = content.match(/\b[A-Z][a-z]+\b/g);
+      if (capitalizedWords && capitalizedWords.length > 0) {
+        return capitalizedWords[0];
+      }
+    }
+  }
+  
+  return null;
+};
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const requestStart = Date.now();
   console.log(`🚀 [LLL.CHAT] Request started at ${new Date().toISOString()}`);
@@ -271,11 +399,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (isImageGenerationModel(model)) {
       console.log(`🎨 [LLL.CHAT] Image generation request detected for model: ${model}`);
       
-      // Extract the prompt from the last user message
-      const lastMessage = messages[messages.length - 1];
-      const prompt = lastMessage?.content || "A beautiful image";
+      // Generate context-aware prompt from conversation history
+      const prompt = generateContextAwarePrompt(messages);
       
-      console.log(`🎨 [LLL.CHAT] Generating image with prompt: "${prompt}"`);
+      console.log(`🎨 [LLL.CHAT] Generating image with context-aware prompt: "${prompt}"`);
+      
+      // Validate prompt
+      if (!prompt || prompt.trim().length === 0) {
+        throw new Error("Empty prompt provided for image generation");
+      }
+      
+      if (prompt.length > 4000) {
+        throw new Error(`Prompt too long (${prompt.length} characters). DALL-E 3 supports up to 4000 characters.`);
+      }
+      
+      console.log(`🎨 [LLL.CHAT] Prompt validation passed. Length: ${prompt.length} characters`);
+      console.log(`🔑 [LLL.CHAT] Using API key ending in: ...${apiKey.slice(-4)}`);
       
       try {
         // Generate image using OpenAI DALL-E API
@@ -296,7 +435,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         if (!imageResponse.ok) {
-          throw new Error(`Image generation failed: ${imageResponse.status} ${imageResponse.statusText}`);
+          // Get detailed error information from the response
+          let errorDetails = '';
+          try {
+            const errorData = await imageResponse.json();
+            errorDetails = JSON.stringify(errorData, null, 2);
+            console.error(`❌ [LLL.CHAT] DALL-E API Error Details:`, errorData);
+          } catch (parseError) {
+            const errorText = await imageResponse.text();
+            errorDetails = errorText;
+            console.error(`❌ [LLL.CHAT] DALL-E API Error Text:`, errorText);
+          }
+          
+          throw new Error(`Image generation failed: ${imageResponse.status} ${imageResponse.statusText}. Details: ${errorDetails}`);
         }
 
         const imageData = await imageResponse.json();
@@ -307,28 +458,89 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         console.log(`🎨 [LLL.CHAT] Image generated successfully: ${imageUrl}`);
+        console.log(`💾 [LLL.CHAT] Now saving image to Convex storage immediately...`);
 
-        // Save the image to Convex storage
-        console.log(`🎨 [LLL.CHAT] Saving image to Convex storage...`);
-        const imageFileId = await convex.action(api.files.saveImageFromUrl, {
-          imageUrl,
-          userId: convexUser._id,
-        });
-        
-        console.log(`🎨 [LLL.CHAT] Image saved to Convex with file ID: ${imageFileId}`);
+        // Save image to Convex storage immediately before responding
+        try {
+          // Download the image from DALL-E
+          const response = await fetch(imageUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.statusText}`);
+          }
 
-        // Generate a message ID for this response
-        const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Send the image result
-        res.write(`f:{"messageId":"${messageId}"}\n`);
-        res.write(`f:{"imageGenerated":true,"imageFileId":"${imageFileId}"}\n`);
-        res.write(`d:{"message":"Image generated successfully!"}\n`);
-        res.write(`f:{"finished":true}\n`);
-        res.end();
-        
-        console.log(`🎨 [LLL.CHAT] Image generation completed in ${Date.now() - aiCallStart}ms`);
-        return;
+          const imageBlob = await response.blob();
+          
+          // Generate upload URL
+          const uploadUrl = await convex.mutation(api.files.generateUploadUrl, {});
+          
+          // Upload the image to Convex storage
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'image/png',
+            },
+            body: imageBlob,
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Failed to upload image: ${uploadResponse.statusText}`);
+          }
+
+          const { storageId } = await uploadResponse.json();
+
+          // Create file record
+          const fileName = `generated-image-${Date.now()}.png`;
+          const fileId = await convex.mutation(api.files.createFile, {
+            name: fileName,
+            type: 'image/png',
+            size: imageBlob.size,
+            storageId: storageId,
+            userId: convexUser._id,
+            threadId: threadId,
+          });
+
+          // Get the Convex URL for the stored image
+          const storedImageFile = await convex.query(api.files.getFile, { fileId });
+          const convexImageUrl = storedImageFile?.url;
+
+          if (!convexImageUrl) {
+            throw new Error("Failed to get Convex image URL");
+          }
+
+          console.log(`✅ [LLL.CHAT] Image saved to Convex storage with URL: ${convexImageUrl}`);
+
+          // Generate a message ID for this response
+          const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          // Send the Convex image URL instead of the temporary DALL-E URL
+          res.write(`f:{"messageId":"${messageId}"}\n`);
+          res.write(`f:{"imageGenerated":true,"imageUrl":"${convexImageUrl}"}\n`);
+          res.write(`d:{"message":""}\n`);
+          res.write(`f:{"finished":true}\n`);
+          res.end();
+          
+          console.log(`🎨 [LLL.CHAT] Image generation and storage completed in ${Date.now() - aiCallStart}ms`);
+          return;
+
+        } catch (storageError) {
+          console.error(`❌ [LLL.CHAT] Failed to save image to Convex storage:`, storageError);
+          
+          // Fallback to temporary URL if storage fails
+          console.log(`⚠️ [LLL.CHAT] Falling back to temporary DALL-E URL`);
+          
+          // Generate a message ID for this response
+          const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          
+          // Send the temporary image URL as fallback
+          res.write(`f:{"messageId":"${messageId}"}\n`);
+          res.write(`f:{"imageGenerated":true,"imageUrl":"${imageUrl}"}\n`);
+          res.write(`d:{"message":""}\n`);
+          res.write(`f:{"finished":true}\n`);
+          res.end();
+          
+          console.log(`🎨 [LLL.CHAT] Image generation completed with fallback in ${Date.now() - aiCallStart}ms`);
+          return;
+        }
         
       } catch (error) {
         console.error(`❌ [LLL.CHAT] Image generation error:`, error);
@@ -466,4 +678,4 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.write(`f:{"error":"${errorMessage}"}\n`);
     res.end();
   }
-} 
+}

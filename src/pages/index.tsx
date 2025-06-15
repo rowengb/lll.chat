@@ -18,6 +18,7 @@ import Logo from '../components/Logo';
 import { SidebarSkeleton, MainChatSkeleton, ChatboxSkeleton } from '../components/skeletons';
 import { trpc } from "@/utils/trpc";
 
+
 interface ApiKeys {
   openai: string;
   anthropic: string;
@@ -83,6 +84,8 @@ const Home: NextPage = () => {
   const setDefaultModelMutation = trpc.userPreferences.setDefaultModel.useMutation();
   const updateThreadMetadataMutation = trpc.chat.updateThreadMetadata.useMutation();
 
+
+
   // Initialize selectedModel based on user preferences
   useEffect(() => {
     if (bestDefaultModel && selectedModel === null) {
@@ -98,7 +101,7 @@ const Home: NextPage = () => {
   // Handle URL routing for authenticated users using query parameters
   useEffect(() => {
     if (user) {
-      const { view, threadId } = router.query;
+      const { view, threadId, tab } = router.query;
       
       if (view === 'chat' && threadId && typeof threadId === 'string') {
         setCurrentView('chat');
@@ -106,9 +109,17 @@ const Home: NextPage = () => {
       } else if (view === 'settings') {
         setCurrentView('settings');
         setCurrentThreadId(null);
+        // Handle tab parameter for settings page
+        if (tab === 'api-keys') {
+          setActiveSettingsTab('api-keys');
+        } else if (tab === 'account') {
+          setActiveSettingsTab('account');
+        }
       } else if (view === 'account') {
-        setCurrentView('account');
+        // Direct account page access - redirect to settings with account tab
+        setCurrentView('settings');
         setCurrentThreadId(null);
+        setActiveSettingsTab('account');
       } else {
         setCurrentView('welcome');
         setCurrentThreadId(null);
@@ -306,6 +317,17 @@ const Home: NextPage = () => {
     router.push('/?view=settings&tab=account', undefined, { shallow: true });
   };
 
+  // Functions to handle tab switching with URL updates
+  const switchToAccountTab = () => {
+    setActiveSettingsTab('account');
+    router.push('/?view=settings&tab=account', undefined, { shallow: true });
+  };
+
+  const switchToApiKeysTab = () => {
+    setActiveSettingsTab('api-keys');
+    router.push('/?view=settings&tab=api-keys', undefined, { shallow: true });
+  };
+
   const handleThreadSelect = (threadId: string) => {
     navigateToChat(threadId);
   };
@@ -367,6 +389,8 @@ const Home: NextPage = () => {
               sidebarCollapsed={sidebarCollapsed}
               sidebarWidth={sidebarWidth}
               onToggleSidebar={toggleSidebar}
+              currentView={currentView}
+              onNavigateToSettings={navigateToSettings}
             />
           );
         }
@@ -411,7 +435,7 @@ const Home: NextPage = () => {
                     <div className="p-6 pb-0">
                       <nav className="flex space-x-2 bg-muted rounded-xl p-1" aria-label="Tabs">
                         <button
-                          onClick={() => setActiveSettingsTab('account')}
+                          onClick={switchToAccountTab}
                           className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-all ${
                             activeSettingsTab === 'account'
                               ? 'bg-background text-foreground shadow-sm'
@@ -424,7 +448,7 @@ const Home: NextPage = () => {
                           </div>
                         </button>
                         <button
-                          onClick={() => setActiveSettingsTab('api-keys')}
+                          onClick={switchToApiKeysTab}
                           className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-all ${
                             activeSettingsTab === 'api-keys'
                               ? 'bg-background text-foreground shadow-sm'
@@ -650,6 +674,8 @@ const Home: NextPage = () => {
               sidebarCollapsed={sidebarCollapsed}
               sidebarWidth={sidebarWidth}
               onToggleSidebar={toggleSidebar}
+              currentView={currentView}
+              onNavigateToSettings={navigateToSettings}
             />
           );
         }
