@@ -61,13 +61,44 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
   const { user } = useUser();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingThread, setEditingThread] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
 
+  const utils = trpc.useUtils();
   const { data: threads } = trpc.chat.getThreads.useQuery(undefined, {
     refetchOnWindowFocus: true,
     staleTime: 5000,
     refetchInterval: 30000,
   });
   const { data: models } = trpc.models.getModels.useQuery();
+
+  const updateThread = trpc.chat.updateThread.useMutation({
+    onMutate: async (newData) => {
+      await utils.chat.getThreads.cancel();
+      const previousThreads = utils.chat.getThreads.getData();
+      utils.chat.getThreads.setData(undefined, (old) => {
+        if (!old) return old;
+        return old.map(thread => 
+          thread.id === newData.id 
+            ? { 
+                ...thread, 
+                title: newData.title !== undefined ? newData.title : thread.title,
+                pinned: newData.pinned !== undefined ? newData.pinned : thread.pinned
+              }
+            : thread
+        );
+      });
+      return { previousThreads };
+    },
+    onError: (err, newData, context) => {
+      if (context?.previousThreads) {
+        utils.chat.getThreads.setData(undefined, context.previousThreads);
+      }
+      toast.dismiss();
+      toast.error("Failed to update conversation");
+    },
+  });
 
   // Filter threads based on search query
   const filteredThreads = threads?.filter(thread => 
@@ -91,29 +122,94 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
   };
 
+  const handleRenameStart = (threadId: string, currentTitle: string) => {
+    setEditingThread(threadId);
+    setEditTitle(currentTitle || `Chat ${threadId.slice(0, 8)}`);
+    setContextMenu(null);
+  };
+
+  const handleRenameSubmit = (threadId: string) => {
+    if (editTitle.trim()) {
+      updateThread.mutate({
+        id: threadId,
+        title: editTitle.trim(),
+      });
+      toast.dismiss();
+      toast.success("Conversation renamed");
+    }
+    setEditingThread(null);
+  };
+
+  const handleRenameCancel = () => {
+    setEditingThread(null);
+    setEditTitle("");
+  };
+
+  const handleRightClick = (e: React.MouseEvent, threadId: string) => {
+    e.preventDefault();
+    setContextMenu({
+      threadId,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      setContextMenu(null);
+    };
+
+    if (contextMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [contextMenu]);
+
   const ThreadItem = ({ thread, isPinned }: { thread: any; isPinned: boolean }) => {
     const provider = getProviderFromModel(thread.model, models);
     const modelName = getModelNameFromId(thread.model, models);
+    const isEditing = editingThread === thread.id;
     
     return (
       <div
                   className={`group relative flex w-full items-center gap-3 rounded-lg p-3 text-left text-sm hover:bg-white dark:hover:bg-muted cursor-pointer ${
             currentThreadId === thread.id ? "bg-white dark:bg-muted text-foreground" : "text-muted-foreground"
         }`}
-        onClick={() => onThreadSelect(thread.id)}
+        onClick={() => !isEditing && onThreadSelect(thread.id)}
+        onContextMenu={(e: React.MouseEvent) => handleRightClick(e, thread.id)}
       >
         <div className="flex-shrink-0 h-4 w-4 flex items-center justify-center">
           {getProviderIcon(provider, modelName)}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-foreground truncate">
-            {thread.title || `${thread.model} conversation`}
-          </div>
-          <div className="text-xs text-muted-foreground">
-            {new Date((thread as any)._creationTime).toLocaleDateString()}
-          </div>
+          {isEditing ? (
+            <Input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onBlur={() => handleRenameSubmit(thread.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleRenameSubmit(thread.id);
+                } else if (e.key === "Escape") {
+                  handleRenameCancel();
+                }
+              }}
+              className="bg-transparent border-0 border-b border-border rounded-none focus:border-primary focus:ring-0 focus:outline-none text-sm p-0 h-auto"
+              autoFocus
+            />
+          ) : (
+            <>
+              <div className="text-sm font-medium text-foreground truncate">
+                {thread.title || `${thread.model} conversation`}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {new Date((thread as any)._creationTime).toLocaleDateString()}
+              </div>
+            </>
+          )}
         </div>
-        {isPinned && (
+        {isPinned && !isEditing && (
           <PinIcon className="h-3 w-3 text-primary flex-shrink-0" />
         )}
       </div>
@@ -196,10 +292,10 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               </div>
 
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-border">
-                <div className="w-20"></div> {/* Spacer for floating buttons */}
-                <div className="flex items-center">
-                  <div className="bg-white dark:bg-muted border border-border px-3 py-1.5 hover:bg-white dark:hover:bg-muted/80 transition-colors cursor-pointer" style={{ borderRadius: '20px' }} onClick={onNavigateToWelcome}>
+              <div className="flex items-center p-4 border-b border-border gap-3">
+                <div className="w-20 flex-shrink-0"></div> {/* Spacer for floating buttons */}
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="bg-white dark:bg-muted border border-border shadow-sm px-3 py-1.5 hover:bg-white dark:hover:bg-muted/80 transition-colors cursor-pointer w-full max-w-none flex items-center justify-center" style={{ borderRadius: '12px' }} onClick={onNavigateToWelcome}>
                     <Logo size="sm" className="flex-shrink-0" />
                   </div>
                 </div>
@@ -209,7 +305,8 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               <div className="px-4 py-3 pb-2">
                 <Button
                   onClick={onNewChat}
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg h-10 text-sm font-medium transition-all duration-200"
+                  className="w-full bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700 text-white dark:text-black h-10 text-sm font-medium transition-all duration-200 shadow-sm"
+                  style={{ borderRadius: '12px' }}
                 >
                   New Chat
                 </Button>
@@ -315,6 +412,25 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
           </div>
         </div>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          className="fixed z-50 bg-card border border-border rounded-md shadow-lg py-1 min-w-[120px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => {
+              const thread = threads?.find(t => t.id === contextMenu.threadId);
+              handleRenameStart(contextMenu.threadId, thread?.title || "");
+            }}
+            className="w-full px-3 py-2 text-left text-sm hover:bg-white dark:hover:bg-muted flex items-center gap-2"
+          >
+            <EditIcon className="h-3 w-3" />
+            Rename
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -908,7 +1024,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           <div className="px-4 py-3 pb-2">
             <Button
               onClick={handleNewChat}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg h-10 text-sm font-medium transition-all duration-200"
+              className="w-full bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700 text-white dark:text-black h-10 text-sm font-medium transition-all duration-200 shadow-sm"
+              style={{ borderRadius: '12px' }}
             >
               New Chat
             </Button>

@@ -38,7 +38,7 @@ export const ImageSkeleton: React.FC<ImageSkeletonProps> = ({ className = "" }) 
         {/* Loading text */}
         <div className="absolute bottom-4 left-4 right-4">
           <div className="text-xs text-muted-foreground/70 text-center animate-pulse">
-            Generating image...
+            Loading image...
           </div>
         </div>
       </div>

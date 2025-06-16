@@ -67,38 +67,118 @@ export const generateTitle = action({
       const modelId = args.modelId || "gpt-4o-mini"; // Default fallback
       const provider = args.provider || "openai"; // Default to OpenAI
       
-      // Determine the API endpoint based on provider
-      let apiUrl = "https://api.openai.com/v1/chat/completions";
-      if (provider === "openrouter") {
-        apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+      // Determine the API endpoint and request format based on provider
+      let apiUrl: string;
+      let headers: Record<string, string>;
+      let requestBody: any;
+      
+      const systemMessage = "Generate a concise, descriptive title (max 60 characters) for a chat conversation based on the user's first message. The title should capture the main topic or intent. Respond with only the title, no quotes or extra formatting.";
+      
+      switch (provider) {
+        case "openai":
+          apiUrl = "https://api.openai.com/v1/chat/completions";
+          headers = {
+            "Authorization": `Bearer ${args.apiKey}`,
+            "Content-Type": "application/json",
+          };
+          requestBody = {
+            model: modelId,
+            messages: [
+              { role: "system", content: systemMessage },
+              { role: "user", content: args.firstMessage }
+            ],
+            max_completion_tokens: 20,
+          };
+          // Only add temperature for models that support it (exclude o1 series and reasoning models)
+          if (!modelId.startsWith("o1") && !modelId.includes("reasoning")) {
+            requestBody.temperature = 1.0;
+          }
+          break;
+          
+        case "anthropic":
+          apiUrl = "https://api.anthropic.com/v1/messages";
+          headers = {
+            "x-api-key": args.apiKey,
+            "Content-Type": "application/json",
+            "anthropic-version": "2023-06-01",
+          };
+          requestBody = {
+            model: modelId,
+            max_tokens: 20,
+            messages: [
+              { role: "user", content: `${systemMessage}\n\nUser message: ${args.firstMessage}` }
+            ],
+          };
+          break;
+          
+        case "gemini":
+          apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`;
+          headers = {
+            "Content-Type": "application/json",
+          };
+          requestBody = {
+            contents: [{
+              parts: [{
+                text: `${systemMessage}\n\nUser message: ${args.firstMessage}`
+              }]
+            }],
+            generationConfig: {
+              maxOutputTokens: 20,
+            }
+          };
+          // Add API key as query parameter for Gemini
+          apiUrl += `?key=${args.apiKey}`;
+          break;
+          
+        case "openrouter":
+          apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+          headers = {
+            "Authorization": `Bearer ${args.apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://lll.chat",
+            "X-Title": "lll.chat",
+          };
+          requestBody = {
+            model: modelId,
+            messages: [
+              { role: "system", content: systemMessage },
+              { role: "user", content: args.firstMessage }
+            ],
+            max_tokens: 20,
+          };
+          // Only add temperature for models that support it (exclude o1 series and reasoning models)
+          if (!modelId.startsWith("o1") && !modelId.includes("reasoning")) {
+            requestBody.temperature = 1.0;
+          }
+          break;
+          
+        default:
+          // For other providers, try OpenAI-compatible format
+          apiUrl = "https://api.openai.com/v1/chat/completions";
+          headers = {
+            "Authorization": `Bearer ${args.apiKey}`,
+            "Content-Type": "application/json",
+          };
+          requestBody = {
+            model: modelId,
+            messages: [
+              { role: "system", content: systemMessage },
+              { role: "user", content: args.firstMessage }
+            ],
+            max_completion_tokens: 20,
+          };
+          // Only add temperature for models that support it (exclude o1 series and reasoning models)
+          if (!modelId.startsWith("o1") && !modelId.includes("reasoning")) {
+            requestBody.temperature = 1.0;
+          }
+          break;
       }
       
       // Generate a concise title using the appropriate API
       const response = await fetch(apiUrl, {
         method: "POST",
-        headers: {
-          "Authorization": `Bearer ${args.apiKey}`,
-          "Content-Type": "application/json",
-          ...(provider === "openrouter" ? {
-            "HTTP-Referer": "https://lll.chat",
-            "X-Title": "lll.chat",
-          } : {}),
-        },
-        body: JSON.stringify({
-          model: modelId, // Use the specified model or fallback
-          messages: [
-            {
-              role: "system",
-              content: "Generate a concise, descriptive title (max 60 characters) for a chat conversation based on the user's first message. The title should capture the main topic or intent. Respond with only the title, no quotes or extra formatting."
-            },
-            {
-              role: "user",
-              content: args.firstMessage
-            }
-          ],
-          max_tokens: 20,
-          temperature: 0.3,
-        }),
+        headers,
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -108,9 +188,27 @@ export const generateTitle = action({
       }
 
       const data = await response.json();
-      const generatedTitle = data.choices[0]?.message?.content?.trim();
+      console.log(`${provider.toUpperCase()} API response:`, JSON.stringify(data, null, 2));
+      let generatedTitle: string | undefined;
+      
+      // Extract title based on provider response format
+      switch (provider) {
+        case "anthropic":
+          generatedTitle = data.content?.[0]?.text?.trim();
+          break;
+        case "gemini":
+          generatedTitle = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          break;
+        default:
+          // OpenAI, OpenRouter, and other OpenAI-compatible providers
+          generatedTitle = data.choices?.[0]?.message?.content?.trim();
+          break;
+      }
+
+      console.log(`${provider.toUpperCase()} extracted title:`, generatedTitle);
 
       if (!generatedTitle) {
+        console.log(`${provider.toUpperCase()} failed to extract title from response:`, data);
         return { success: false, error: "No title generated" };
       }
 

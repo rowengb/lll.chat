@@ -1039,11 +1039,12 @@ export function Chatbox({
             type={isStreaming ? "button" : "submit"}
             onClick={isStreaming ? onStop : undefined}
             disabled={isStreaming ? false : ((!input.trim() && uploadedFiles.length === 0) || isLoading)}
-            className={`rounded-xl h-12 w-12 shadow-sm transition-all ${
+            className={`h-12 w-12 shadow-sm transition-all ${
               isStreaming 
                 ? 'bg-destructive hover:bg-destructive/90' 
-                : 'bg-primary hover:bg-primary/90'
+                : 'bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700 text-white dark:text-black'
             }`}
+            style={{ borderRadius: '12px' }}
             size="sm"
             title={isStreaming ? "Stop generation" : "Send message"}
           >
