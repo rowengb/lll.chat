@@ -109,25 +109,13 @@ export const smartFocus = (inputRef: React.RefObject<HTMLInputElement | HTMLText
     return;
   }
   
-  // On mobile, be more selective about when to focus
-  const timeSinceLastInteraction = Date.now() - lastUserInteraction;
+  // On mobile, COMPLETELY disable automatic focus to prevent scrolling issues
+  // Only allow focus for very specific user-initiated actions
+  console.log(`[FOCUS] Mobile focus disabled for reason: ${reason}`);
   
-  // Don't focus if:
-  // 1. User is currently scrolling
-  // 2. User hasn't interacted recently (likely just browsing/reading)
-  // 3. Focus was triggered by automatic events (like thread changes, message completion)
-  if (isUserScrolling) {
-    console.log(`[FOCUS] Skipping focus on mobile - user is scrolling (reason: ${reason})`);
-    return;
-  }
-  
-  if (timeSinceLastInteraction > 5000 && !force) {
-    console.log(`[FOCUS] Skipping focus on mobile - no recent user interaction (reason: ${reason})`);
-    return;
-  }
-  
-  // Allow focus for user-initiated actions
-  if (reason === 'user-action' || reason === 'form-submit' || reason === 'example-click') {
+  // Only allow focus for explicit user actions that expect input focus
+  if (reason === 'example-click') {
+    // User clicked on an example prompt - they expect to be able to edit/send immediately
     if (delay > 0) {
       setTimeout(() => {
         inputRef.current?.focus();
@@ -138,7 +126,15 @@ export const smartFocus = (inputRef: React.RefObject<HTMLInputElement | HTMLText
     return;
   }
   
-  console.log(`[FOCUS] Skipping auto-focus on mobile (reason: ${reason})`);
+  // All other reasons are disabled on mobile to prevent scrolling issues:
+  // - 'component-mount': No auto-focus when page loads
+  // - 'thread-change': No auto-focus when switching conversations
+  // - 'form-submit': No auto-focus after sending a message
+  // - 'user-action': No auto-focus for general user actions
+  // - 'stream-content': No auto-focus during streaming
+  // - any other automatic focus triggers
+  
+  console.log(`[FOCUS] Skipping all auto-focus on mobile (reason: ${reason})`);
 };
 
 // Initialize interaction tracking

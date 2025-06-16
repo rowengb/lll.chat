@@ -2,6 +2,7 @@
   "name": "lll-chat",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.12.1",
   "scripts": {
     "build": "next build",
     "predev": "kill-port 3000",
