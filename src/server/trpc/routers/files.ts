@@ -178,4 +178,23 @@ export const filesRouter = createTRPCRouter({
         threadId: input.threadId as Id<"threads">,
       });
     }),
+
+  duplicateFilesForThread: protectedProcedure
+    .input(z.object({
+      sourceThreadId: z.string(),
+      targetThreadId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      return await convex.mutation(api.files.duplicateFilesForThread, {
+        sourceThreadId: input.sourceThreadId as Id<"threads">,
+        targetThreadId: input.targetThreadId as Id<"threads">,
+        userId: convexUser._id,
+      });
+    }),
 }); 

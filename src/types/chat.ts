@@ -22,6 +22,8 @@ export interface Message {
   groundingMetadata?: GroundingMetadata;
   attachments?: FileAttachmentData[];
   imageUrl?: string;
+  imageFileId?: string;
+  stoppedByUser?: boolean;
 }
 
 export interface GroundingSource {

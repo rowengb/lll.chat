@@ -17,6 +17,94 @@ export const useChatStreaming = () => {
   // Ref to track streaming state and prevent race conditions
   const isStreamingRef = useRef(false);
   const lastStreamCompletedAt = useRef<number>(0);
+  
+  // AbortController for stopping streams
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentStreamDataRef = useRef<{
+    threadId: string;
+    optimisticAssistantMessage: any;
+    fullContent: string;
+    messageId: string;
+    isGrounded: boolean;
+    groundingMetadata: any;
+    imageGenerated: boolean;
+    imageUrl: string;
+    selectedModel: string;
+    content: string;
+    files: any[];
+    saveStreamedMessage: any;
+    updateFileAssociations: any;
+  } | null>(null);
+
+  const stopStream = async () => {
+    console.log('[STREAM] Stop requested by user');
+    
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // Save partial response if we have stream data
+    if (currentStreamDataRef.current) {
+      const streamData = currentStreamDataRef.current;
+      
+      try {
+        // Save the partial response to database
+        await streamData.saveStreamedMessage.mutateAsync({
+          threadId: streamData.threadId,
+          userContent: streamData.content,
+          assistantContent: streamData.fullContent,
+          model: streamData.selectedModel,
+          userAttachments: streamData.files.map(file => file.id),
+          isGrounded: streamData.isGrounded,
+          groundingSources: streamData.groundingMetadata?.sources && streamData.groundingMetadata.sources.length > 0 ? streamData.groundingMetadata.sources : undefined,
+          imageUrl: streamData.imageGenerated ? streamData.imageUrl : undefined,
+          stoppedByUser: true, // Flag to indicate this was stopped by user
+        });
+
+        // Update file associations if there are files
+        if (streamData.files.length > 0) {
+          await streamData.updateFileAssociations.mutateAsync({
+            fileIds: streamData.files.map(file => file.id),
+            messageId: streamData.messageId,
+            threadId: streamData.threadId,
+          });
+        }
+
+        // Mark the assistant message as complete but stopped
+        const currentMessages = getMessages(streamData.threadId);
+        const updatedMessages = currentMessages.map(msg => {
+          if (msg.id === streamData.optimisticAssistantMessage.id) {
+            return { 
+              ...msg, 
+              isOptimistic: false, 
+              content: streamData.fullContent,
+              model: streamData.selectedModel, 
+              isGrounded: streamData.isGrounded,
+              groundingMetadata: streamData.groundingMetadata,
+              imageUrl: streamData.imageGenerated ? streamData.imageUrl : undefined,
+              stoppedByUser: true, // Flag for UI display
+            };
+          } else if (msg.role === "user" && msg.isOptimistic) {
+            return { ...msg, isOptimistic: false };
+          }
+          return msg;
+        }).filter(msg => !msg.isOptimistic);
+        
+        setMessages(streamData.threadId, updatedMessages);
+        
+        console.log('[STREAM] Partial response saved after user stop');
+      } catch (error) {
+        console.error('[STREAM] Failed to save partial response:', error);
+      }
+    }
+    
+    // Clean up streaming state
+    isStreamingRef.current = false;
+    setStreaming(null, false);
+    setLoading(null, false);
+    abortControllerRef.current = null;
+    currentStreamDataRef.current = null;
+  };
 
   const streamResponse = async (
     threadId: string,
@@ -51,6 +139,9 @@ export const useChatStreaming = () => {
     // Mark as streaming to prevent server sync interference
     isStreamingRef.current = true;
     setStreaming(threadId, true);
+    
+    // Create AbortController for this stream
+    abortControllerRef.current = new AbortController();
 
     try {
       // Get conversation history for streaming (exclude optimistic and error messages)
@@ -62,7 +153,24 @@ export const useChatStreaming = () => {
 
       console.log(`[STREAM] Sending request with ${messages.length} messages`);
 
-      // Create streaming request
+      // Store current stream data for potential stopping
+      currentStreamDataRef.current = {
+        threadId,
+        optimisticAssistantMessage,
+        fullContent: "",
+        messageId: "",
+        isGrounded: false,
+        groundingMetadata: undefined,
+        imageGenerated: false,
+        imageUrl: "",
+        selectedModel,
+        content,
+        files,
+        saveStreamedMessage,
+        updateFileAssociations,
+      };
+
+      // Create streaming request with abort signal
       const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: {
@@ -75,6 +183,7 @@ export const useChatStreaming = () => {
           files: files.length > 0 ? files : undefined,
           searchGrounding: searchGroundingEnabled,
         }),
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
@@ -119,6 +228,10 @@ export const useChatStreaming = () => {
                 if (metadata.messageId) {
                   messageId = metadata.messageId;
                   console.log(`[STREAM] Got message ID: ${messageId}`);
+                  // Update stream data
+                  if (currentStreamDataRef.current) {
+                    currentStreamDataRef.current.messageId = messageId;
+                  }
                 }
                 if (metadata.grounding) {
                   isGrounded = true;
@@ -148,6 +261,12 @@ export const useChatStreaming = () => {
                     
                     console.log(`🔍 [STREAM] Processed grounding metadata:`, groundingMetadata);
                     
+                    // Update stream data
+                    if (currentStreamDataRef.current) {
+                      currentStreamDataRef.current.isGrounded = isGrounded;
+                      currentStreamDataRef.current.groundingMetadata = groundingMetadata;
+                    }
+                    
                     // Auto-scroll to bottom when grounding sources are added
                     setTimeout(() => {
                       scrollToBottomPinned();
@@ -158,6 +277,12 @@ export const useChatStreaming = () => {
                   imageGenerated = true;
                   imageUrl = metadata.imageUrl || "";
                   console.log(`🎨 [STREAM] Image generated: ${imageUrl}`);
+                  
+                  // Update stream data
+                  if (currentStreamDataRef.current) {
+                    currentStreamDataRef.current.imageGenerated = imageGenerated;
+                    currentStreamDataRef.current.imageUrl = imageUrl;
+                  }
                   
                   // Update the streaming message with the image URL immediately
                   updateStreamingMessage(threadId, optimisticAssistantMessage.id, { imageUrl });
@@ -205,6 +330,11 @@ export const useChatStreaming = () => {
                 fullContent += contentChunk;
                 
                 console.log(`[STREAM] Content chunk: "${contentChunk}" (total: ${fullContent.length} chars)`);
+                
+                // Update stream data with latest content
+                if (currentStreamDataRef.current) {
+                  currentStreamDataRef.current.fullContent = fullContent;
+                }
                 
                 // Hide loading animation on first content chunk (TTFB complete)
                 // But keep loading for image generation models until image is generated
@@ -263,23 +393,6 @@ export const useChatStreaming = () => {
                     lastModel: selectedModel,
                   });
                 }
-
-                // Generate title for new conversations
-                const currentMessages = getMessages(threadId);
-                const isFirstMessage = currentMessages.filter(msg => !msg.isOptimistic && msg.role === "user").length === 0;
-                if (isFirstMessage) {
-                  try {
-                    const titleResult = await generateTitle.mutateAsync({
-                      threadId,
-                      firstMessage: content,
-                    });
-                    if (titleResult.success) {
-                      await refetchThreads();
-                    }
-                  } catch (error) {
-                    console.error("Failed to generate title:", error);
-                  }
-                }
                 
                 // Mark both user and assistant messages as non-optimistic and clean up other optimistic messages
                 const allMessages = getMessages(threadId);
@@ -324,6 +437,14 @@ export const useChatStreaming = () => {
       }
 
     } catch (error) {
+      // Handle abort specifically (user stopped the stream)
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('[STREAM] Stream aborted by user');
+        // Don't show error message for user-initiated stops
+        // The stopStream function handles saving partial response
+        return;
+      }
+      
       console.error("[STREAM] Streaming error:", error);
       
       // Replace optimistic assistant message with error message instead of removing it
@@ -351,11 +472,16 @@ export const useChatStreaming = () => {
       }, 200);
       
       // Don't throw the error - we've handled it by showing it in the chat
+    } finally {
+      // Clean up references on completion or error
+      abortControllerRef.current = null;
+      currentStreamDataRef.current = null;
     }
   };
 
   return {
     streamResponse,
+    stopStream,
     isStreamingRef,
     lastStreamCompletedAt
   };

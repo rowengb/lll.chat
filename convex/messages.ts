@@ -19,6 +19,7 @@ export const createMessage = mutation({
     imageUrl: v.optional(v.string()),
     imageFileId: v.optional(v.id("files")),
     imageData: v.optional(v.string()),
+    stoppedByUser: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const messageId = await ctx.db.insert("messages", {
@@ -33,6 +34,7 @@ export const createMessage = mutation({
       imageUrl: args.imageUrl,
       imageFileId: args.imageFileId,
       imageData: args.imageData,
+      stoppedByUser: args.stoppedByUser,
     });
     
     return messageId;
@@ -68,6 +70,7 @@ export const createMany = mutation({
       }))),
       imageUrl: v.optional(v.string()),
       imageData: v.optional(v.string()),
+      stoppedByUser: v.optional(v.boolean()),
     })),
   },
   handler: async (ctx, args) => {
@@ -97,6 +100,7 @@ export const createAssistantMessage = mutation({
     imageUrl: v.optional(v.string()),
     imageFileId: v.optional(v.id("files")),
     imageData: v.optional(v.string()),
+    stoppedByUser: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     return await ctx.db.insert("messages", {
@@ -111,6 +115,7 @@ export const createAssistantMessage = mutation({
       imageUrl: args.imageUrl,
       imageFileId: args.imageFileId,
       imageData: args.imageData,
+      stoppedByUser: args.stoppedByUser,
     });
   },
 });
@@ -529,5 +534,26 @@ export const getMessagesWithImages = query({
     );
 
     return messagesWithImages;
+  },
+});
+
+export const updateMessageFileAssociations = mutation({
+  args: {
+    messageId: v.id("messages"),
+    attachments: v.optional(v.array(v.id("files"))),
+    imageFileId: v.optional(v.id("files")),
+  },
+  handler: async (ctx, args) => {
+    const updates: any = {};
+    
+    if (args.attachments !== undefined) {
+      updates.attachments = args.attachments;
+    }
+    
+    if (args.imageFileId !== undefined) {
+      updates.imageFileId = args.imageFileId;
+    }
+
+    return await ctx.db.patch(args.messageId, updates);
   },
 }); 

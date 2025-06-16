@@ -142,8 +142,6 @@ export const chatConvexRouter = createTRPCRouter({
       }));
     }),
 
-
-
   saveStreamedMessage: protectedProcedure
     .input(z.object({ 
       threadId: z.string(),
@@ -160,6 +158,7 @@ export const chatConvexRouter = createTRPCRouter({
       })).optional(),
       imageUrl: z.string().optional(),
       imageData: z.string().optional(),
+      stoppedByUser: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -188,6 +187,7 @@ export const chatConvexRouter = createTRPCRouter({
             groundingSources: input.groundingSources,
             imageUrl: input.imageUrl,
             imageData: input.imageData,
+            stoppedByUser: input.stoppedByUser,
           },
         ],
       });
@@ -222,6 +222,7 @@ export const chatConvexRouter = createTRPCRouter({
       })).optional(),
       imageUrl: z.string().optional(),
       imageData: z.string().optional(),
+      stoppedByUser: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -240,6 +241,7 @@ export const chatConvexRouter = createTRPCRouter({
         groundingSources: input.groundingSources,
         imageUrl: input.imageUrl,
         imageData: input.imageData,
+        stoppedByUser: input.stoppedByUser,
       });
 
       return { 
@@ -418,6 +420,17 @@ export const chatConvexRouter = createTRPCRouter({
         content: z.string(),
         role: z.string(),
         model: z.string().optional(),
+        attachments: z.array(z.string()).optional(),
+        isGrounded: z.boolean().optional(),
+        groundingSources: z.array(z.object({
+          title: z.string(),
+          url: z.string(),
+          snippet: z.string().optional(),
+          confidence: z.number().optional(),
+        })).optional(),
+        imageUrl: z.string().optional(),
+        imageData: z.string().optional(),
+        stoppedByUser: z.boolean().optional(),
       })),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -429,18 +442,14 @@ export const chatConvexRouter = createTRPCRouter({
 
       const messages = await convex.mutation(api.messages.createMany, {
         messages: input.messages.map(msg => ({
-          content: msg.content,
-          role: msg.role,
-          model: msg.model,
+          ...msg,
           threadId: input.threadId as Id<"threads">,
           userId: convexUser._id,
+          attachments: msg.attachments?.map(id => id as Id<"files">),
         })),
       });
 
-      return { 
-        messageIds: messages,
-        count: messages.length 
-      };
+      return messages;
     }),
 
   updateGroundingSourceUnfurl: protectedProcedure
@@ -504,5 +513,19 @@ export const chatConvexRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+
+  updateMessageFileAssociations: protectedProcedure
+    .input(z.object({
+      messageId: z.string(),
+      attachments: z.array(z.string()).optional(),
+      imageFileId: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return await convex.mutation(api.messages.updateMessageFileAssociations, {
+        messageId: input.messageId as Id<"messages">,
+        attachments: input.attachments?.map(id => id as Id<"files">),
+        imageFileId: input.imageFileId ? input.imageFileId as Id<"files"> : undefined,
+      });
     }),
 }); 

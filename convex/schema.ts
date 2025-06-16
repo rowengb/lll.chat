@@ -49,6 +49,7 @@ export default defineSchema({
     imageUrl: v.optional(v.string()), // Generated image URL (temporary, will be replaced by imageFileId)
     imageFileId: v.optional(v.id("files")), // Stored image file ID in Convex
     imageData: v.optional(v.string()), // Base64 encoded image data
+    stoppedByUser: v.optional(v.boolean()), // Flag to indicate if stream was stopped by user
   }).index("by_thread", ["threadId"]).index("by_user", ["userId"]),
 
   files: defineTable({

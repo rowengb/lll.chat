@@ -28,6 +28,8 @@ export const useChatData = (threadId: string | null) => {
   const saveAssistantMessage = trpc.chat.saveAssistantMessage.useMutation();
   const createManyMessages = trpc.chat.createManyMessages.useMutation();
   const updateFileAssociations = trpc.files.updateFileAssociations.useMutation();
+  const duplicateFilesForThread = trpc.files.duplicateFilesForThread.useMutation();
+  const updateMessageFileAssociations = trpc.chat.updateMessageFileAssociations.useMutation();
 
   // Utilities
   const utils = trpc.useUtils();
@@ -54,6 +56,8 @@ export const useChatData = (threadId: string | null) => {
     saveAssistantMessage,
     createManyMessages,
     updateFileAssociations,
+    duplicateFilesForThread,
+    updateMessageFileAssociations,
     
     // Utilities
     utils

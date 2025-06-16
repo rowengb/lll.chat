@@ -58,7 +58,6 @@ export function FileAttachment({
   showPreview = true 
 }: FileAttachmentProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [imageWidth, setImageWidth] = useState<number | null>(null);
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -85,11 +84,6 @@ export function FileAttachment({
 
   const canView = isViewableFile(file.type) && file.url;
 
-  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const img = e.currentTarget;
-    setImageWidth(img.offsetWidth);
-  };
-
   return (
     <>
       <div 
@@ -100,13 +94,12 @@ export function FileAttachment({
       >
         {isImageFile(file.type) && file.url && showPreview ? (
           // Image preview with enhanced interaction
-          <div className="inline-block">
-            <div className="relative">
+          <div className="w-full">
+            <div className="relative w-full">
               <img
                 src={file.url}
                 alt={file.name}
-                className="max-w-full max-h-48 rounded-lg object-contain block"
-                onLoad={handleImageLoad}
+                className="w-full max-h-48 rounded-lg object-contain block"
               />
               {canView && (
                 <div className="absolute inset-0 bg-black/0 group-hover/attachment:bg-black/20 transition-colors rounded-lg flex items-center justify-center">
@@ -118,62 +111,41 @@ export function FileAttachment({
                 </div>
               )}
             </div>
-            <div className="mt-2">
-              {imageWidth ? (
-                <div 
-                  className="overflow-hidden"
-                  style={{ width: `${imageWidth}px` }}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 min-w-0 overflow-hidden">
-                      <div className="text-sm font-medium text-gray-900 truncate">
-                        {file.name}
-                      </div>
-                      <div className="text-xs text-gray-500 truncate">
-                        {formatFileSize(file.size)}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {canView && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleView}
-                          className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
-                          title="View file"
-                        >
-                          <EyeIcon className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {file.url && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleDownload}
-                          className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
-                          title="Download file"
-                        >
-                          <DownloadIcon className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+            <div className="mt-2 w-full">
+              <div className="flex items-center justify-between gap-2 w-full">
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    {file.name}
+                  </div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {formatFileSize(file.size)}
                   </div>
                 </div>
-              ) : (
-                // Skeleton placeholder while image loads
-                <div className="animate-pulse">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="h-4 bg-gray-200 rounded mb-1"></div>
-                      <div className="h-3 bg-gray-200 rounded w-16"></div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="h-8 w-8 bg-gray-200 rounded"></div>
-                      <div className="h-8 w-8 bg-gray-200 rounded"></div>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {canView && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleView}
+                      className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                      title="View file"
+                    >
+                      <EyeIcon className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {file.url && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDownload}
+                      className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
+                      title="Download file"
+                    >
+                      <DownloadIcon className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         ) : (

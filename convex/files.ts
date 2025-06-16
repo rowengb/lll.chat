@@ -31,8 +31,6 @@ export const createFile = mutation({
   },
 });
 
-
-
 export const getFile = query({
   args: { fileId: v.id("files") },
   handler: async (ctx, args) => {
@@ -144,5 +142,39 @@ export const updateFileAssociations = mutation({
       });
     }
     return { success: true };
+  },
+});
+
+export const duplicateFilesForThread = mutation({
+  args: {
+    sourceThreadId: v.id("threads"),
+    targetThreadId: v.id("threads"),
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // Get all files from the source thread
+    const sourceFiles = await ctx.db
+      .query("files")
+      .withIndex("by_thread", (q) => q.eq("threadId", args.sourceThreadId))
+      .collect();
+
+    const fileIdMap: Record<string, string> = {}; // old ID -> new ID
+
+    // Create new file records for the target thread
+    for (const sourceFile of sourceFiles) {
+      const newFileId = await ctx.db.insert("files", {
+        name: sourceFile.name,
+        type: sourceFile.type,
+        size: sourceFile.size,
+        storageId: sourceFile.storageId, // Same storage, different record
+        userId: args.userId,
+        threadId: args.targetThreadId,
+        // messageId will be updated later when we know the new message IDs
+      });
+
+      fileIdMap[sourceFile._id] = newFileId;
+    }
+
+    return fileIdMap;
   },
 }); 

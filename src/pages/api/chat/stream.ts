@@ -166,68 +166,174 @@ const generateContextAwarePrompt = (messages: any[]): string => {
   const lastMessage = messages[messages.length - 1];
   const lastUserPrompt = (lastMessage?.content as string) || "";
 
-  // If the last prompt is already detailed and specific, use it as-is
-  if (lastUserPrompt.length > 50 && !containsVagueReferences(lastUserPrompt)) {
-    return lastUserPrompt;
+  // Clean up the prompt by removing common prefixes but keep the core request
+  let cleanedPrompt = lastUserPrompt.trim();
+  
+  // Remove common image generation prefixes
+  cleanedPrompt = cleanedPrompt.replace(/^(generate an image of|create an image of|make an image of|draw|genereate an image of)\s*/i, "");
+  
+  // Check if this is a modification request that should reference a previous image
+  if (isImageModificationRequest(cleanedPrompt)) {
+    const previousImagePrompt = findPreviousImagePrompt(messages);
+    if (previousImagePrompt) {
+      return combineImagePrompts(previousImagePrompt, cleanedPrompt);
+    }
+  }
+  
+  // If we have a meaningful prompt after cleanup, use it directly
+  if (cleanedPrompt.length >= 5) {
+    return cleanedPrompt;
   }
 
-  // Look for context in recent conversation (last 10 messages)
-  const recentMessages = messages.slice(-10);
-  let contextualContent = "";
-  let mainSubject = "";
-
-  // Extract key topics and subjects from recent conversation
-  for (let i = recentMessages.length - 2; i >= 0; i--) { // Skip the last message (image request)
-    const message = recentMessages[i];
-    if (message?.content && typeof message.content === 'string') {
-      const content = message.content.toLowerCase();
-      
-      // Look for specific subjects that could be visualized
-      const subjects = extractVisualSubjects(content);
-      if (subjects.length > 0) {
-        mainSubject = subjects[0]; // Use the first/most relevant subject
-        contextualContent = message.content; // Already checked it's a string above
-        break;
+  // Only use context-aware logic for truly vague requests (very short or only generic words)
+  if (isVagueImageRequest(lastUserPrompt)) {
+    // Look for context in recent conversation (last 5 messages)
+    const recentMessages = messages.slice(-5);
+    
+    // Extract key topics from recent conversation
+    for (let i = recentMessages.length - 2; i >= 0; i--) {
+      const message = recentMessages[i];
+      if (message?.content && typeof message.content === 'string') {
+        const content = message.content.toLowerCase();
+        
+        // Look for specific subjects that could be visualized
+        const subjects = extractVisualSubjects(content);
+        if (subjects.length > 0) {
+          const mainSubject = subjects[0];
+          return `A detailed visual representation of ${mainSubject}, high quality, professional illustration`;
+        }
       }
     }
   }
 
-  // If we found contextual content, create a comprehensive prompt
-  if (mainSubject && contextualContent) {
-    // Handle vague references in the last message
-    let enhancedPrompt = lastUserPrompt;
-    
-    // Replace vague references with specific context
-    enhancedPrompt = enhancedPrompt.replace(/\b(this|that|it)\b/gi, mainSubject);
-    enhancedPrompt = enhancedPrompt.replace(/^(generate an image of|create an image of|make an image of|draw)\s*/i, "");
-    
-    // If the prompt is still vague, create a descriptive prompt
-    if (enhancedPrompt.trim().length < 20 || containsVagueReferences(enhancedPrompt)) {
-      return `A detailed visual representation of ${mainSubject}, high quality, professional illustration`;
-    }
-    
-    return enhancedPrompt.trim();
-  }
-
-  // Fallback: try to extract any meaningful content from recent messages
-  const fallbackContext = extractFallbackContext(recentMessages);
-  if (fallbackContext) {
-    return `A visual representation of ${fallbackContext}, artistic, high quality`;
-  }
-
-  // Final fallback
+  // Final fallback - use the original prompt or a generic fallback
   return lastUserPrompt || "A beautiful, artistic image";
 };
 
-// Helper function to check if text contains vague references
-const containsVagueReferences = (text: string): boolean => {
-  const vaguePatterns = [
-    /\b(this|that|it|these|those)\b/i,
-    /^(generate|create|make|draw)\s*(an?\s*)?(image|picture|photo)\s*(of)?\s*$/i,
-    /^(show me|give me)\s/i
+// Helper function to check if text is a truly vague image request
+const isVagueImageRequest = (text: string): boolean => {
+  const trimmed = text.trim().toLowerCase();
+  
+  // Very short requests (less than 5 characters) are likely vague
+  if (trimmed.length < 5) {
+    return true;
+  }
+  
+  // Exact matches for completely generic requests
+  const vagueExactMatches = [
+    "image",
+    "picture", 
+    "photo",
+    "generate image",
+    "create image",
+    "make image",
+    "draw something",
+    "show me",
+    "give me"
   ];
   
-  return vaguePatterns.some(pattern => pattern.test(text));
+  if (vagueExactMatches.includes(trimmed)) {
+    return true;
+  }
+  
+  // Only treat as vague if it's ONLY generic words with no specific content
+  const genericOnlyPattern = /^(generate|create|make|draw|show me|give me)\s*(an?\s*)?(image|picture|photo)\s*$/i;
+  
+  return genericOnlyPattern.test(trimmed);
+};
+
+// Helper function to detect if a prompt is trying to modify a previous image
+const isImageModificationRequest = (text: string): boolean => {
+  const trimmed = text.trim().toLowerCase();
+  
+  // Patterns that indicate modification of existing content
+  const modificationPatterns = [
+    /^make (it|this|that)\s+/i,
+    /^turn (it|this|that) into\s+/i,
+    /^convert (it|this|that) to\s+/i,
+    /^change (it|this|that) to\s+/i,
+    /^style (it|this|that) as\s+/i,
+    /^render (it|this|that) as\s+/i,
+    /^but /i,
+    /^now /i,
+    /^also /i,
+    /^add /i,
+    /^remove /i,
+    /^with /i,
+    /^in the style of/i
+  ];
+  
+  return modificationPatterns.some(pattern => pattern.test(trimmed));
+};
+
+// Helper function to find the most recent image generation prompt in the conversation
+const findPreviousImagePrompt = (messages: any[]): string | null => {
+  // Look backwards through messages to find the most recent image generation
+  for (let i = messages.length - 2; i >= 0; i--) {
+    const message = messages[i];
+    if (message?.content && typeof message.content === 'string') {
+      // Check if this was likely an image generation request
+      const content = message.content.trim();
+      
+      // Skip very short or vague requests
+      if (content.length < 5 || isVagueImageRequest(content)) {
+        continue;
+      }
+      
+      // If it contains image generation keywords or was long enough to be descriptive
+      const hasImageKeywords = /\b(image|picture|photo|generate|create|draw|show|paint|render|visualize)\b/i.test(content);
+      const isDescriptive = content.length >= 10;
+      
+      if (hasImageKeywords || isDescriptive) {
+        // Clean the prompt
+        let cleanedPrompt = content.replace(/^(generate an image of|create an image of|make an image of|draw|genereate an image of)\s*/i, "");
+        return cleanedPrompt.trim();
+      }
+    }
+  }
+  
+  return null;
+};
+
+// Helper function to combine previous image prompt with modification request
+const combineImagePrompts = (previousPrompt: string, modification: string): string => {
+  const mod = modification.trim().toLowerCase();
+  
+  // Handle different types of modifications
+  if (mod.startsWith('make it') || mod.startsWith('make this') || mod.startsWith('make that')) {
+    const modificationPart = mod.replace(/^make (it|this|that)\s+/i, '').trim();
+    if (modificationPart.startsWith('into')) {
+      // "make it into a painting" -> "city in dubai as a painting"
+      const style = modificationPart.replace(/^into\s+(a\s+|an\s+)?/i, '').trim();
+      return `${previousPrompt} rendered as ${style}`;
+    } else if (modificationPart.startsWith('more')) {
+      // "make it more colorful" -> "city in dubai, more colorful"
+      return `${previousPrompt}, ${modificationPart}`;
+    } else {
+      // "make it red" -> "city in dubai, but red"
+      return `${previousPrompt}, but ${modificationPart}`;
+    }
+  }
+  
+  if (mod.startsWith('turn it into') || mod.startsWith('convert it to')) {
+    const style = mod.replace(/^(turn it into|convert it to)\s+(a\s+|an\s+)?/i, '').trim();
+    return `${previousPrompt} styled as ${style}`;
+  }
+  
+  if (mod.startsWith('in the style of')) {
+    return `${previousPrompt} ${modification}`;
+  }
+  
+  if (mod.startsWith('but') || mod.startsWith('with')) {
+    return `${previousPrompt} ${modification}`;
+  }
+  
+  if (mod.startsWith('add') || mod.startsWith('remove')) {
+    return `${previousPrompt}, ${modification}`;
+  }
+  
+  // Default combination
+  return `${previousPrompt} with ${modification}`;
 };
 
 // Helper function to extract visual subjects from text

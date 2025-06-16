@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { ArrowUpIcon, PaperclipIcon, XIcon, FileIcon, ImageIcon, FileTextIcon, VideoIcon, MusicIcon, FileSpreadsheetIcon, GlobeIcon } from 'lucide-react';
+import { ArrowUpIcon, PaperclipIcon, XIcon, FileIcon, ImageIcon, FileTextIcon, VideoIcon, MusicIcon, FileSpreadsheetIcon, GlobeIcon, SquareIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ModelSelector } from './ModelSelector';
 import { UploadedFile } from './FileUpload';
@@ -19,6 +19,8 @@ interface ChatboxProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
   isLoading: boolean;
+  isStreaming?: boolean;
+  onStop?: () => void;
   inputRef: React.RefObject<HTMLInputElement | null>;
   className?: string;
   searchGroundingEnabled?: boolean;
@@ -120,7 +122,7 @@ const ImagePreview = ({ file, onRemove, onClick }: { file: any; onRemove: () => 
   }, [file]);
 
   return (
-    <div className="relative group">
+    <div className="relative group flex-shrink-0">
       <div 
         className="w-12 h-12 rounded-lg overflow-hidden bg-muted border border-border p-0.5 cursor-pointer hover:border-border/80 transition-colors"
         onClick={onClick}
@@ -157,7 +159,7 @@ const CompactFileItem = ({ file, onRemove, isLoading = false, onClick }: { file:
   return (
     <div className="relative group">
       <div 
-        className={`${isLoading ? 'min-w-48' : 'min-w-32'} h-12 rounded-lg border px-3 py-2 transition-all duration-300 ${
+        className={`${isLoading ? 'min-w-48' : 'min-w-32'} sm:min-w-0 flex-shrink-0 h-12 rounded-lg border px-3 py-2 transition-all duration-300 ${
           file.status === 'error' ? 'bg-destructive/10 border-destructive/20' : 
           file.isUploading ? 'bg-primary/10 border-primary/20' : 
           'bg-muted border-border hover:border-border/80 cursor-pointer'
@@ -228,6 +230,8 @@ export function Chatbox({
   selectedModel,
   onModelChange,
   isLoading,
+  isStreaming = false,
+  onStop,
   inputRef,
   className = "",
   searchGroundingEnabled = true,
@@ -239,6 +243,7 @@ export function Chatbox({
   // Modal state
   const [selectedFile, setSelectedFile] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   
   // Check if the selected model supports Google Search grounding
   const supportsGrounding = selectedModel.includes('gemini-2.0') || 
@@ -420,7 +425,496 @@ export function Chatbox({
     setSelectedFile(null);
   };
 
+  // Handle paste events for file uploading (images and other supported types)
+  const handlePaste = async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
 
+    const filesToUpload: File[] = [];
+    let hasText = false;
+    let textContent = '';
+    
+    // Check each item in the clipboard
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      
+      if (!item) continue;
+      
+      // Check for file types (images, documents, etc.)
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file) {
+          // Check if it's a supported file type
+          const supportedTypes = [
+            'image/', // All image types
+            'text/', // Text files
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/json',
+          ];
+          
+          const isSupported = supportedTypes.some(type => file.type.startsWith(type) || file.type === type);
+          
+          if (isSupported) {
+            filesToUpload.push(file);
+          } else {
+            console.log(`📋 [PASTE] Unsupported file type: ${file.type}`);
+            toast.error(`Unsupported file type: ${file.type}`);
+          }
+        }
+      }
+      
+      // Check for text content that could be saved as a file
+      else if (item.kind === 'string' && item.type === 'text/plain') {
+        hasText = true;
+        item.getAsString((text) => {
+          textContent = text;
+        });
+      }
+    }
+
+    // Process files if found
+    if (filesToUpload.length > 0) {
+      // Prevent default paste behavior for files
+      event.preventDefault();
+      
+      console.log(`📋 [PASTE] Processing ${filesToUpload.length} pasted file(s)`);
+      
+      // Track files being added in this paste operation
+      let currentUploadedFiles = [...uploadedFiles];
+      
+      // Process each pasted file through the upload system sequentially
+      for (const file of filesToUpload) {
+        const tempId = uuidv4();
+        
+        // Generate a meaningful filename for pasted files
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        let fileName: string;
+        
+        if (file.name && file.name !== 'blob') {
+          // Use original filename if available
+          fileName = file.name;
+        } else {
+          // Generate filename based on type
+          let extension = 'bin'; // Default extension
+          
+          if (file.type.startsWith('image/')) {
+            extension = file.type.split('/')[1] || 'png';
+            fileName = `pasted-image-${timestamp}.${extension}`;
+          } else if (file.type.startsWith('text/')) {
+            extension = 'txt';
+            fileName = `pasted-text-${timestamp}.${extension}`;
+          } else if (file.type === 'application/pdf') {
+            extension = 'pdf';
+            fileName = `pasted-document-${timestamp}.${extension}`;
+          } else if (file.type.includes('word')) {
+            extension = file.type.includes('openxmlformats') ? 'docx' : 'doc';
+            fileName = `pasted-document-${timestamp}.${extension}`;
+          } else if (file.type.includes('sheet') || file.type.includes('excel')) {
+            extension = file.type.includes('openxmlformats') ? 'xlsx' : 'xls';
+            fileName = `pasted-spreadsheet-${timestamp}.${extension}`;
+          } else if (file.type === 'application/json') {
+            extension = 'json';
+            fileName = `pasted-data-${timestamp}.${extension}`;
+          } else {
+            fileName = `pasted-file-${timestamp}.${extension}`;
+          }
+        }
+        
+        addUpload({
+          id: tempId,
+          name: fileName,
+          type: file.type,
+          size: file.size,
+        });
+
+        // Check file size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+          updateError(tempId, `File is too large. Maximum size is 10MB.`);
+          toast.error(`Pasted file ${fileName} is too large. Maximum size is 10MB.`);
+          setTimeout(() => removeUpload(tempId), 3000);
+          continue;
+        }
+
+        // Check if we're at the limit (use local tracking for accurate count)
+        const currentFiles = currentUploadedFiles.length + uploads.filter(u => u.status === 'done').length;
+        if (currentFiles >= 5) {
+          updateError(tempId, "Maximum 5 files allowed per message.");
+          toast.error("Maximum 5 files allowed per message.");
+          setTimeout(() => removeUpload(tempId), 3000);
+          break;
+        }
+
+        try {
+          updateStatus(tempId, 'uploading');
+          
+          // Generate upload URL
+          const uploadUrl = await generateUploadUrl.mutateAsync();
+          
+          // Upload file with progress tracking using XMLHttpRequest
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', uploadUrl, true);
+          xhr.setRequestHeader('Content-Type', file.type);
+          
+          // Track upload progress
+          xhr.upload.addEventListener('progress', (event) => {
+            if (event.lengthComputable) {
+              const percent = Math.round((event.loaded / event.total) * 100);
+              updateProgress(tempId, percent);
+            }
+          });
+
+          const uploadPromise = new Promise<{ storageId: string }>((resolve, reject) => {
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                  resolve(JSON.parse(xhr.responseText));
+                } catch (e) {
+                  reject(e);
+                }
+              } else {
+                reject(new Error(`Upload failed: ${xhr.statusText}`));
+              }
+            };
+            xhr.onerror = () => reject(new Error(`Failed to upload pasted file`));
+          });
+
+          xhr.send(file);
+          const { storageId } = await uploadPromise;
+
+          updateProgress(tempId, 100);
+          updateStatus(tempId, 'done');
+
+          // Create file record in database
+          const fileRecord = await createFile.mutateAsync({
+            name: fileName,
+            type: file.type,
+            size: file.size,
+            storageId,
+          });
+
+          // Create uploaded file object
+          const uploadedFile: UploadedFile = {
+            id: fileRecord,
+            name: fileName,
+            type: file.type,
+            size: file.size,
+            storageId,
+            status: 'done',
+            originalFile: file, // Keep reference to original file
+          };
+
+          // Add to local tracking and update state
+          currentUploadedFiles.push(uploadedFile);
+          onFilesChange([...currentUploadedFiles]);
+          
+          // Remove from upload store after a brief delay
+          setTimeout(() => removeUpload(tempId), 2000);
+          
+        } catch (error) {
+          console.error("Error uploading pasted file:", error);
+          updateError(tempId, `Failed to upload pasted file`);
+          toast.error(`Failed to upload pasted file`);
+          setTimeout(() => removeUpload(tempId), 3000);
+        }
+      }
+      
+      // Show success message
+      if (filesToUpload.length > 1) {
+        toast.success(`${filesToUpload.length} files pasted and processed`);
+      } else {
+        const fileType = filesToUpload[0]?.type.startsWith('image/') ? 'Image' : 'File';
+        toast.success(`${fileType} pasted and uploaded successfully`);
+      }
+    }
+    
+    // Handle text content - offer to save as file if it's substantial
+    else if (hasText && textContent.trim().length > 100) {
+      // Wait a bit for the text to be set
+      setTimeout(() => {
+        if (confirm(`Found ${textContent.length} characters of text content. Save as a text file?`)) {
+          event.preventDefault();
+          
+          // Create a text file from the pasted content
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          const fileName = `pasted-text-${timestamp}.txt`;
+          const textFile = new File([textContent], fileName, { type: 'text/plain' });
+          
+          // Process as a regular file upload
+          const tempId = uuidv4();
+          addUpload({
+            id: tempId,
+            name: fileName,
+            type: 'text/plain',
+            size: textFile.size,
+          });
+          
+          // Upload the text file
+          (async () => {
+            try {
+              updateStatus(tempId, 'uploading');
+              
+              const uploadUrl = await generateUploadUrl.mutateAsync();
+              const xhr = new XMLHttpRequest();
+              xhr.open('POST', uploadUrl, true);
+              xhr.setRequestHeader('Content-Type', 'text/plain');
+              
+              xhr.upload.addEventListener('progress', (event) => {
+                if (event.lengthComputable) {
+                  const percent = Math.round((event.loaded / event.total) * 100);
+                  updateProgress(tempId, percent);
+                }
+              });
+
+              const uploadPromise = new Promise<{ storageId: string }>((resolve, reject) => {
+                xhr.onload = () => {
+                  if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                      resolve(JSON.parse(xhr.responseText));
+                    } catch (e) {
+                      reject(e);
+                    }
+                  } else {
+                    reject(new Error(`Upload failed: ${xhr.statusText}`));
+                  }
+                };
+                xhr.onerror = () => reject(new Error(`Failed to upload text file`));
+              });
+
+              xhr.send(textFile);
+              const { storageId } = await uploadPromise;
+
+              updateProgress(tempId, 100);
+              updateStatus(tempId, 'done');
+
+              const fileRecord = await createFile.mutateAsync({
+                name: fileName,
+                type: 'text/plain',
+                size: textFile.size,
+                storageId,
+              });
+
+              const uploadedFile: UploadedFile = {
+                id: fileRecord,
+                name: fileName,
+                type: 'text/plain',
+                size: textFile.size,
+                storageId,
+                status: 'done',
+                originalFile: textFile,
+              };
+
+              onFilesChange([...uploadedFiles, uploadedFile]);
+              setTimeout(() => removeUpload(tempId), 2000);
+              toast.success('Text content saved as file');
+              
+            } catch (error) {
+              console.error("Error uploading text file:", error);
+              updateError(tempId, `Failed to upload text file`);
+              toast.error(`Failed to upload text file`);
+              setTimeout(() => removeUpload(tempId), 3000);
+            }
+          })();
+        }
+      }, 100);
+    }
+  };
+
+  // Handle drag and drop events for file uploading
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isDragOver) {
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    // Only set to false if we're leaving the main container
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = event.clientX;
+    const y = event.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragOver(false);
+
+    const files = Array.from(event.dataTransfer.files);
+    if (files.length === 0) return;
+
+    console.log(`🎯 [DROP] Processing ${files.length} dropped file(s)`);
+
+    // Validate file types
+    const supportedTypes = [
+      'image/', // All image types
+      'text/', // Text files
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/json',
+    ];
+
+    const validFiles: File[] = [];
+    const invalidFiles: string[] = [];
+
+    files.forEach(file => {
+      const isSupported = supportedTypes.some(type => 
+        file.type.startsWith(type) || file.type === type
+      );
+      
+      if (isSupported) {
+        validFiles.push(file);
+      } else {
+        invalidFiles.push(`${file.name} (${file.type})`);
+      }
+    });
+
+    // Show errors for invalid files
+    if (invalidFiles.length > 0) {
+      toast.error(`Unsupported file types: ${invalidFiles.join(', ')}`);
+    }
+
+    if (validFiles.length === 0) return;
+
+    // Track files being added in this drop operation
+    let currentUploadedFiles = [...uploadedFiles];
+
+    // Process each dropped file through the upload system sequentially
+    for (const file of validFiles) {
+      const tempId = uuidv4();
+      
+      addUpload({
+        id: tempId,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      });
+
+      // Check file size (10MB limit)
+      if (file.size > 10 * 1024 * 1024) {
+        updateError(tempId, `File is too large. Maximum size is 10MB.`);
+        toast.error(`${file.name} is too large. Maximum size is 10MB.`);
+        setTimeout(() => removeUpload(tempId), 3000);
+        continue;
+      }
+
+      // Check if we're at the limit (use local tracking for accurate count)
+      const currentFiles = currentUploadedFiles.length + uploads.filter(u => u.status === 'done').length;
+      if (currentFiles >= 5) {
+        updateError(tempId, "Maximum 5 files allowed per message.");
+        toast.error("Maximum 5 files allowed per message.");
+        setTimeout(() => removeUpload(tempId), 3000);
+        break;
+      }
+
+      try {
+        updateStatus(tempId, 'uploading');
+        
+        // Generate upload URL
+        const uploadUrl = await generateUploadUrl.mutateAsync();
+        
+        // Upload file with progress tracking using XMLHttpRequest
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrl, true);
+        xhr.setRequestHeader('Content-Type', file.type);
+        
+        // Track upload progress
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            updateProgress(tempId, percent);
+          }
+        });
+
+        const uploadPromise = new Promise<{ storageId: string }>((resolve, reject) => {
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                resolve(JSON.parse(xhr.responseText));
+              } catch (e) {
+                reject(e);
+              }
+            } else {
+              reject(new Error(`Upload failed: ${xhr.statusText}`));
+            }
+          };
+          xhr.onerror = () => reject(new Error(`Failed to upload ${file.name}`));
+        });
+
+        xhr.send(file);
+        const { storageId } = await uploadPromise;
+
+        updateProgress(tempId, 100);
+        updateStatus(tempId, 'done');
+
+        // Create file record in database
+        const fileRecord = await createFile.mutateAsync({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          storageId,
+        });
+
+        // Create uploaded file object
+        const uploadedFile: UploadedFile = {
+          id: fileRecord,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          storageId,
+          status: 'done',
+          originalFile: file,
+        };
+
+        // Add to local tracking and update state
+        currentUploadedFiles.push(uploadedFile);
+        onFilesChange([...currentUploadedFiles]);
+        
+        // Remove from upload store after a brief delay
+        setTimeout(() => removeUpload(tempId), 2000);
+        
+      } catch (error) {
+        console.error("Error uploading dropped file:", error);
+        updateError(tempId, `Failed to upload ${file.name}`);
+        toast.error(`Failed to upload ${file.name}`);
+        setTimeout(() => removeUpload(tempId), 3000);
+      }
+    }
+    
+    // Show success message
+    if (validFiles.length > 1) {
+      toast.success(`${validFiles.length} files dropped and processed`);
+    } else {
+      const fileType = validFiles[0]?.type.startsWith('image/') ? 'Image' : 'File';
+      toast.success(`${fileType} dropped and uploaded successfully`);
+    }
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      onSubmit(event as any);
+    }
+  };
 
   // Combine uploads and uploaded files for unified display
   const allFiles = [
@@ -440,27 +934,51 @@ export function Chatbox({
 
   return (
     <div 
-      className={`relative chatbox-stable shadow-xl dark:shadow-2xl dark:shadow-black/50 ${className}`}
+      className={`relative chatbox-stable shadow-xl dark:shadow-2xl dark:shadow-black/50 ${className} ${
+        isDragOver ? 'ring-2 ring-primary ring-offset-2' : ''
+      }`}
       style={{
         transform: 'translateY(-4px)',
         borderRadius: '20px'
       }}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       {/* Glassmorphic background with subtle overlay */}
       <div 
-        className="absolute inset-0 bg-white/20 dark:bg-slate-900/20 backdrop-blur-xl border border-border"
+        className={`absolute inset-0 bg-white/20 dark:bg-slate-900/20 backdrop-blur-xl border border-border ${
+          isDragOver ? 'bg-primary/5 border-primary/30' : ''
+        }`}
         style={{
           borderRadius: '20px',
           clipPath: 'inset(0 round 20px)'
         }}
       />
+      
+      {/* Drag overlay */}
+      {isDragOver && (
+        <div className="absolute inset-0 flex items-center justify-center bg-primary/10 backdrop-blur-sm rounded-[20px] z-20">
+          <div className="text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-primary/20 flex items-center justify-center">
+              <PaperclipIcon className="h-6 w-6 text-primary" />
+            </div>
+            <p className="text-base font-medium text-primary">Drop files here</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Images, PDFs, documents, and more
+            </p>
+          </div>
+        </div>
+      )}
+      
       {/* Content */}
       <div className="relative z-10 px-5 py-4">
       <form onSubmit={onSubmit}>
         {/* Unified Files Display - All in rows */}
         {allFiles.length > 0 && (
           <div className="mb-3">
-            <div className="flex flex-wrap gap-2 items-start">
+            <div className="flex flex-nowrap sm:flex-wrap gap-2 items-start overflow-x-auto pb-1 pt-2 pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
               {allFiles.map((file) => {
                 // Show images as squares only when completed
                 if (file.type.startsWith('image/') && !file.isUploading) {
@@ -506,22 +1024,27 @@ export function Chatbox({
                 minHeight: '20px',
                 maxHeight: '120px'
               }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  onSubmit(e as any);
-                }
-              }}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
             />
           </div>
           <Button 
-            type="submit" 
-            disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}
-            className="rounded-xl h-12 w-12 bg-primary hover:bg-primary/90 shadow-sm transition-all"
+            type={isStreaming ? "button" : "submit"}
+            onClick={isStreaming ? onStop : undefined}
+            disabled={isStreaming ? false : ((!input.trim() && uploadedFiles.length === 0) || isLoading)}
+            className={`rounded-xl h-12 w-12 shadow-sm transition-all ${
+              isStreaming 
+                ? 'bg-destructive hover:bg-destructive/90' 
+                : 'bg-primary hover:bg-primary/90'
+            }`}
             size="sm"
-
+            title={isStreaming ? "Stop generation" : "Send message"}
           >
-            <ArrowUpIcon className="h-6 w-6 text-primary-foreground" strokeWidth={1.8} strokeLinecap="square" />
+            {isStreaming ? (
+              <SquareIcon className="h-5 w-5 text-destructive-foreground" fill="currentColor" />
+            ) : (
+              <ArrowUpIcon className="h-6 w-6 text-primary-foreground" strokeWidth={1.8} strokeLinecap="square" />
+            )}
           </Button>
         </div>
         

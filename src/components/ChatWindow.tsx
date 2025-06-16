@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon } from "lucide-react";
+import { CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, SquareIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 
@@ -29,7 +29,7 @@ import { getDefaultModel, getProviderFromModel, createShakeAnimation, navigateTo
 import { filterOutEmptyOptimisticMessages, createOptimisticUserMessage, removeErrorMessages, mapFileAttachments } from '../utils/messageUtils';
 
 // Types
-import { ChatWindowProps, Message } from '../types/chat';
+import { ChatWindowProps, Message, FileAttachmentData } from '../types/chat';
 
 // Constants
 import { sharedLayoutClasses, sharedGridClasses, chatboxLayoutClasses, chatboxGridClasses } from '../constants/chatLayout';
@@ -55,6 +55,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     addMessage, 
     isLoading,
     setLoading,
+    isStreaming,
   } = useChatStore();
   
   const { getImageState } = useImageStore();
@@ -72,9 +73,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     updateThreadMetadata,
     generateTitle,
     saveStreamedMessage,
+    saveAssistantMessage,
     deleteMessagesFromPoint,
     createManyMessages,
     updateFileAssociations,
+    duplicateFilesForThread,
+    updateMessageFileAssociations,
     utils
   } = useChatData(threadId);
 
@@ -87,7 +91,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     handleGroundingSourcesToggle
   } = useChatScrolling();
 
-  const { streamResponse, isStreamingRef, lastStreamCompletedAt } = useChatStreaming();
+  const { streamResponse, stopStream, isStreamingRef, lastStreamCompletedAt } = useChatStreaming();
 
   // Computed values
   const shouldShowBanner = hasAnyApiKeys === false && currentView !== 'settings';
@@ -279,6 +283,60 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     }
   };
 
+  // Custom streaming function for retries that only saves assistant message
+  const streamRetryResponse = async (
+    threadId: string,
+    content: string,
+    selectedModel: string,
+    files: FileAttachmentData[] = [],
+    searchGroundingEnabled: boolean = true,
+    inputRef: React.RefObject<HTMLInputElement | null>,
+    scrollToBottomPinned: () => void,
+    saveAssistantMessage: any,
+    updateFileAssociations: any,
+    updateThreadMetadata: any,
+    generateTitle: any,
+    refetchThreads: any
+  ) => {
+    // Create a custom save function that only saves assistant message
+    const customSaveStreamedMessage = {
+      mutateAsync: async (params: any) => {
+        // Only save the assistant message for retries
+        const assistantResult = await saveAssistantMessage.mutateAsync({
+          threadId: params.threadId,
+          content: params.assistantContent,
+          model: params.model,
+          isGrounded: params.isGrounded,
+          groundingSources: params.groundingSources,
+          imageUrl: params.imageUrl,
+          stoppedByUser: params.stoppedByUser,
+        });
+
+        // Return format expected by streamResponse
+        return {
+          userMessage: { id: null }, // No user message saved
+          assistantMessage: assistantResult
+        };
+      }
+    };
+
+    // Call streamResponse with our custom save function
+    await streamResponse(
+      threadId,
+      content,
+      selectedModel,
+      files,
+      searchGroundingEnabled,
+      inputRef,
+      scrollToBottomPinned,
+      customSaveStreamedMessage,
+      updateFileAssociations,
+      updateThreadMetadata,
+      generateTitle,
+      refetchThreads
+    );
+  };
+
   const handleRetryMessage = async (messageId: string, isUserMessage: boolean) => {
     if (!threadId) return;
 
@@ -293,13 +351,26 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
       if (messageIndex === -1) return;
 
+      const targetMessage = currentMessages[messageIndex];
+      if (!targetMessage) return; // Type guard
+      
+      // Delete messages from this point forward in the database (if not optimistic)
+      if (!targetMessage.isOptimistic) {
+        await deleteMessagesFromPoint.mutateAsync({
+          threadId,
+          fromMessageId: messageId,
+        });
+      }
+
       if (isUserMessage) {
-        const messagesToKeep = currentMessages.slice(0, messageIndex + 1);
+        // For user message retry: remove this message and all after it, then regenerate
+        const messagesToKeep = currentMessages.slice(0, messageIndex);
         setMessages(threadId, messagesToKeep);
         
         const userMessage = currentMessages[messageIndex];
         if (userMessage) {
-          await streamResponse(
+          // For retry, use custom streaming that only saves assistant message
+          await streamRetryResponse(
             threadId,
             userMessage.content,
             selectedModel,
@@ -307,7 +378,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             searchGroundingEnabled,
             inputRef,
             scrollToBottomPinned,
-            saveStreamedMessage,
+            saveAssistantMessage,
             updateFileAssociations,
             updateThreadMetadata,
             generateTitle,
@@ -315,12 +386,13 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           );
         }
       } else {
+        // For AI message retry: remove this message, keep user message, regenerate AI response
         const messagesToKeep = currentMessages.slice(0, messageIndex);
         setMessages(threadId, messagesToKeep);
           
-        const lastUserMessage = messagesToKeep.reverse().find(msg => msg.role === "user");
+        const lastUserMessage = messagesToKeep.slice().reverse().find(msg => msg.role === "user");
         if (lastUserMessage) {
-          await streamResponse(
+          await streamRetryResponse(
             threadId,
             lastUserMessage.content,
             selectedModel,
@@ -328,7 +400,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             searchGroundingEnabled,
             inputRef,
             scrollToBottomPinned,
-            saveStreamedMessage,
+            saveAssistantMessage,
             updateFileAssociations,
             updateThreadMetadata,
             generateTitle,
@@ -449,14 +521,80 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           .filter(msg => !msg.isOptimistic);
         
         if (messagesToCopy.length > 0) {
-          await createManyMessages.mutateAsync({
+          // Step 1: Duplicate all files for the new thread
+          const fileIdMap = await duplicateFilesForThread.mutateAsync({
+            sourceThreadId: threadId,
+            targetThreadId: newThreadId,
+          });
+
+          // Step 2: Create messages (without file associations initially)
+          const createdMessageIds = await createManyMessages.mutateAsync({
             threadId: newThreadId,
             messages: messagesToCopy.map(msg => ({
               content: msg.content,
               role: msg.role,
               model: msg.model || undefined,
+              // Don't include attachments/imageFileId yet - we'll update them separately
+              // Copy grounding data
+              isGrounded: msg.isGrounded || undefined,
+              groundingSources: msg.groundingMetadata?.sources?.map(source => ({
+                title: source.title,
+                url: source.url,
+                snippet: source.snippet || undefined,
+                confidence: source.confidence || undefined,
+              })) || undefined,
+              // Copy image generation data (URLs only, file IDs updated separately)
+              imageUrl: msg.imageUrl || undefined,
+              imageData: msg.imageData || undefined,
+              // Copy stopped by user flag
+              stoppedByUser: msg.stoppedByUser || undefined,
             })),
           });
+
+          // Step 3: Update message file associations with duplicated file IDs
+          for (let i = 0; i < messagesToCopy.length; i++) {
+            const originalMessage = messagesToCopy[i];
+            const newMessageId = createdMessageIds[i];
+
+            if (!originalMessage || !newMessageId) continue;
+
+            // Update attachments if any
+            const newAttachmentIds = originalMessage.attachments?.map(attachment => 
+              fileIdMap[attachment.id]
+            ).filter((id): id is string => Boolean(id));
+
+            // Update image file ID if any
+            let newImageFileId: string | undefined;
+            if ((originalMessage as any).imageFileId) {
+              newImageFileId = fileIdMap[(originalMessage as any).imageFileId];
+            }
+
+            // Update the message with new file associations
+            if (newAttachmentIds?.length || newImageFileId) {
+              await updateMessageFileAssociations.mutateAsync({
+                messageId: newMessageId.toString(),
+                attachments: newAttachmentIds?.length ? newAttachmentIds : undefined,
+                imageFileId: newImageFileId,
+              });
+            }
+
+            // Update file records with the new message ID
+            if (newAttachmentIds?.length) {
+              await updateFileAssociations.mutateAsync({
+                fileIds: newAttachmentIds,
+                messageId: newMessageId.toString(),
+                threadId: newThreadId,
+              });
+            }
+
+            if (newImageFileId) {
+              await updateFileAssociations.mutateAsync({
+                fileIds: [newImageFileId],
+                messageId: newMessageId.toString(),
+                threadId: newThreadId,
+              });
+            }
+          }
         }
         
         onThreadCreate(newThreadId);
@@ -464,7 +602,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         utils.chat.getThreads.invalidate();
         
         toast.dismiss();
-        toast.success("Conversation branched successfully");
+        toast.success("Conversation branched successfully with all attachments and images");
       }
     } catch (error) {
       console.error("Error branching conversation:", error);
@@ -496,12 +634,15 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
     try {
       if (!threadId) {
-        const defaultModel = getDefaultModel(bestDefaultModel);
+        // Create thread immediately with a proper placeholder title
+        const placeholderTitle = messageContent.length > 60 
+          ? `${messageContent.slice(0, 57)}...`
+          : messageContent || (messageFiles.length > 0 ? `File: ${messageFiles[0]?.name}` : 'New Chat');
+        
         const newThread = await createThread.mutateAsync({
-          title: messageContent.slice(0, 50) || (messageFiles.length > 0 ? `File: ${messageFiles[0]?.name}` : 'New Chat'),
-          model: defaultModel,
+          title: placeholderTitle,
+          model: selectedModel,
         });
-        onModelChange(defaultModel);
         
         setLoading(newThread.id, true);
         isStreamingRef.current = true;
@@ -517,8 +658,24 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
         }, 0);
         
+        // Make thread appear in sidebar immediately
         onThreadCreate(newThread.id);
+        await refetchThreads();
 
+        // Start title generation immediately in parallel (don't await)
+        generateTitle.mutateAsync({
+          threadId: newThread.id,
+          firstMessage: messageContent,
+        }).then((titleResult) => {
+          if (titleResult.success) {
+            // Refresh sidebar to show updated title
+            refetchThreads();
+          }
+        }).catch((error) => {
+          console.error("Failed to generate title:", error);
+        });
+
+        // Start AI response streaming (also in parallel)
         await streamResponse(
           newThread.id,
           messageContent,
@@ -534,7 +691,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           refetchThreads
         );
         
-        await refetchThreads();
       } else {
         setLoading(threadId, true);
         
@@ -687,10 +843,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                   {message.content}
                                 </p>
                                 {message.attachments && message.attachments.length > 0 && (
-                                  <div className="mt-2 inline-block">
-                                    <div className="grid grid-cols-2 gap-2 max-w-md">
+                                  <div className="mt-2 w-full">
+                                    <div className="flex flex-col gap-2 w-full max-w-2xl">
                                       {message.attachments.map((file) => (
-                                        <div key={file.id}>
+                                        <div key={file.id} className="w-full">
                                           <FileAttachmentWithUrl fileId={file.id} />
                                         </div>
                                       ))}
@@ -716,6 +872,17 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                 {message.role === "assistant" && message.imageUrl && (
                                   <div className="mt-4">
                                     <MessageImage imageUrl={message.imageUrl} />
+                                  </div>
+                                )}
+                                
+                                {message.role === "assistant" && message.stoppedByUser && (
+                                  <div className="mt-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                    <div className="flex items-center gap-2">
+                                      <SquareIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="currentColor" />
+                                      <span className="text-sm text-amber-700 dark:text-amber-300">
+                                        Stopped by user
+                                      </span>
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -773,7 +940,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                 >
                                   <CopyIcon className="h-4 w-4" />
                                 </ActionButton>
-                        
+
                                 <ActionButton
                                   variant="ghost"
                                   size="sm"
@@ -847,6 +1014,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 selectedModel={selectedModel}
                 onModelChange={onModelChange}
                 isLoading={isLoading}
+                isStreaming={isStreaming}
+                onStop={stopStream}
                 inputRef={inputRef}
                 searchGroundingEnabled={searchGroundingEnabled}
                 onSearchGroundingChange={setSearchGroundingEnabled}
@@ -867,6 +1036,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   selectedModel={selectedModel}
                   onModelChange={onModelChange}
                   isLoading={isLoading}
+                  isStreaming={isStreaming}
+                  onStop={stopStream}
                   inputRef={inputRef}
                   searchGroundingEnabled={searchGroundingEnabled}
                   onSearchGroundingChange={setSearchGroundingEnabled}

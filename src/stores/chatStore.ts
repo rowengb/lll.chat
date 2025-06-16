@@ -23,6 +23,7 @@ interface Message {
   attachments?: FileAttachment[];
   imageUrl?: string; // For image generation results
   imageData?: string; // For base64 image data
+  stoppedByUser?: boolean; // Flag to indicate if stream was stopped by user
 }
 
 interface GroundingSource {
