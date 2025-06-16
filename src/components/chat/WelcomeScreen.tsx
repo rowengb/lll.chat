@@ -13,6 +13,7 @@ interface WelcomeScreenProps {
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   onToggleSidebar?: () => void;
+  onOpenSearch?: () => void;
   
   // Banner props
   shouldShowBanner: boolean;
@@ -42,6 +43,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   sidebarCollapsed,
   sidebarWidth,
   onToggleSidebar,
+  onOpenSearch,
   shouldShowBanner,
   shouldShakeBanner,
   onNavigateToSettings,
@@ -87,6 +89,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       <MobileMenuButton 
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={onToggleSidebar}
+        onOpenSearch={onOpenSearch}
       />
 
       {/* Welcome Content Area with proper scrolling container for chatbox alignment */}

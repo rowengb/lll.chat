@@ -6,6 +6,7 @@ export interface ChatWindowProps {
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   onToggleSidebar?: () => void;
+  onOpenSearch?: () => void;
   currentView?: string;
   onNavigateToSettings?: () => void;
 }

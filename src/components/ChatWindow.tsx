@@ -34,7 +34,7 @@ import { ChatWindowProps, Message, FileAttachmentData } from '../types/chat';
 // Constants
 import { sharedLayoutClasses, sharedGridClasses, chatboxLayoutClasses, chatboxGridClasses } from '../constants/chatLayout';
 
-const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth, onToggleSidebar, currentView, onNavigateToSettings }: ChatWindowProps) => {
+const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth, onToggleSidebar, onOpenSearch, currentView, onNavigateToSettings }: ChatWindowProps) => {
   // Local state
   const [input, setInput] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -730,6 +730,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         sidebarCollapsed={sidebarCollapsed}
         sidebarWidth={sidebarWidth}
         onToggleSidebar={onToggleSidebar}
+        onOpenSearch={onOpenSearch}
         shouldShowBanner={shouldShowBanner}
         shouldShakeBanner={shouldShakeBanner}
         onNavigateToSettings={handleNavigateToSettings}
@@ -771,6 +772,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       <MobileMenuButton 
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={onToggleSidebar}
+        onOpenSearch={onOpenSearch}
       />
 
       {/* Messages + Chatbox Area */}

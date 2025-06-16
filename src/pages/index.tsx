@@ -657,6 +657,7 @@ const Home: NextPage = () => {
               sidebarCollapsed={sidebarCollapsed}
               sidebarWidth={sidebarWidth}
               onToggleSidebar={toggleSidebar}
+              onOpenSearch={openSearch}
               currentView={currentView}
               onNavigateToSettings={navigateToSettings}
             />
@@ -1034,6 +1035,7 @@ const Home: NextPage = () => {
               sidebarCollapsed={sidebarCollapsed}
               sidebarWidth={sidebarWidth}
               onToggleSidebar={toggleSidebar}
+              onOpenSearch={openSearch}
               currentView={currentView}
               onNavigateToSettings={navigateToSettings}
             />

@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 interface MobileMenuButtonProps {
   sidebarCollapsed: boolean;
   onToggleSidebar?: () => void;
+  onOpenSearch?: () => void;
 }
 
 export const MobileMenuButton: React.FC<MobileMenuButtonProps> = ({
   sidebarCollapsed,
-  onToggleSidebar
+  onToggleSidebar,
+  onOpenSearch
 }) => {
   if (!sidebarCollapsed) return null;
 
@@ -31,10 +33,10 @@ export const MobileMenuButton: React.FC<MobileMenuButtonProps> = ({
         >
           <div className="flex flex-col gap-1">
             <Button
-              onClick={() => {/* TODO: Add search functionality */}}
+              onClick={onOpenSearch}
               size="sm"
               variant="ghost"
-              title="Search"
+              title="Search (Ctrl+K)"
               className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
             >
               <SearchIcon className="h-4 w-4" />

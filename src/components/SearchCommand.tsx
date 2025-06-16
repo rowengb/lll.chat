@@ -11,6 +11,7 @@ import {
   PinIcon
 } from 'lucide-react';
 import { trpc } from '@/utils/trpc';
+import { getProviderIcon } from '@/components/ModelSelector';
 
 interface SearchCommandProps {
   isOpen: boolean;
@@ -133,108 +134,103 @@ export const SearchCommand: React.FC<SearchCommandProps> = ({
       onClick={onClose}
     >
       <div 
-        className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl mx-4 transition-all duration-150 ${
+        className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-2xl xl:max-w-3xl mx-3 sm:mx-4 md:mx-6 transition-all duration-150 ${
           isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <Command 
           className="bg-background border border-border rounded-2xl shadow-2xl overflow-hidden"
-          shouldFilter={false}
+          shouldFilter={true}
+          value={search}
+          onValueChange={setSearch}
         >
-          <div className="flex items-center border-b border-border px-4">
-            <SearchIcon className="h-5 w-5 text-muted-foreground mr-3" />
+          <div className="flex items-center border-b border-border px-3 sm:px-4 md:px-6">
+            <SearchIcon className="h-5 w-5 text-muted-foreground mr-2 sm:mr-3" />
             <Command.Input
-              value={search}
-              onValueChange={setSearch}
               placeholder="Search threads, models, or actions..."
-              className="flex-1 bg-transparent border-0 py-4 text-base placeholder:text-muted-foreground focus:outline-none focus:ring-0"
+              className="flex-1 bg-transparent border-0 py-3 sm:py-4 text-sm sm:text-base placeholder:text-muted-foreground focus:outline-none focus:ring-0"
               autoFocus
             />
-            <div className="text-xs text-muted-foreground ml-3">
+            <div className="text-xs text-muted-foreground ml-2 sm:ml-3 hidden sm:block">
               ESC to close
             </div>
           </div>
 
-          <Command.List className="max-h-96 overflow-y-auto p-2">
+          <Command.List className="max-h-72 sm:max-h-96 md:max-h-[28rem] overflow-y-auto p-2 sm:p-3">
             <Command.Empty className="py-8 text-center text-muted-foreground">
               No results found.
             </Command.Empty>
 
             {/* Quick Actions */}
-            <Command.Group heading="Actions">
+            <Command.Group heading="Actions" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide">
               <Command.Item
                 value="action:new-chat"
                 onSelect={handleSelect}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
+                className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
               >
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10">
-                  <PlusIcon className="h-4 w-4 text-primary" />
+                <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-primary/10">
+                  <PlusIcon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
                 </div>
-                <div className="flex-1">
-                  <div className="font-medium">New Chat</div>
-                  <div className="text-sm text-muted-foreground">Start a new conversation</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm sm:text-base">New Chat</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Start a new conversation</div>
                 </div>
               </Command.Item>
 
               <Command.Item
                 value="action:settings"
                 onSelect={handleSelect}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
+                className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
               >
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted">
-                  <SettingsIcon className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-muted">
+                  <SettingsIcon className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                 </div>
-                <div className="flex-1">
-                  <div className="font-medium">Settings</div>
-                  <div className="text-sm text-muted-foreground">Configure API keys and preferences</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm sm:text-base">Settings</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Configure API keys and preferences</div>
                 </div>
               </Command.Item>
 
               <Command.Item
                 value="action:account"
                 onSelect={handleSelect}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
+                className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
               >
-                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted">
-                  <UserIcon className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-muted">
+                  <UserIcon className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                 </div>
-                <div className="flex-1">
-                  <div className="font-medium">Account</div>
-                  <div className="text-sm text-muted-foreground">Manage your account settings</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm sm:text-base">Account</div>
+                  <div className="text-xs sm:text-sm text-muted-foreground hidden sm:block">Manage your account settings</div>
                 </div>
               </Command.Item>
             </Command.Group>
 
             {/* Recent Threads */}
             {threads.length > 0 && (
-              <Command.Group heading="Recent Threads">
+              <Command.Group heading="Recent Threads" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide">
                 {threads
-                  .filter(thread => 
-                    !search || 
-                    (thread.title && thread.title.toLowerCase().includes(search.toLowerCase())) ||
-                    (thread.model && thread.model.toLowerCase().includes(search.toLowerCase()))
-                  )
                   .slice(0, 8)
                   .map(thread => (
                     <Command.Item
                       key={thread.id}
                       value={`thread:${thread.id}`}
                       onSelect={handleSelect}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
+                      className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
                     >
-                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted">
+                      <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-muted">
                         {(thread as any).pinned ? (
-                          <PinIcon className="h-4 w-4 text-yellow-500" />
+                          <PinIcon className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />
                         ) : (
-                          <MessageSquareIcon className="h-4 w-4 text-muted-foreground" />
+                          <MessageSquareIcon className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">
+                        <div className="font-medium text-sm sm:text-base truncate">
                           {thread.title || `${thread.model || 'Unknown'} conversation`}
                         </div>
-                        <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-2">
                           <span>{thread.model || 'Unknown'}</span>
                           <span>•</span>
                           <span>{formatDate((thread as any)._creationTime)}</span>
@@ -250,31 +246,27 @@ export const SearchCommand: React.FC<SearchCommandProps> = ({
 
             {/* Models */}
             {onModelChange && allModels.length > 0 && (
-              <Command.Group heading="Models">
+              <Command.Group heading="Models" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide">
                 {allModels
-                  .filter(model => 
-                    !search || 
-                    (model.name && model.name.toLowerCase().includes(search.toLowerCase())) ||
-                    (model.provider && model.provider.toLowerCase().includes(search.toLowerCase()))
-                  )
                   .slice(0, 6)
                   .map(model => (
                     <Command.Item
                       key={model.id}
                       value={`model:${model.id}`}
                       onSelect={handleSelect}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
+                      className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
                     >
-                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-muted">
-                        {favoriteModels.some(fav => fav.id === model.id) ? (
-                          <StarIcon className="h-4 w-4 text-yellow-500" />
-                        ) : (
-                          <BotIcon className="h-4 w-4 text-muted-foreground" />
+                      <div className="relative flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-muted">
+                        <div className="text-sm sm:text-base">
+                          {getProviderIcon(model.provider || 'openai', model.name, 'sm')}
+                        </div>
+                        {favoriteModels.some(fav => fav.id === model.id) && (
+                          <StarIcon className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 sm:h-3 sm:w-3 text-yellow-500 bg-background rounded-full" />
                         )}
                       </div>
-                      <div className="flex-1">
-                        <div className="font-medium">{model.name}</div>
-                        <div className="text-sm text-muted-foreground">{model.provider}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm sm:text-base">{model.name}</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">{model.provider}</div>
                       </div>
                     </Command.Item>
                   ))}
