@@ -19,6 +19,8 @@ import Logo from '../components/Logo';
 
 import { trpc } from "@/utils/trpc";
 import { useOpenRouterStore } from '@/stores/openRouterStore';
+import { SearchCommand } from '@/components/SearchCommand';
+import { useSearchCommand } from '@/hooks/useSearchCommand';
 
 
 interface ApiKeys {
@@ -27,6 +29,7 @@ interface ApiKeys {
   gemini: string;
   deepseek: string;
   meta: string;
+  xai: string;
   openrouter: string;
 }
 
@@ -56,6 +59,7 @@ const Home: NextPage = () => {
     gemini: "",
     deepseek: "",
     meta: "",
+    xai: "",
     openrouter: "",
   });
   const [showKeys, setShowKeys] = useState<Record<keyof ApiKeys, boolean>>({
@@ -64,6 +68,7 @@ const Home: NextPage = () => {
     gemini: false,
     deepseek: false,
     meta: false,
+    xai: false,
     openrouter: false,
   });
   const [saved, setSaved] = useState(false);
@@ -76,6 +81,9 @@ const Home: NextPage = () => {
   const { useOpenRouter, setUseOpenRouter } = useOpenRouterStore();
   
   const [activeSettingsTab, setActiveSettingsTab] = useState<'api-keys' | 'account'>('account');
+
+  // Search command hook
+  const { isOpen: isSearchOpen, openSearch, closeSearch } = useSearchCommand();
 
   // Get user's best default model
   const { data: bestDefaultModel } = trpc.userPreferences.getBestDefaultModel.useQuery(
@@ -96,6 +104,7 @@ const Home: NextPage = () => {
   const { data: allModels } = trpc.models.getModels.useQuery();
   const setDefaultModelMutation = trpc.userPreferences.setDefaultModel.useMutation();
   const setTitleGenerationModelMutation = trpc.userPreferences.setTitleGenerationModel.useMutation();
+  const setOpenRouterModeMutation = trpc.userPreferences.setOpenRouterMode.useMutation();
   const updateThreadMetadataMutation = trpc.chat.updateThreadMetadata.useMutation();
 
 
@@ -191,6 +200,7 @@ const Home: NextPage = () => {
         gemini: dbApiKeys.gemini || "",
         deepseek: dbApiKeys.deepseek || "",
         meta: dbApiKeys.meta || "",
+        xai: dbApiKeys.xai || "",
         openrouter: dbApiKeys.openrouter || "",
       });
     }
@@ -205,50 +215,42 @@ const Home: NextPage = () => {
     }
   }, [userPreferences]);
 
-  // Initialize toggle state based on existing API keys
+  // Sync OpenRouter mode preference from database with Zustand store
   useEffect(() => {
-    if (dbApiKeys) {
+    if (userPreferences && 'useOpenRouter' in userPreferences && userPreferences.useOpenRouter !== undefined) {
+      // If database has a preference, use it and update Zustand store
+      setUseOpenRouter(userPreferences.useOpenRouter);
+    } else if (dbApiKeys) {
+      // If no database preference, infer from API keys and save to database
       const hasIndividualKeys = Object.entries(dbApiKeys)
         .filter(([provider]) => provider !== 'openrouter')
         .some(([, key]) => key && key.trim());
       const hasOpenRouterKey = dbApiKeys.openrouter && dbApiKeys.openrouter.trim();
       
+      let inferredMode = false;
+      
       // If user has OpenRouter key but no individual keys, default to OpenRouter mode
       // If user has individual keys but no OpenRouter key, default to individual mode
-      // If user has both, keep current toggle state
       if (hasOpenRouterKey && !hasIndividualKeys) {
-        setUseOpenRouter(true);
+        inferredMode = true;
       } else if (hasIndividualKeys && !hasOpenRouterKey) {
-        setUseOpenRouter(false);
+        inferredMode = false;
       }
-      // If user has both or neither, keep current toggle state
+      // If user has both or neither, keep current toggle state (false by default)
+      
+      setUseOpenRouter(inferredMode);
+      
+      // Save the inferred preference to database
+      setOpenRouterModeMutation.mutate({ useOpenRouter: inferredMode });
     }
-  }, [dbApiKeys]);
+  }, [userPreferences, dbApiKeys]);
 
   // Settings page helper functions
   const getAvailableModels = () => {
-    if (!allModels || !dbApiKeys) return [];
+    if (!allModels) return [];
     
-    const availableProviders = new Set();
-    const hasOpenRouterKey = dbApiKeys.openrouter && dbApiKeys.openrouter.trim();
-    
-    Object.entries(dbApiKeys).forEach(([provider, key]) => {
-      if (key && key.trim()) {
-        availableProviders.add(provider);
-      }
-    });
-
-    return allModels.filter(model => {
-      if (!model.isActive) return false;
-      
-      if (useOpenRouter) {
-        // In OpenRouter mode, only show models with OpenRouter support
-        return hasOpenRouterKey && model.openrouterModelId;
-      } else {
-        // In individual mode, only show models with direct provider keys
-        return availableProviders.has(model.provider);
-      }
-    });
+    // Always show all active models so users can discover what's available
+    return allModels.filter(model => model.isActive);
   };
 
   const availableModels = useMemo(() => getAvailableModels(), [allModels, dbApiKeys, useOpenRouter]);
@@ -268,109 +270,125 @@ const Home: NextPage = () => {
     }));
   };
 
-  const handleToggleMode = (newUseOpenRouter: boolean) => {
-    setUseOpenRouter(newUseOpenRouter);
-    
-    // Check if current default model is still available in the new mode
-    if (selectedDefaultModel && allModels && dbApiKeys) {
-      const currentDefaultModel = allModels.find(model => model.id === selectedDefaultModel);
+  const handleToggleMode = async (newUseOpenRouter: boolean) => {
+    try {
+      // Update the database preference first
+      await setOpenRouterModeMutation.mutateAsync({ useOpenRouter: newUseOpenRouter });
       
-      if (currentDefaultModel) {
-        const hasDirectProviderKey = dbApiKeys[currentDefaultModel.provider as keyof typeof dbApiKeys]?.trim();
-        const hasOpenRouterSupport = dbApiKeys.openrouter?.trim() && currentDefaultModel.openrouterModelId;
-        
-        let isModelAvailableInNewMode = false;
-        
-        if (newUseOpenRouter) {
-          // In OpenRouter mode, model needs OpenRouter support
-          isModelAvailableInNewMode = !!hasOpenRouterSupport;
-        } else {
-          // In individual mode, model needs direct provider key
-          isModelAvailableInNewMode = !!hasDirectProviderKey;
-        }
-        
-        // If current default model is not available in new mode, reset it
-        if (!isModelAvailableInNewMode) {
-          setSelectedDefaultModel("");
-        }
-      }
-    }
-    
-    // Check if current selected chat model is still available in the new mode
-    if (selectedModel && allModels && dbApiKeys) {
-      const currentSelectedModel = allModels.find(model => model.id === selectedModel);
+      // Then update the local Zustand store
+      setUseOpenRouter(newUseOpenRouter);
       
-      if (currentSelectedModel) {
-        const hasDirectProviderKey = dbApiKeys[currentSelectedModel.provider as keyof typeof dbApiKeys]?.trim();
-        const hasOpenRouterSupport = dbApiKeys.openrouter?.trim() && currentSelectedModel.openrouterModelId;
+      // Invalidate and refetch all relevant queries to update UI immediately
+      utils.userPreferences.getBestDefaultModel.invalidate();
+      utils.models.getFavoriteModels.invalidate();
+      utils.models.getOtherModels.invalidate();
+      utils.models.getModels.invalidate();
+      
+      // Check if current default model is still available in the new mode
+      if (selectedDefaultModel && allModels && dbApiKeys) {
+        const currentDefaultModel = allModels.find(model => model.id === selectedDefaultModel);
         
-        let isModelAvailableInNewMode = false;
-        
-        if (newUseOpenRouter) {
-          // In OpenRouter mode, model needs OpenRouter support
-          isModelAvailableInNewMode = !!hasOpenRouterSupport;
-        } else {
-          // In individual mode, model needs direct provider key
-          isModelAvailableInNewMode = !!hasDirectProviderKey;
-        }
-        
-        // If current selected model is not available in new mode, reset to best available
-        if (!isModelAvailableInNewMode) {
-          // Find the best available model in the new mode
-          const availableModelsInNewMode = allModels.filter(model => {
-            if (!model.isActive) return false;
-            
-            const modelHasDirectKey = dbApiKeys[model.provider as keyof typeof dbApiKeys]?.trim();
-            const modelHasOpenRouterSupport = dbApiKeys.openrouter?.trim() && model.openrouterModelId;
-            
-            if (newUseOpenRouter) {
-              return !!modelHasOpenRouterSupport;
-            } else {
-              return !!modelHasDirectKey;
-            }
-          });
+        if (currentDefaultModel) {
+          const hasDirectProviderKey = dbApiKeys[currentDefaultModel.provider as keyof typeof dbApiKeys]?.trim();
+          const hasOpenRouterSupport = currentDefaultModel.openrouterModelId;
           
-          // Set to the first available model (usually the cheapest/default)
-          if (availableModelsInNewMode.length > 0 && availableModelsInNewMode[0]) {
-            setSelectedModel(availableModelsInNewMode[0].id);
+          let isModelAvailableInNewMode = false;
+          
+          if (newUseOpenRouter) {
+            // In OpenRouter mode, model needs OpenRouter support (regardless of key presence)
+            isModelAvailableInNewMode = !!hasOpenRouterSupport;
+          } else {
+            // In individual mode, model needs direct provider key
+            isModelAvailableInNewMode = !!hasDirectProviderKey;
+          }
+          
+          // If current default model is not available in new mode, reset it
+          if (!isModelAvailableInNewMode) {
+            setSelectedDefaultModel("");
           }
         }
       }
-    }
-    
-    // Check if current title generation model is still available in the new mode
-    if (selectedTitleGenerationModel && allModels && dbApiKeys) {
-      const currentTitleModel = allModels.find(model => model.id === selectedTitleGenerationModel);
       
-      if (currentTitleModel) {
-        const hasDirectProviderKey = dbApiKeys[currentTitleModel.provider as keyof typeof dbApiKeys]?.trim();
-        const hasOpenRouterSupport = dbApiKeys.openrouter?.trim() && currentTitleModel.openrouterModelId;
+      // Check if current selected chat model is still available in the new mode
+      if (selectedModel && allModels && dbApiKeys) {
+        const currentSelectedModel = allModels.find(model => model.id === selectedModel);
         
-        let isModelAvailableInNewMode = false;
-        
-        if (newUseOpenRouter) {
-          // In OpenRouter mode, model needs OpenRouter support
-          isModelAvailableInNewMode = !!hasOpenRouterSupport;
-        } else {
-          // In individual mode, model needs direct provider key
-          isModelAvailableInNewMode = !!hasDirectProviderKey;
-        }
-        
-        // If current title generation model is not available in new mode, reset it
-        if (!isModelAvailableInNewMode) {
-          setSelectedTitleGenerationModel("");
+        if (currentSelectedModel) {
+          const hasDirectProviderKey = dbApiKeys[currentSelectedModel.provider as keyof typeof dbApiKeys]?.trim();
+          const hasOpenRouterSupport = currentSelectedModel.openrouterModelId;
+          
+          let isModelAvailableInNewMode = false;
+          
+          if (newUseOpenRouter) {
+            // In OpenRouter mode, model needs OpenRouter support (regardless of key presence)
+            isModelAvailableInNewMode = !!hasOpenRouterSupport;
+          } else {
+            // In individual mode, model needs direct provider key
+            isModelAvailableInNewMode = !!hasDirectProviderKey;
+          }
+          
+          // If current selected model is not available in new mode, reset to best available
+          if (!isModelAvailableInNewMode) {
+            // Find the best available (enabled) model in the new mode
+            const enabledModelsInNewMode = allModels.filter(model => {
+              if (!model.isActive) return false;
+              
+              const modelHasDirectKey = dbApiKeys[model.provider as keyof typeof dbApiKeys]?.trim();
+              const modelHasOpenRouterKey = dbApiKeys.openrouter?.trim();
+              
+              if (newUseOpenRouter) {
+                // In OpenRouter mode, model needs OpenRouter support AND OpenRouter key
+                return !!model.openrouterModelId && !!modelHasOpenRouterKey;
+              } else {
+                // In individual mode, model needs direct provider key
+                return !!modelHasDirectKey;
+              }
+            });
+            
+            // Set to the first enabled model (usually the cheapest/default)
+            if (enabledModelsInNewMode.length > 0 && enabledModelsInNewMode[0]) {
+              setSelectedModel(enabledModelsInNewMode[0].id);
+            }
+          }
         }
       }
+      
+      // Check if current title generation model is still available in the new mode
+      if (selectedTitleGenerationModel && allModels && dbApiKeys) {
+        const currentTitleModel = allModels.find(model => model.id === selectedTitleGenerationModel);
+        
+        if (currentTitleModel) {
+          const hasDirectProviderKey = dbApiKeys[currentTitleModel.provider as keyof typeof dbApiKeys]?.trim();
+          const hasOpenRouterSupport = currentTitleModel.openrouterModelId;
+          
+          let isModelAvailableInNewMode = false;
+          
+          if (newUseOpenRouter) {
+            // In OpenRouter mode, model needs OpenRouter support (regardless of key presence)
+            isModelAvailableInNewMode = !!hasOpenRouterSupport;
+          } else {
+            // In individual mode, model needs direct provider key
+            isModelAvailableInNewMode = !!hasDirectProviderKey;
+          }
+          
+          // If current title generation model is not available in new mode, reset it
+          if (!isModelAvailableInNewMode) {
+            setSelectedTitleGenerationModel("");
+          }
+        }
+      }
+      
+      toast.dismiss();
+      toast.success(`Switched to ${newUseOpenRouter ? 'OpenRouter' : 'Individual Provider'} mode. ${
+        newUseOpenRouter 
+          ? 'Models without OpenRouter support or missing OpenRouter key will be disabled.'
+          : 'Models without individual API keys will be disabled.'
+      }`);
+    } catch (error) {
+      console.error('Failed to update OpenRouter mode:', error);
+      toast.dismiss();
+      toast.error("Failed to update OpenRouter mode preference");
     }
-    
-    toast.dismiss();
-    const newAvailableModels = getAvailableModels();
-    toast.success(`Switched to ${newUseOpenRouter ? 'OpenRouter' : 'Individual Provider'} mode${
-      (selectedDefaultModel && newAvailableModels && !newAvailableModels.find(m => m.id === selectedDefaultModel)) ||
-      (selectedModel && newAvailableModels && !newAvailableModels.find(m => m.id === selectedModel))
-        ? '. Models updated to match available options.'
-        : ''
-    }`);
   };
 
   const handleSave = async () => {
@@ -402,6 +420,15 @@ const Home: NextPage = () => {
       }
       
       await Promise.all(savePromises);
+      
+      // Invalidate and refetch all relevant queries to update UI immediately
+      utils.apiKeys.getApiKeys.invalidate();
+      utils.apiKeys.hasAnyApiKeys.invalidate();
+      utils.userPreferences.getBestDefaultModel.invalidate();
+      utils.models.getFavoriteModels.invalidate();
+      utils.models.getOtherModels.invalidate();
+      utils.models.getModels.invalidate();
+      
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
       toast.dismiss();
@@ -439,6 +466,15 @@ const Home: NextPage = () => {
         ...prev,
         [provider]: ""
       }));
+      
+      // Invalidate and refetch all relevant queries to update UI immediately
+      utils.apiKeys.getApiKeys.invalidate();
+      utils.apiKeys.hasAnyApiKeys.invalidate();
+      utils.userPreferences.getBestDefaultModel.invalidate();
+      utils.models.getFavoriteModels.invalidate();
+      utils.models.getOtherModels.invalidate();
+      utils.models.getModels.invalidate();
+      
       toast.dismiss();
       toast.success(`${getProviderInfo(provider).name} API key cleared`);
     } catch (error) {
@@ -461,6 +497,7 @@ const Home: NextPage = () => {
       gemini: { name: "Google Gemini", placeholder: "AI..." },
       deepseek: { name: "DeepSeek", placeholder: "sk-..." },
       meta: { name: "Meta (Llama)", placeholder: "..." },
+      xai: { name: "xAI", placeholder: "xai-..." },
       openrouter: { name: "OpenRouter", placeholder: "sk-or-..." },
     };
     return info[provider];
@@ -1302,6 +1339,7 @@ const Home: NextPage = () => {
           collapsed={sidebarCollapsed}
               onToggleCollapse={toggleSidebar}
           onWidthChange={setSidebarWidth}
+              onOpenSearch={openSearch}
         />
         </div>
           <div className="flex-1 flex items-center justify-center">
@@ -1342,6 +1380,7 @@ const Home: NextPage = () => {
               collapsed={sidebarCollapsed}
               onToggleCollapse={toggleSidebar}
               onWidthChange={setSidebarWidth}
+              onOpenSearch={openSearch}
             />
           </div>
           
@@ -1349,6 +1388,18 @@ const Home: NextPage = () => {
           <div className="flex-1 transition-opacity duration-200 ease-in-out">
             {renderContent()}
           </div>
+
+          {/* Search Command Modal */}
+          <SearchCommand
+            isOpen={isSearchOpen}
+            onClose={closeSearch}
+            onThreadSelect={handleThreadSelect}
+            onNewChat={handleNewChat}
+            onNavigateToSettings={navigateToSettings}
+            onNavigateToAccount={navigateToAccount}
+            onModelChange={handleModelChange}
+            currentThreadId={currentThreadId}
+          />
       </main>
       </>
     );

@@ -26,6 +26,7 @@ const getModelProvider = (model?: string) => {
   if (model.includes("gemini") || model.includes("google")) return { provider: "gemini", model };
   if (model.includes("deepseek")) return { provider: "deepseek", model };
   if (model.includes("llama") || model.includes("meta")) return { provider: "meta", model };
+  if (model.includes("grok") || model.includes("xai")) return { provider: "xai", model };
   return { provider: "openai", model };
 };
 
@@ -445,40 +446,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
 
   try {
+    // Get user preferences to check OpenRouter mode
+    const userPreferences = await convex.query(api.users.getPreferences, {
+      userId: convexUser._id,
+    });
+    
     // Get model data from database to check for OpenRouter model ID
     const modelFromDb = await convex.query(api.models.getModelById, { modelId: model });
     
     // Determine provider from model
     const modelData = getModelProvider(model);
     
-    // Get API key from Convex database - try specific provider first, then fall back to OpenRouter
-    let apiKey = await getApiKeyFromDatabase(convexUser._id, modelData.provider);
+    const useOpenRouterMode = userPreferences?.useOpenRouter ?? false;
+    
+    let apiKey: string | null = null;
     let actualProvider = modelData.provider;
     let actualModelId = model; // Default to original model ID
     
-    // If no specific provider key found, try OpenRouter as fallback
-    if (!apiKey) {
-      apiKey = await getApiKeyFromDatabase(convexUser._id, "openrouter");
-      if (apiKey) {
+    if (useOpenRouterMode) {
+      // In OpenRouter mode, use OpenRouter API key and model ID
+      const openRouterKey = await getApiKeyFromDatabase(convexUser._id, "openrouter");
+      if (openRouterKey) {
+        apiKey = openRouterKey;
         actualProvider = "openrouter";
         // Use OpenRouter model ID if available, otherwise use original model ID
         if (modelFromDb?.openrouterModelId) {
           actualModelId = modelFromDb.openrouterModelId;
-          console.log(`🔀 [LLL.CHAT] Using OpenRouter API key with model ID: ${actualModelId} (original: ${model})`);
+          console.log(`🔀 [LLL.CHAT] Using OpenRouter mode with model ID: ${actualModelId} (original: ${model})`);
         } else {
-          console.log(`🔀 [LLL.CHAT] Using OpenRouter API key for ${modelData.provider} model: ${model} (no OpenRouter model ID found)`);
+          console.log(`🔀 [LLL.CHAT] Using OpenRouter mode for ${modelData.provider} model: ${model} (no OpenRouter model ID found)`);
         }
+      } else {
+        console.log(`⚠️  [LLL.CHAT] OpenRouter mode enabled but no OpenRouter API key found`);
+        res.write(`f:{"error":"OpenRouter mode is enabled but no OpenRouter API key found. Please add an OpenRouter API key in Settings."}\n`);
+        res.end();
+        return;
+      }
+    } else {
+      // In individual provider mode, use specific provider API key
+      const providerKey = await getApiKeyFromDatabase(convexUser._id, modelData.provider);
+      if (providerKey) {
+        apiKey = providerKey;
+      } else {
+        console.log(`⚠️  [LLL.CHAT] No API key found for ${modelData.provider} in individual provider mode`);
+        res.write(`f:{"error":"No API key found for ${modelData.provider}. Please add a ${modelData.provider} API key in Settings or switch to OpenRouter mode."}\n`);
+        res.end();
+        return;
       }
     }
-    
-    if (!apiKey) {
-      console.log(`⚠️  [LLL.CHAT] No API key found for ${modelData.provider} or OpenRouter`);
-      res.write(`f:{"error":"No API key found for ${modelData.provider}. Please add a ${modelData.provider} API key or an OpenRouter API key in Settings."}\n`);
-      res.end();
-      return;
-    }
 
-    console.log(`🔑 [LLL.CHAT] Using ${actualProvider} API key for ${modelData.provider} model`);
+    console.log(`🔑 [LLL.CHAT] Using ${actualProvider} API key for ${modelData.provider} model (mode: ${useOpenRouterMode ? 'OpenRouter' : 'Individual'})`);
     
     const aiCallStart = Date.now();
     console.log(`🤖 [LLL.CHAT] Starting AI API call at ${new Date().toISOString()}`);

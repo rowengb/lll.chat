@@ -32,17 +32,45 @@ export function FileViewerModal({
   const [numPages, setNumPages] = useState<number>();
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [pdfPageWidth, setPdfPageWidth] = useState<number | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleDownload = () => {
-    if (file.url) {
-      const link = document.createElement('a');
-      link.href = file.url;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+  const handleDownload = async () => {
+    if (file.url && !isDownloading) {
+      setIsDownloading(true);
+      try {
+        // Fetch the file as a blob to ensure proper download
+        const response = await fetch(file.url);
+        if (!response.ok) {
+          throw new Error('Failed to fetch file');
+        }
+        
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the blob URL
+        URL.revokeObjectURL(blobUrl);
+      } catch (error) {
+        console.error('Download failed:', error);
+        // Fallback to direct link if blob download fails
+        const link = document.createElement('a');
+        link.href = file.url;
+        link.download = file.name;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } finally {
+        setIsDownloading(false);
+      }
     }
   };
 
@@ -227,9 +255,13 @@ export function FileViewerModal({
                 {file.type} • {formatFileSize(file.size)}
               </p>
               <div className="flex gap-2 justify-center">
-                <Button onClick={handleDownload} size="sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
+                <Button onClick={handleDownload} size="sm" disabled={isDownloading}>
+                  {isDownloading ? (
+                    <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  {isDownloading ? "Downloading..." : "Download"}
                 </Button>
                 <Button onClick={handleOpenInNewTab} variant="outline" size="sm">
                   <ExternalLink className="h-4 w-4 mr-2" />
@@ -301,9 +333,13 @@ export function FileViewerModal({
           <p className="text-sm mt-2">File type: {file.type}</p>
           <p className="text-sm">Size: {formatFileSize(file.size)}</p>
           <div className="flex gap-2 justify-center mt-4">
-            <Button onClick={handleDownload} size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Download
+            <Button onClick={handleDownload} size="sm" disabled={isDownloading}>
+              {isDownloading ? (
+                <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {isDownloading ? "Downloading..." : "Download"}
             </Button>
             <Button onClick={handleOpenInNewTab} variant="outline" size="sm">
               <ExternalLink className="h-4 w-4 mr-2" />
@@ -356,9 +392,14 @@ export function FileViewerModal({
               variant="ghost"
               size="sm"
               onClick={handleDownload}
-              title="Download"
+              disabled={isDownloading}
+              title={isDownloading ? "Downloading..." : "Download"}
             >
-              <Download className="h-4 w-4" />
+              {isDownloading ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
             </Button>
             
             <Button

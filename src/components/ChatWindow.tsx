@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, SquareIcon } from "lucide-react";
+import { CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, SquareIcon, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 
@@ -25,7 +25,7 @@ import { useChatScrolling } from '../hooks/useChatScrolling';
 import { useChatStreaming } from '../hooks/useChatStreaming';
 
 // Utils
-import { getDefaultModel, getProviderFromModel, createShakeAnimation, navigateToSettings, adjustTextareaHeight } from '../utils/chatHelpers';
+import { getDefaultModel, getProviderFromModel, createShakeAnimation, navigateToSettings, adjustTextareaHeight, smartFocus } from '../utils/chatHelpers';
 import { filterOutEmptyOptimisticMessages, createOptimisticUserMessage, removeErrorMessages, mapFileAttachments } from '../utils/messageUtils';
 
 // Types
@@ -104,10 +104,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
   // Auto-focus input on component mount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
-    return () => clearTimeout(timer);
+    smartFocus(inputRef, { delay: 100, reason: 'component-mount' });
   }, []);
 
   // Handle input changes
@@ -139,9 +136,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         });
       }
       
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 200);
+      smartFocus(inputRef, { delay: 200, reason: 'thread-change' });
     }
   }, [threadId, messagesContainer]);
 
@@ -343,9 +338,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     try {
       setLoading(threadId, true);
       
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 50);
+      smartFocus(inputRef, { delay: 50, reason: 'user-action' });
       
       const currentMessages = getMessages(threadId);
       const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
@@ -369,6 +362,13 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         
         const userMessage = currentMessages[messageIndex];
         if (userMessage) {
+          // Add the user message back as an optimistic message
+          const optimisticUserMessage = createOptimisticUserMessage(
+            userMessage.content, 
+            userMessage.attachments
+          );
+          addMessage(threadId, optimisticUserMessage);
+          
           // For retry, use custom streaming that only saves assistant message
           await streamRetryResponse(
             threadId,
@@ -454,9 +454,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         addMessage(threadId, optimisticUserMessage);
         setLoading(threadId, true);
         
-        setTimeout(() => {
-          inputRef.current?.focus();
-        }, 50);
+        smartFocus(inputRef, { delay: 50, reason: 'user-action' });
         
         await streamResponse(
           threadId,
@@ -496,9 +494,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     try {
       setLoading(threadId, true);
       
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 50);
+      smartFocus(inputRef, { delay: 50, reason: 'user-action' });
       
         const currentMessages = getMessages(threadId);
       const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
@@ -628,9 +624,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     setInput("");
     setUploadedFiles([]);
 
-    setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
+    smartFocus(inputRef, { delay: 100, reason: 'form-submit' });
 
     try {
       if (!threadId) {
@@ -647,9 +641,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         setLoading(newThread.id, true);
         isStreamingRef.current = true;
         
-        setTimeout(() => {
-          inputRef.current?.focus();
-        }, 50);
+        smartFocus(inputRef, { delay: 50, reason: 'form-submit' });
 
         const optimisticUserMessage = createOptimisticUserMessage(messageContent, messageFiles);
         addMessage(newThread.id, optimisticUserMessage);
@@ -694,9 +686,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       } else {
         setLoading(threadId, true);
         
-        setTimeout(() => {
-          inputRef.current?.focus();
-        }, 50);
+        smartFocus(inputRef, { delay: 50, reason: 'form-submit' });
         
         const currentMessages = getMessages(threadId);
         const messagesWithoutErrors = removeErrorMessages(currentMessages);
@@ -839,7 +829,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                               </div>
                             ) : message.role === "user" ? (
                               <div>
-                                <p className="whitespace-pre-wrap text-sm leading-loose">
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed">
                                   {message.content}
                                 </p>
                                 {message.attachments && message.attachments.length > 0 && (
@@ -856,10 +846,22 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                               </div>
                             ) : (
                               <div>
+                                {message.isError ? (
+                                  <div className="flex items-center gap-3">
+                                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+                                    <div className="flex-1">
                                 <ChunkedMarkdown 
                                   content={message.content}
                                   chunkSize={75}
                                 />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <ChunkedMarkdown 
+                                    content={message.content}
+                                    chunkSize={75}
+                                  />
+                                )}
                                 
                                 {message.role === "assistant" && message.groundingMetadata && (
                                   <GroundingSources

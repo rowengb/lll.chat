@@ -807,9 +807,10 @@ export const updateModelsWithCorrectData = mutation({
       {
         id: "Qwen/QwQ-32B",
         name: "Qwen qwkq-32b",
-        description: "Qwen question-answering model",
-        provider: "together",
-        apiUrl: "https://api.together.xyz/v1/chat/completions",
+        description: "Qwen question-answering model (OpenRouter only)",
+        provider: "openrouter",
+        apiUrl: "https://openrouter.ai/api/v1/chat/completions",
+        openrouterModelId: "qwen/qwq-32b-preview",
         capabilities: ["reasoning"],
         isFavorite: false,
         isActive: true,
@@ -820,9 +821,10 @@ export const updateModelsWithCorrectData = mutation({
       {
         id: "qwen2.5-32b-instruct",
         name: "Qwen 2.5 32b",
-        description: "Alibaba's Qwen model",
-        provider: "alibaba",
-        apiUrl: "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
+        description: "Alibaba's Qwen model (OpenRouter only)",
+        provider: "openrouter",
+        apiUrl: "https://openrouter.ai/api/v1/chat/completions",
+        openrouterModelId: "qwen/qwen-2.5-32b-instruct",
         capabilities: [],
         isFavorite: false,
         isActive: true,
@@ -1179,6 +1181,39 @@ export const updateRemainingModelDisplayNames = mutation({
 });
 
 // Update models with pricing information
+// Update Qwen models to use OpenRouter only
+export const updateQwenModelsToOpenRouter = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Find and update Qwen models
+    const qwenModels = await ctx.db.query("models").collect();
+    
+    let updatedCount = 0;
+    
+    for (const model of qwenModels) {
+      if (model.id === "Qwen/QwQ-32B") {
+        await ctx.db.patch(model._id, {
+          description: "Qwen question-answering model (OpenRouter only)",
+          provider: "openrouter",
+          apiUrl: "https://openrouter.ai/api/v1/chat/completions",
+          openrouterModelId: "qwen/qwq-32b-preview",
+        });
+        updatedCount++;
+      } else if (model.id === "qwen2.5-32b-instruct") {
+        await ctx.db.patch(model._id, {
+          description: "Alibaba's Qwen model (OpenRouter only)",
+          provider: "openrouter", 
+          apiUrl: "https://openrouter.ai/api/v1/chat/completions",
+          openrouterModelId: "qwen/qwen-2.5-32b-instruct",
+        });
+        updatedCount++;
+      }
+    }
+    
+    return { message: `Updated ${updatedCount} Qwen models to use OpenRouter only` };
+  },
+});
+
 export const updateModelsWithPricing = mutation({
   args: {},
   handler: async (ctx) => {

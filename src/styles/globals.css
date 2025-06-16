@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import JetBrains Mono font */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -19,7 +22,7 @@
     --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 84% 4.9%;
 
-    --muted: 210 40% 96%;
+    --muted: 210 40% 94%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
     --accent: 210 40% 96%;
@@ -84,11 +87,149 @@
   
   body {
     @apply bg-background text-foreground;
+    line-height: 1.5;
+  }
+  
+  /* Apply 1.5 line height globally */
+  p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, label, button, input, textarea {
+    line-height: 1.5;
   }
 }
 
 /* Syntax highlighting for code blocks */
+@import 'highlight.js/styles/github.css';
 @import 'highlight.js/styles/github-dark.css';
+
+/* Clean syntax highlighting for light mode */
+.light .hljs {
+  background: #f8fafc !important;
+  color: #334155 !important;
+}
+
+.light .hljs-keyword,
+.light .hljs-selector-tag,
+.light .hljs-built_in {
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+.light .hljs-string,
+.light .hljs-attr {
+  color: #059669 !important;
+}
+
+.light .hljs-number,
+.light .hljs-literal {
+  color: #dc2626 !important;
+}
+
+.light .hljs-comment {
+  color: #64748b !important;
+  font-style: italic !important;
+}
+
+.light .hljs-function,
+.light .hljs-title {
+  color: #2563eb !important;
+  font-weight: 500 !important;
+}
+
+.light .hljs-variable,
+.light .hljs-name {
+  color: #7c3aed !important;
+}
+
+/* Dark mode syntax highlighting */
+.dark .hljs {
+  background: #1e293b !important;
+  color: #e2e8f0 !important;
+}
+
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-built_in {
+  color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+.dark .hljs-string,
+.dark .hljs-attr {
+  color: #34d399 !important;
+}
+
+.dark .hljs-number,
+.dark .hljs-literal {
+  color: #f87171 !important;
+}
+
+.dark .hljs-comment {
+  color: #94a3b8 !important;
+  font-style: italic !important;
+}
+
+.dark .hljs-function,
+.dark .hljs-title {
+  color: #60a5fa !important;
+  font-weight: 500 !important;
+}
+
+.dark .hljs-variable,
+.dark .hljs-name {
+  color: #a78bfa !important;
+}
+
+/* Force code block backgrounds */
+.light pre,
+.light pre code,
+.light pre .hljs {
+  background-color: #f8fafc !important;
+}
+
+.light code:not(pre code) {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+.dark pre,
+.dark pre code,
+.dark pre .hljs {
+  background-color: #1e293b !important;
+}
+
+.dark code:not(pre code) {
+  background-color: #334155 !important;
+  color: #e2e8f0 !important;
+  border: 1px solid #475569 !important;
+}
+
+/* JetBrains Mono font for all code elements */
+pre,
+code,
+.hljs,
+[class*="language-"],
+.font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace !important;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+  font-variant-ligatures: contextual;
+}
+
+/* Prevent code wrapping and ensure proper scrolling */
+pre {
+  white-space: pre !important;
+  overflow-x: auto !important;
+  word-wrap: normal !important;
+  word-break: normal !important;
+}
+
+pre code {
+  white-space: pre !important;
+  word-wrap: normal !important;
+  word-break: normal !important;
+  display: block !important;
+}
+
+
 
 /* Custom markdown styles */
 .prose {
@@ -272,11 +413,40 @@
   transform: translateZ(0);
 }
 
+/* Enhanced mobile scroll tracking */
+.mobile-scroll-optimized {
+  /* Optimize touch scrolling on mobile */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  /* Prevent momentum scrolling from interfering */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+/* iOS specific scroll fixes */
+.ios-scroll-fix {
+  /* Fix iOS scroll momentum issues */
+  -webkit-overflow-scrolling: touch;
+  /* Prevent rubber band effect */
+  overscroll-behavior-y: contain;
+  /* Improve scroll performance */
+  will-change: scroll-position;
+}
+
 /* Prevent pull-to-refresh on mobile */
 .mobile-no-refresh {
   overscroll-behavior-y: contain;
   /* Prevent pull-to-refresh specifically */
   -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile scroll isolation */
+.mobile-scroll-isolated {
+  /* Isolate scroll context */
+  contain: layout style paint;
+  /* Prevent scroll chaining */
+  overscroll-behavior: contain;
 }
 
 /* Mobile textarea optimizations */

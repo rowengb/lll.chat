@@ -103,6 +103,26 @@ export const userPreferencesRouter = createTRPCRouter({
       return { success: true, titleGenerationModel: input.modelId };
     }),
 
+  // Set user's OpenRouter mode preference
+  setOpenRouterMode: protectedProcedure
+    .input(z.object({
+      useOpenRouter: z.boolean(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      await convex.mutation(api.users.updatePreferences, {
+        userId: convexUser._id,
+        useOpenRouter: input.useOpenRouter,
+      });
+
+      return { success: true, useOpenRouter: input.useOpenRouter };
+    }),
+
   // Get the best default model for user (either user's preference or cheapest available)
   getBestDefaultModel: protectedProcedure.query(async ({ ctx }) => {
     const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -126,20 +146,33 @@ export const userPreferencesRouter = createTRPCRouter({
 
     // Create a map of available providers (those with API keys)
     const availableProviders = new Set(apiKeys.map(key => key.provider));
+    const hasOpenRouterKey = availableProviders.has('openrouter');
+    const useOpenRouterMode = preferences?.useOpenRouter ?? false;
 
-    // Filter models to only those with available API keys
-    const availableModels = allModels.filter((model: ModelData) => 
-      availableProviders.has(model.provider) && model.isActive
-    );
+    // Filter models based on OpenRouter mode preference
+    let availableModels: ModelData[];
+    
+    if (useOpenRouterMode && hasOpenRouterKey) {
+      // In OpenRouter mode, only show models with OpenRouter support
+      availableModels = allModels.filter((model: ModelData) => 
+        model.isActive && model.openrouterModelId
+      );
+    } else {
+      // In individual provider mode, only show models with direct provider keys
+      availableModels = allModels.filter((model: ModelData) => 
+        availableProviders.has(model.provider) && model.isActive
+      );
+    }
 
-    // If user has a default model set and it's available, use it
+    // If user has a default model set and it's available in current mode, use it
     if (preferences?.defaultModel) {
       const defaultModel = availableModels.find((model: ModelData) => model.id === preferences.defaultModel);
       if (defaultModel) {
         return {
           modelId: defaultModel.id,
           reason: "user_preference",
-          modelName: defaultModel.name
+          modelName: defaultModel.name,
+          useOpenRouterMode
         };
       }
     }
@@ -158,7 +191,8 @@ export const userPreferencesRouter = createTRPCRouter({
           modelId: cheapestModel.id,
           reason: cheapestModel.costPer1kTokens !== undefined ? "cheapest_available" : "first_available",
           modelName: cheapestModel.name,
-          cost: cheapestModel.costPer1kTokens
+          cost: cheapestModel.costPer1kTokens,
+          useOpenRouterMode
         };
       }
     }
@@ -166,8 +200,9 @@ export const userPreferencesRouter = createTRPCRouter({
     // No models available - user needs to add API keys
     return {
       modelId: null,
-      reason: "no_api_keys",
-      modelName: null
+      reason: useOpenRouterMode ? "no_openrouter_key" : "no_api_keys",
+      modelName: null,
+      useOpenRouterMode
     };
   }),
 }); 

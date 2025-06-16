@@ -6,6 +6,7 @@ import { ApiKeyWarningBanner } from "../ApiKeyWarningBanner";
 import { MobileMenuButton } from "./MobileMenuButton";
 import { Chatbox } from "../Chatbox";
 import { UploadedFile } from "../FileUpload";
+import { smartFocus } from "../../utils/chatHelpers";
 
 interface WelcomeScreenProps {
   // Layout props
@@ -62,7 +63,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
   const handleExampleClick = (prompt: string) => {
     onInputChange(prompt);
-    inputRef.current?.focus();
+    smartFocus(inputRef, { reason: 'example-click' });
   };
 
   return (

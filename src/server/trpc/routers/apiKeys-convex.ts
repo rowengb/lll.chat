@@ -68,7 +68,7 @@ export const apiKeysConvexRouter = createTRPCRouter({
   // Save or update an API key
   saveApiKey: protectedProcedure
     .input(z.object({
-      provider: z.enum(["openai", "anthropic", "gemini", "deepseek", "meta", "openrouter"]),
+      provider: z.enum(["openai", "anthropic", "gemini", "deepseek", "meta", "xai", "openrouter"]),
       key: z.string().min(1, "API key cannot be empty"),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -92,7 +92,7 @@ export const apiKeysConvexRouter = createTRPCRouter({
   // Delete an API key
   deleteApiKey: protectedProcedure
     .input(z.object({
-      provider: z.enum(["openai", "anthropic", "gemini", "deepseek", "meta", "openrouter"]),
+      provider: z.enum(["openai", "anthropic", "gemini", "deepseek", "meta", "xai", "openrouter"]),
     }))
     .mutation(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);
@@ -118,7 +118,7 @@ export const apiKeysConvexRouter = createTRPCRouter({
   // Check if user has API keys for specific providers
   hasApiKeys: protectedProcedure
     .input(z.object({
-      providers: z.array(z.enum(["openai", "anthropic", "gemini", "deepseek", "meta", "openrouter"])),
+      providers: z.array(z.enum(["openai", "anthropic", "gemini", "deepseek", "meta", "xai", "openrouter"])),
     }))
     .query(async ({ ctx, input }) => {
       const convexUser = await getOrCreateConvexUser(ctx.userId);

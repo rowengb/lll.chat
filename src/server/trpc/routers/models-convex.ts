@@ -47,4 +47,9 @@ export const modelsConvexRouter = createTRPCRouter({
     .mutation(async () => {
       return await convex.mutation(api.models.addOpenRouterModelIds);
     }),
+
+  updateQwenModelsToOpenRouter: protectedProcedure
+    .mutation(async () => {
+      return await convex.mutation(api.models.updateQwenModelsToOpenRouter);
+    }),
 }); 

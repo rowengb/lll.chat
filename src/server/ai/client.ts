@@ -88,9 +88,11 @@ class OpenAIClient implements AIClient {
       apiKey: params.apiKey || process.env.OPENAI_API_KEY,
     };
     
-    // Use OpenRouter endpoint for OpenRouter provider
+    // Use specific endpoints for different providers
     if (this.provider === "openrouter") {
       clientConfig.baseURL = "https://openrouter.ai/api/v1";
+    } else if (this.provider === "xai") {
+      clientConfig.baseURL = "https://api.x.ai/v1";
     }
     
     const client = new OpenAI(clientConfig);

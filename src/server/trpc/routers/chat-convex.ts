@@ -358,17 +358,14 @@ export const chatConvexRouter = createTRPCRouter({
       // Determine provider from model
       const modelData = await getModelProvider(titleGenerationModel);
       
-      // Try to get API key for the specific provider first, then fall back to OpenRouter
-      let apiKeyRecord = await convex.query(api.apiKeys.getByUserAndProvider, {
-        userId: convexUser._id,
-        provider: modelData.provider,
-      });
+      const useOpenRouterMode = preferences?.useOpenRouter ?? false;
       
+      let apiKeyRecord: any = null;
       let actualProvider = modelData.provider;
       let actualModelId = titleGenerationModel;
       
-      // If no specific provider key found, try OpenRouter as fallback
-      if (!apiKeyRecord?.keyValue) {
+      if (useOpenRouterMode) {
+        // In OpenRouter mode, use OpenRouter API key
         apiKeyRecord = await convex.query(api.apiKeys.getByUserAndProvider, {
           userId: convexUser._id,
           provider: "openrouter",
@@ -380,11 +377,19 @@ export const chatConvexRouter = createTRPCRouter({
           if (modelFromDb?.openrouterModelId) {
             actualModelId = modelFromDb.openrouterModelId;
           }
+        } else {
+          return { success: false, error: "OpenRouter mode is enabled but no OpenRouter API key found. Please add an OpenRouter API key in Settings." };
         }
-      }
-
-      if (!apiKeyRecord?.keyValue) {
-        return { success: false, error: `No API key found for ${modelData.provider} or OpenRouter. Please add an API key in Settings.` };
+      } else {
+        // In individual provider mode, use specific provider API key
+        apiKeyRecord = await convex.query(api.apiKeys.getByUserAndProvider, {
+          userId: convexUser._id,
+          provider: modelData.provider,
+        });
+        
+        if (!apiKeyRecord?.keyValue) {
+          return { success: false, error: `No API key found for ${modelData.provider}. Please add a ${modelData.provider} API key in Settings or switch to OpenRouter mode.` };
+        }
       }
 
       // Decrypt the API key

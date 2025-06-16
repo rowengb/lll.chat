@@ -57,6 +57,7 @@ export const updatePreferences = mutation({
     userId: v.id("users"),
     defaultModel: v.optional(v.string()),
     titleGenerationModel: v.optional(v.string()),
+    useOpenRouter: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const { userId, ...updates } = args;
@@ -74,6 +75,7 @@ export const getPreferences = query({
     return {
       defaultModel: user.defaultModel,
       titleGenerationModel: user.titleGenerationModel,
+      useOpenRouter: user.useOpenRouter,
     };
   },
 });

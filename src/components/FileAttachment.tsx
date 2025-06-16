@@ -58,16 +58,44 @@ export function FileAttachment({
   showPreview = true 
 }: FileAttachmentProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (file.url) {
-      const link = document.createElement('a');
-      link.href = file.url;
-      link.download = file.name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    if (file.url && !isDownloading) {
+      setIsDownloading(true);
+      try {
+        // Fetch the file as a blob to ensure proper download
+        const response = await fetch(file.url);
+        if (!response.ok) {
+          throw new Error('Failed to fetch file');
+        }
+        
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the blob URL
+        URL.revokeObjectURL(blobUrl);
+      } catch (error) {
+        console.error('Download failed:', error);
+        // Fallback to direct link if blob download fails
+        const link = document.createElement('a');
+        link.href = file.url;
+        link.download = file.name;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } finally {
+        setIsDownloading(false);
+      }
     }
   };
 
@@ -138,10 +166,15 @@ export function FileAttachment({
                       variant="ghost"
                       size="sm"
                       onClick={handleDownload}
-                      className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
-                      title="Download file"
+                      disabled={isDownloading}
+                      className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                      title={isDownloading ? "Downloading..." : "Download file"}
                     >
-                      <DownloadIcon className="h-4 w-4" />
+                      {isDownloading ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                      ) : (
+                        <DownloadIcon className="h-4 w-4" />
+                      )}
                     </Button>
                   )}
                 </div>
@@ -182,10 +215,15 @@ export function FileAttachment({
                   variant="ghost"
                   size="sm"
                   onClick={handleDownload}
-                  className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
-                  title="Download file"
+                  disabled={isDownloading}
+                  className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                  title={isDownloading ? "Downloading..." : "Download file"}
                 >
-                  <DownloadIcon className="h-4 w-4" />
+                  {isDownloading ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
+                  ) : (
+                    <DownloadIcon className="h-4 w-4" />
+                  )}
                 </Button>
               )}
             </div>

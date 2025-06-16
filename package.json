@@ -35,7 +35,7 @@
     "@types/jsdom": "^21.1.7",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
-    "cmdk": "^0.2.0",
+    "cmdk": "^0.2.1",
     "convex": "^1.24.8",
     "crypto-js": "^4.2.0",
     "framer-motion": "^12.16.0",

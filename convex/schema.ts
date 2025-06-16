@@ -12,6 +12,7 @@ export default defineSchema({
     // User preferences
     defaultModel: v.optional(v.string()), // User's preferred default model ID
     titleGenerationModel: v.optional(v.string()), // User's preferred model for generating chat titles
+    useOpenRouter: v.optional(v.boolean()), // Whether user prefers OpenRouter mode
   }).index("by_email", ["email"]).index("by_auth_id", ["authId"]),
 
   threads: defineTable({

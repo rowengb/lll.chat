@@ -27,6 +27,61 @@ const getModelNameFromId = (modelId?: string | null, models?: any[]) => {
   return modelData?.name;
 };
 
+// Time categorization utility functions
+const getTimeCategory = (creationTime: number): string => {
+  const now = new Date();
+  const threadDate = new Date(creationTime);
+  
+  // Reset time to start of day for accurate day comparison
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+  
+  const threadDateStart = new Date(threadDate.getFullYear(), threadDate.getMonth(), threadDate.getDate());
+  
+  if (threadDateStart.getTime() >= today.getTime()) {
+    return 'Today';
+  } else if (threadDateStart.getTime() >= yesterday.getTime()) {
+    return 'Yesterday';
+  } else if (threadDateStart.getTime() >= weekAgo.getTime()) {
+    return 'Last 7 Days';
+  } else if (threadDateStart.getTime() >= monthAgo.getTime()) {
+    return 'Last 30 Days';
+  } else {
+    return 'Older';
+  }
+};
+
+const getCategoryOrder = (category: string): number => {
+  const order = {
+    'Today': 0,
+    'Yesterday': 1,
+    'Last 7 Days': 2,
+    'Last 30 Days': 3,
+    'Older': 4
+  };
+  return order[category as keyof typeof order] || 5;
+};
+
+const groupThreadsByTime = (threads: any[]) => {
+  const grouped = threads.reduce((acc, thread) => {
+    const category = getTimeCategory(thread._creationTime);
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(thread);
+    return acc;
+  }, {} as Record<string, any[]>);
+  
+  // Sort threads within each category by creation time (newest first)
+  Object.keys(grouped).forEach(category => {
+    grouped[category].sort((a: any, b: any) => b._creationTime - a._creationTime);
+  });
+  
+  return grouped;
+};
+
 interface SidebarProps {
   currentThreadId: string | null;
   onThreadSelect: (threadId: string) => void;
@@ -37,6 +92,7 @@ interface SidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onWidthChange?: (width: number) => void;
+  onOpenSearch?: () => void;
 }
 
 interface MobileSidebarProps {
@@ -48,6 +104,7 @@ interface MobileSidebarProps {
   onNavigateToSettings?: () => void;
   onNavigateToAccount?: () => void;
   onNavigateToWelcome?: () => void;
+  onOpenSearch?: () => void;
 }
 
 interface ContextMenu {
@@ -57,7 +114,7 @@ interface ContextMenu {
 }
 
 // Mobile Sidebar Component
-function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome }: MobileSidebarProps) {
+function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, onOpenSearch }: MobileSidebarProps) {
   const { user } = useUser();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,6 +173,15 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
   );
   const sortedUnpinnedThreads = [...unpinnedThreads].sort((a, b) => 
     (b as any)._creationTime - (a as any)._creationTime
+  );
+
+  // Group unpinned threads by time
+  const groupedUnpinnedThreads = groupThreadsByTime(unpinnedThreads);
+  
+  // Define the correct order and filter only existing categories
+  const categoryOrder = ['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Older'];
+  const timeCategories = categoryOrder.filter(category => 
+    groupedUnpinnedThreads[category] && groupedUnpinnedThreads[category].length > 0
   );
 
   const handleThemeToggle = () => {
@@ -355,22 +421,22 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
                     </div>
                   )}
 
-                  {/* Regular Threads Section */}
-                  {sortedUnpinnedThreads.length > 0 && sortedPinnedThreads.length > 0 && (
-                    <div className="flex items-center gap-2 px-1 py-2 mb-2">
-                      <MessageSquareIcon className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-sm font-medium text-muted-foreground tracking-wide">
-                        Recent
-                      </span>
+                  {/* Time-based Thread Categories */}
+                  {timeCategories.map((category, categoryIndex) => (
+                    <div key={category} className={categoryIndex > 0 || sortedPinnedThreads.length > 0 ? "mt-4" : ""}>
+                      <div className="flex items-center gap-2 px-1 py-2 mb-2">
+                        <MessageSquareIcon className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-sm font-medium text-muted-foreground tracking-wide">
+                          {category}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {groupedUnpinnedThreads[category].map((thread: any) => (
+                          <ThreadItem key={thread.id} thread={thread} isPinned={false} />
+                        ))}
+                      </div>
                     </div>
-                  )}
-
-                  {/* Unpinned Threads */}
-                  <div className="space-y-1">
-                    {sortedUnpinnedThreads.map((thread) => (
-                      <ThreadItem key={thread.id} thread={thread} isPinned={false} />
-                    ))}
-                  </div>
+                  ))}
                 </div>
               </div>
 
@@ -442,7 +508,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
   );
 }
 
-export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, collapsed, onToggleCollapse, onWidthChange }: SidebarProps) {
+export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, collapsed, onToggleCollapse, onWidthChange, onOpenSearch }: SidebarProps) {
   const router = useRouter();
   const { user } = useUser();
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -781,6 +847,15 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     (b as any)._creationTime - (a as any)._creationTime
   );
 
+  // Group unpinned threads by time
+  const groupedUnpinnedThreads = groupThreadsByTime(unpinnedThreads);
+  
+  // Define the correct order and filter only existing categories
+  const categoryOrder = ['Today', 'Yesterday', 'Last 7 Days', 'Last 30 Days', 'Older'];
+  const timeCategories = categoryOrder.filter(category => 
+    groupedUnpinnedThreads[category] && groupedUnpinnedThreads[category].length > 0
+  );
+
   const ThreadItem = ({ thread, isPinned }: { thread: any; isPinned: boolean }) => {
     const provider = getProviderFromModel(thread.model, models);
     const modelName = getModelNameFromId(thread.model, models);
@@ -944,10 +1019,10 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               <PlusIcon className="h-4.25 w-4.25" />
             </Button>
             <Button
-              onClick={() => {/* TODO: Add search functionality */}}
+              onClick={onOpenSearch}
               size="sm"
               variant="ghost"
-              title="Search"
+              title="Search (Ctrl+K)"
               className="h-8 w-8 p-0 hover:bg-white dark:hover:bg-card rounded-full transition-colors"
             >
               <SearchIcon className="h-4 w-4" />
@@ -1078,22 +1153,22 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                 </div>
               )}
 
-              {/* Regular Threads Section */}
-              {sortedUnpinnedThreads.length > 0 && sortedPinnedThreads.length > 0 && (
-                <div className="flex items-center gap-2 px-1 py-2 mb-2">
-                  <MessageSquareIcon className="h-3 w-3 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground tracking-wide">
-                    Recent
-                  </span>
+              {/* Time-based Thread Categories */}
+              {timeCategories.map((category, categoryIndex) => (
+                <div key={category} className={categoryIndex > 0 || sortedPinnedThreads.length > 0 ? "mt-4" : ""}>
+                  <div className="flex items-center gap-2 px-1 py-2 mb-2">
+                    <MessageSquareIcon className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-sm font-medium text-muted-foreground tracking-wide">
+                      {category}
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    {groupedUnpinnedThreads[category].map((thread: any) => (
+                      <ThreadItem key={thread.id} thread={thread} isPinned={false} />
+                    ))}
+                  </div>
                 </div>
-              )}
-
-              {/* Unpinned Threads */}
-              <div className="space-y-1">
-                {sortedUnpinnedThreads.map((thread) => (
-                  <ThreadItem key={thread.id} thread={thread} isPinned={false} />
-                ))}
-              </div>
+              ))}
             </div>
           </div>
 
@@ -1223,6 +1298,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           onNavigateToWelcome?.();
           onToggleCollapse(); // Close sidebar after navigation
         }}
+        onOpenSearch={onOpenSearch}
       />
 
       {/* Context Menu */}

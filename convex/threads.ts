@@ -152,6 +152,23 @@ export const generateTitle = action({
           }
           break;
           
+        case "xai":
+          apiUrl = "https://api.x.ai/v1/chat/completions";
+          headers = {
+            "Authorization": `Bearer ${args.apiKey}`,
+            "Content-Type": "application/json",
+          };
+          requestBody = {
+            model: modelId,
+            messages: [
+              { role: "system", content: systemMessage },
+              { role: "user", content: args.firstMessage }
+            ],
+            max_tokens: 350,
+            temperature: 1.0,
+          };
+          break;
+          
         default:
           // For other providers, try OpenAI-compatible format
           apiUrl = "https://api.openai.com/v1/chat/completions";

@@ -3,6 +3,7 @@ import { useChatStore } from "../stores/chatStore";
 import { Message, FileAttachmentData, GroundingMetadata, GroundingSource } from "../types/chat";
 import { isImageGenerationModel } from "../utils/modelUtils";
 import { createOptimisticAssistantMessage, prepareMessagesForStreaming } from "../utils/messageUtils";
+import { smartFocus } from "../utils/chatHelpers";
 
 export const useChatStreaming = () => {
   const {
@@ -133,7 +134,7 @@ export const useChatStreaming = () => {
     setTimeout(() => {
       scrollToBottomPinned();
       // Also focus input so user can start typing next message while AI responds
-      inputRef.current?.focus();
+      smartFocus(inputRef, { reason: 'stream-start' });
     }, 0);
     
     // Mark as streaming to prevent server sync interference
@@ -305,7 +306,7 @@ export const useChatStreaming = () => {
                     if (msg.id === optimisticAssistantMessage.id) {
                       return {
                         ...msg,
-                        content: `❌ **Error**: ${metadata.error}`,
+                        content: `**Error**: ${metadata.error}`,
                         isOptimistic: false,
                         isError: true
                       };
@@ -351,7 +352,7 @@ export const useChatStreaming = () => {
                 // Keep input focused during streaming so user can immediately type next message
                 // Only focus if not already focused to avoid interrupting user typing
                 if (document.activeElement !== inputRef.current) {
-                  inputRef.current?.focus();
+                  smartFocus(inputRef, { reason: 'stream-content' });
                 }
               } catch (e) {
                 console.error('[STREAM] Failed to parse content chunk:', e);
@@ -421,9 +422,7 @@ export const useChatStreaming = () => {
                 setLoading(null, false);
                 
                 // Auto-focus input after streaming completes so user can immediately type next message
-                setTimeout(() => {
-                  inputRef.current?.focus();
-                }, 200); // Slightly longer delay to ensure all UI updates are complete
+                smartFocus(inputRef, { delay: 200, reason: 'stream-complete' });
                 
                 return;
               } catch (e) {
@@ -453,7 +452,7 @@ export const useChatStreaming = () => {
         if (msg.id === optimisticAssistantMessage.id) {
           return {
             ...msg,
-            content: `❌ **Error**: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`,
+            content: `**Error**: ${error instanceof Error ? error.message : 'An unexpected error occurred'}`,
             isOptimistic: false,
             isError: true
           };
@@ -467,9 +466,7 @@ export const useChatStreaming = () => {
       setLoading(null, false); // Clear loading on error
       
       // Auto-focus input after error so user can immediately type next message
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 200);
+      smartFocus(inputRef, { delay: 200, reason: 'stream-error' });
       
       // Don't throw the error - we've handled it by showing it in the chat
     } finally {

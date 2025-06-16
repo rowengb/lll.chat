@@ -101,7 +101,7 @@ const preprocessMarkdownContent = (content: string): string => {
 };
 
 // Split markdown content into logical chunks
-const chunkMarkdown = (content: string, chunkSize: number = 50): MarkdownChunk[] => {
+const chunkMarkdown = (content: string, chunkSize: number = 100): MarkdownChunk[] => {
   const lines = content.split('\n');
   const chunks: MarkdownChunk[] = [];
   
@@ -111,8 +111,7 @@ const chunkMarkdown = (content: string, chunkSize: number = 50): MarkdownChunk[]
   let codeBlockFence = '';
   
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line) continue;
+    const line = lines[i] || '';
     
     currentChunk.push(line);
     
@@ -121,7 +120,8 @@ const chunkMarkdown = (content: string, chunkSize: number = 50): MarkdownChunk[]
       if (!inCodeBlock) {
         inCodeBlock = true;
         codeBlockFence = line.trim();
-      } else if (line.trim() === '```' || line.trim().startsWith('```')) {
+      } else {
+        // End of code block
         inCodeBlock = false;
         codeBlockFence = '';
       }
@@ -130,10 +130,9 @@ const chunkMarkdown = (content: string, chunkSize: number = 50): MarkdownChunk[]
     // Create chunk when we reach chunk size and we're not in a code block
     if (currentChunk.length >= chunkSize && !inCodeBlock) {
       // Look for a good breaking point (empty line, heading, or list item)
-      let breakPoint = currentChunk.length - 1;
-      for (let j = currentChunk.length - 1; j >= Math.max(0, currentChunk.length - 10); j--) {
-        const checkLine = currentChunk[j];
-        if (!checkLine) continue;
+      let breakPoint = -1;
+      for (let j = currentChunk.length - 1; j >= Math.max(0, currentChunk.length - 20); j--) {
+        const checkLine = currentChunk[j] || '';
         
         const trimmedLine = checkLine.trim();
         if (trimmedLine === '' || 
@@ -144,6 +143,11 @@ const chunkMarkdown = (content: string, chunkSize: number = 50): MarkdownChunk[]
           breakPoint = j;
           break;
         }
+      }
+      
+      // If no good break point found, don't chunk yet
+      if (breakPoint === -1) {
+        continue;
       }
       
       // Create chunk up to break point
@@ -238,7 +242,7 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
           // Style paragraphs
           p: ({ node, ...props }) => (
             <p 
-              className="text-sm leading-loose text-foreground mb-3 last:mb-0"
+              className="text-sm text-foreground mb-3 last:mb-0 leading-relaxed"
               {...props}
             />
           ),
@@ -258,8 +262,7 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
             
             return isInline ? (
               <code 
-                className="text-gray-100 px-2 py-1 rounded text-xs font-mono" 
-                style={{ backgroundColor: '#0C1117' }}
+                className="text-foreground px-2 py-1 rounded text-xs font-mono bg-gray-100 dark:bg-muted border border-gray-300 dark:border-border" 
                 {...props}
               >
                 {children}
@@ -278,8 +281,7 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
             if (!language && !className) {
               return (
                 <pre 
-                  className="text-gray-100 p-4 rounded-xl overflow-x-auto dark-scrollbar text-xs font-mono w-full min-w-0 my-3" 
-                  style={{ backgroundColor: '#0C1117' }}
+                  className="text-foreground p-4 rounded-xl overflow-x-auto dark-scrollbar text-xs font-mono w-full min-w-0 my-3 bg-gray-100 dark:bg-muted border border-gray-300 dark:border-border whitespace-pre" 
                   {...props}
                 >
                   {children}
@@ -311,7 +313,7 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
           ),
           li: ({ node, ...props }) => (
             <li 
-              className="text-sm leading-loose text-foreground"
+              className="text-sm text-foreground leading-relaxed"
               {...props}
             />
           ),
@@ -346,13 +348,13 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
           ),
           th: ({ node, ...props }) => (
             <th 
-              className="border border-border px-3 py-2 text-left font-semibold text-foreground text-sm"
+              className="border border-border px-3 py-2 text-left font-semibold text-foreground text-sm leading-relaxed"
               {...props}
             />
           ),
           td: ({ node, ...props }) => (
             <td 
-              className="border border-border px-3 py-2 text-sm text-foreground"
+              className="border border-border px-3 py-2 text-sm text-foreground leading-relaxed"
               {...props}
             />
           ),
@@ -397,7 +399,7 @@ MemoizedChunk.displayName = 'MemoizedChunk';
 export const ChunkedMarkdown: React.FC<ChunkedMarkdownProps> = ({ 
   content, 
   className = "w-full min-w-0 overflow-hidden",
-  chunkSize = 50 
+  chunkSize = 100 
 }) => {
   const chunks = useMemo(() => {
     // Preprocess content to extract markdown from code blocks
@@ -416,7 +418,7 @@ export const ChunkedMarkdown: React.FC<ChunkedMarkdownProps> = ({
     }
     
     // For small content, don't chunk
-    if (processedContent.split('\n').length <= chunkSize) {
+    if (processedContent.split('\n').length <= chunkSize * 2) {
       return [{
         id: generateHash(processedContent + (isStreaming ? Date.now().toString() : '')),
         content: processedContent,
