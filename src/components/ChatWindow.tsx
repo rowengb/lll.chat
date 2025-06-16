@@ -762,7 +762,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   // Main chat interface when threadId exists
   return (
     <div 
-      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900 left-0 sm:left-auto"
+      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900 left-0 sm:left-auto mobile-no-refresh"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
         transition: 'left 0.3s ease-out'
@@ -784,9 +784,9 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       />
 
       {/* Messages + Chatbox Area */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-hidden relative mobile-scroll-isolated">
         <CustomScrollbar 
-          className={`h-full ${scrollLocked.current ? 'scroll-locked' : ''}`}
+          className={`h-full mobile-scroll-optimized ios-scroll-fix ${scrollLocked.current ? 'scroll-locked' : ''}`}
           onRef={setMessagesContainer}
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>
@@ -890,7 +890,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           </div>
 
                           {/* Message Actions */}
-                          <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity`}>
+                          <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100 mobile-no-hover"} transition-opacity`}>
                             {message.role === "assistant" && (
                               <div className="flex items-center gap-1 mr-1">
                                 <div className="flex items-center gap-1 text-sm text-muted-foreground px-5">

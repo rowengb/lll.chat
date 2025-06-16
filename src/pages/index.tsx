@@ -1025,6 +1025,11 @@ const Home: NextPage = () => {
         <Head>
           <title>lll.chat - High-Performance AI Chat</title>
           <meta name="description" content="Experience lightning-fast AI conversations with lll.chat's optimized chat platform" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+          <meta name="mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+          <meta name="format-detection" content="telephone=no" />
           <link rel="icon" href="/favicon.ico" sizes="any" />
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
           <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -1045,6 +1050,11 @@ const Home: NextPage = () => {
         <Head>
           <title>lll.chat - High-Performance AI Chat</title>
           <meta name="description" content="Experience lightning-fast AI conversations with lll.chat's optimized chat platform" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+          <meta name="mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+          <meta name="format-detection" content="telephone=no" />
           <link rel="icon" href="/favicon.ico" sizes="any" />
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
           <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -1270,6 +1280,11 @@ const Home: NextPage = () => {
       <Head>
         <title>lll.chat</title>
         <meta name="description" content="lll.chat - High-performance AI chat application" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="format-detection" content="telephone=no" />
           <link rel="icon" href="/favicon.ico" sizes="any" />
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
           <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -1304,6 +1319,11 @@ const Home: NextPage = () => {
         <Head>
           <title>{getPageTitle()}</title>
           <meta name="description" content="lll.chat - High-performance AI chat application" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+          <meta name="mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+          <meta name="format-detection" content="telephone=no" />
           <link rel="icon" href="/favicon.ico" sizes="any" />
           <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
           <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

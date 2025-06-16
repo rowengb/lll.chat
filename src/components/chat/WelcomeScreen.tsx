@@ -67,7 +67,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
   return (
     <div 
-      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900 left-0 sm:left-auto"
+      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900 left-0 sm:left-auto mobile-no-refresh"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
         transition: 'left 0.3s ease-out'
@@ -89,8 +89,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       />
 
       {/* Welcome Content Area with proper scrolling container for chatbox alignment */}
-      <div className="flex-1 overflow-hidden relative">
-        <div className="h-full overflow-y-auto">
+      <div className="flex-1 overflow-hidden relative mobile-scroll-isolated">
+        <div className="h-full overflow-y-auto mobile-scroll-optimized ios-scroll-fix">
           <div className={`${sharedGridClasses} min-h-full flex items-center justify-center pb-32`}>
             <div></div>
             <div className="w-full">

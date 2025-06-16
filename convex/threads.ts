@@ -87,7 +87,7 @@ export const generateTitle = action({
               { role: "system", content: systemMessage },
               { role: "user", content: args.firstMessage }
             ],
-            max_completion_tokens: 20,
+            max_completion_tokens: 350,
           };
           // Only add temperature for models that support it (exclude o1 series and reasoning models)
           if (!modelId.startsWith("o1") && !modelId.includes("reasoning")) {
@@ -144,7 +144,7 @@ export const generateTitle = action({
               { role: "system", content: systemMessage },
               { role: "user", content: args.firstMessage }
             ],
-            max_tokens: 20,
+            max_tokens: 350,
           };
           // Only add temperature for models that support it (exclude o1 series and reasoning models)
           if (!modelId.startsWith("o1") && !modelId.includes("reasoning")) {
@@ -165,7 +165,7 @@ export const generateTitle = action({
               { role: "system", content: systemMessage },
               { role: "user", content: args.firstMessage }
             ],
-            max_completion_tokens: 20,
+            max_completion_tokens: 350,
           };
           // Only add temperature for models that support it (exclude o1 series and reasoning models)
           if (!modelId.startsWith("o1") && !modelId.includes("reasoning")) {

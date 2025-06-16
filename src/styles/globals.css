@@ -261,6 +261,66 @@
   display: none; /* Chrome, Safari, Edge */
 }
 
+/* Mobile scrolling optimizations */
+.mobile-scroll-container {
+  /* Optimize touch scrolling on mobile */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  /* Prevent momentum scrolling from interfering */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+/* Prevent pull-to-refresh on mobile */
+.mobile-no-refresh {
+  overscroll-behavior-y: contain;
+  /* Prevent pull-to-refresh specifically */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile textarea optimizations */
+.mobile-textarea {
+  /* Prevent zoom on focus on iOS */
+  font-size: 16px;
+  /* Prevent scrolling issues */
+  touch-action: manipulation;
+  /* Prevent iOS from adding extra padding */
+  -webkit-appearance: none;
+  appearance: none;
+  /* Prevent text selection issues */
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Mobile button optimizations */
+.mobile-button {
+  /* Prevent accidental touches */
+  touch-action: manipulation;
+  /* Prevent iOS button styling */
+  -webkit-appearance: none;
+  appearance: none;
+  /* Prevent double-tap zoom */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile hover state fixes */
+@media (hover: none) and (pointer: coarse) {
+  /* Remove hover states on touch devices */
+  .mobile-no-hover:hover {
+    background-color: inherit !important;
+    color: inherit !important;
+    transform: none !important;
+  }
+}
+
+/* Prevent iOS zoom on input focus */
+@media screen and (max-width: 640px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
 /* Custom overlay scrollbar */
 .custom-scrollbar-container {
   position: relative;
@@ -299,86 +359,30 @@
   background: hsl(var(--muted-foreground) / 0.6);
 }
 
-.custom-scrollbar-thumb:active {
-  background: hsl(var(--muted-foreground) / 0.8);
-  cursor: grabbing;
-}
-
-/* Overlay scrollbar that doesn't affect layout */
-.overlay-scrollbar {
-  /* Force scrollbar to overlay, not take layout space */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
-  overflow-y: overlay; /* Chrome overlay mode */
-  scrollbar-gutter: stable;
-}
-
-/* Show custom scrollbar only on webkit browsers */
-.overlay-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  background: transparent;
-}
-
-.overlay-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.overlay-scrollbar::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-foreground) / 0.4);
-  border-radius: 4px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-.overlay-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--muted-foreground) / 0.7);
-}
-
-/* For Firefox, use thin scrollbar */
-@supports (scrollbar-width: thin) {
-  .overlay-scrollbar {
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
+/* Mobile-specific scroll improvements */
+@media (max-width: 640px) {
+  /* Improve mobile scrolling performance */
+  .mobile-scroll-optimized {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    /* Hardware acceleration */
+    will-change: scroll-position;
+    transform: translateZ(0);
   }
-}
-
-/* Custom scrollbars for code blocks */
-pre, code {
-  scrollbar-width: thin; /* Firefox */
-  scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
-}
-
-pre::-webkit-scrollbar, code::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-pre::-webkit-scrollbar-track, code::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-pre::-webkit-scrollbar-thumb, code::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--muted-foreground) / 0.4);
-  border-radius: 4px;
-  border: 1px solid transparent;
-  background-clip: content-box;
-}
-
-pre::-webkit-scrollbar-thumb:hover, code::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--muted-foreground) / 0.6);
-}
-
-pre::-webkit-scrollbar-corner, code::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-/* Prevent any scroll behavior during initial load */
-.scroll-locked {
-  scroll-behavior: auto !important;
-}
-
-.scroll-locked * {
-  scroll-behavior: auto !important;
+  
+  /* Prevent scroll chaining on mobile */
+  .mobile-scroll-isolated {
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+  }
+  
+  /* Fix for iOS Safari scroll issues */
+  .ios-scroll-fix {
+    -webkit-overflow-scrolling: touch;
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+  }
 }
 
  

@@ -1022,7 +1022,7 @@ export function Chatbox({
               onChange={(e) => onInputChange(e.target.value)}
               placeholder="Type your message..."
               disabled={isLoading}
-              className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none hidden-scrollbar text-foreground placeholder:text-muted-foreground"
+              className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none hidden-scrollbar text-foreground placeholder:text-muted-foreground mobile-textarea"
               style={{ 
                 border: 'none', 
                 outline: 'none', 
@@ -1039,7 +1039,7 @@ export function Chatbox({
             type={isStreaming ? "button" : "submit"}
             onClick={isStreaming ? onStop : undefined}
             disabled={isStreaming ? false : ((!input.trim() && uploadedFiles.length === 0) || isLoading)}
-            className={`h-12 w-12 shadow-sm transition-all ${
+            className={`h-12 w-12 shadow-sm transition-all mobile-button ${
               isStreaming 
                 ? 'bg-destructive hover:bg-destructive/90' 
                 : 'bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700 text-white dark:text-black'
@@ -1073,7 +1073,7 @@ export function Chatbox({
                   size="sm"
                   onClick={() => onSearchGroundingChange(!searchGroundingEnabled)}
                   disabled={isLoading}
-                  className={`h-7 transition-colors border rounded-full ${
+                  className={`h-7 transition-colors border rounded-full mobile-button ${
                     searchGroundingEnabled 
                       ? 'text-primary bg-primary/10 border-primary/20 hover:bg-primary/20 hover:border-primary/30' 
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border hover:border-border/80'
