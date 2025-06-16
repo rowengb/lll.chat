@@ -59,9 +59,12 @@ export const generateTitle = action({
     threadId: v.id("threads"),
     firstMessage: v.string(),
     apiKey: v.string(),
+    modelId: v.optional(v.string()), // Optional model ID, defaults to gpt-4o-mini
   },
   handler: async (ctx, args) => {
     try {
+      const modelId = args.modelId || "gpt-4o-mini"; // Default fallback
+      
       // Use OpenAI to generate a concise title
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
@@ -70,7 +73,7 @@ export const generateTitle = action({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini", // Fast and cost-effective for this task
+          model: modelId, // Use the specified model or fallback
           messages: [
             {
               role: "system",

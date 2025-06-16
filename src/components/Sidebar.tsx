@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { PlusIcon, MessageSquareIcon, SettingsIcon, ChevronLeftIcon, SearchIcon, TrashIcon, PinIcon, MoreVerticalIcon, EditIcon, Waves, UserIcon, LogOutIcon, GitBranchIcon, XIcon, PinOffIcon, PanelLeftIcon } from "lucide-react";
+import { PlusIcon, MessageSquareIcon, SettingsIcon, ChevronLeftIcon, SearchIcon, TrashIcon, PinIcon, MoreVerticalIcon, EditIcon, Waves, UserIcon, LogOutIcon, GitBranchIcon, XIcon, PinOffIcon, PanelLeftIcon, SunIcon, MoonIcon } from "lucide-react";
 import { useRouter } from "next/router";
 import { useUser, SignOutButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { getProviderIcon } from "./ModelSelector";
 import toast from "react-hot-toast";
 import Logo from './Logo';
 import { useChatStore } from "../stores/chatStore";
+import { useTheme } from '@/hooks/useTheme';
 
 
 // Helper function to get provider from model name using database
@@ -58,6 +59,7 @@ interface ContextMenu {
 // Mobile Sidebar Component
 function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome }: MobileSidebarProps) {
   const { user } = useUser();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: threads } = trpc.chat.getThreads.useQuery(undefined, {
@@ -85,14 +87,18 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
     (b as any)._creationTime - (a as any)._creationTime
   );
 
+  const handleThemeToggle = () => {
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+  };
+
   const ThreadItem = ({ thread, isPinned }: { thread: any; isPinned: boolean }) => {
     const provider = getProviderFromModel(thread.model, models);
     const modelName = getModelNameFromId(thread.model, models);
     
     return (
       <div
-        className={`group relative flex w-full items-center gap-3 rounded-lg p-3 text-left text-sm hover:bg-muted cursor-pointer ${
-          currentThreadId === thread.id ? "bg-muted text-foreground" : "text-muted-foreground"
+                  className={`group relative flex w-full items-center gap-3 rounded-lg p-3 text-left text-sm hover:bg-white dark:hover:bg-muted cursor-pointer ${
+            currentThreadId === thread.id ? "bg-white dark:bg-muted text-foreground" : "text-muted-foreground"
         }`}
         onClick={() => onThreadSelect(thread.id)}
       >
@@ -128,36 +134,29 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
           onClick={onClose}
         />
         
-        {/* Sidebar Panel with floating design */}
+        {/* Sidebar Panel flush with edges */}
         <div 
           className={`fixed transition-opacity duration-300 ease-out ${
             isOpen ? 'opacity-100' : 'opacity-0'
           }`}
           style={{
-            top: '24px',
-            left: '24px',
-            right: '24px',
-            maxHeight: 'calc(100vh - 100px)',
+            top: '0px',
+            left: '0px',
+            right: '0px',
+            maxHeight: '100vh',
             minHeight: 'auto'
           }}
         >
           <div 
-            className="relative shadow-xl dark:shadow-2xl dark:shadow-black/50 max-h-full"
-            style={{
-              borderRadius: '20px'
-            }}
+            className="relative max-h-full"
           >
-            {/* Background with border */}
+            {/* Background with bottom border */}
             <div 
-              className="absolute inset-0 bg-gray-50/50 dark:bg-gray-950 border border-border"
-              style={{
-                borderRadius: '20px',
-                clipPath: 'inset(0 round 20px)'
-              }}
+              className="absolute inset-0 bg-gray-100 dark:bg-gray-950 border-b border-gray-400/30 dark:border-gray-500/30"
             />
             
             {/* Content */}
-            <div className="relative z-10 flex flex-col overflow-hidden rounded-2xl">
+            <div className="relative z-10 flex flex-col overflow-hidden">
               {/* Floating buttons inside mobile sidebar */}
               <div 
                 className="absolute z-50 transition-opacity duration-200 ease-out opacity-100"
@@ -167,9 +166,9 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
                 }}
               >
                 <div 
-                  className="bg-muted border border-border" 
+                  className="bg-white dark:bg-muted border border-border shadow-sm" 
                   style={{ 
-                    borderRadius: '20px',
+                    borderRadius: '12px',
                     padding: '4px'
                   }}
                 >
@@ -179,7 +178,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
                       size="sm"
                       variant="ghost"
                       title="Collapse Sidebar"
-                      className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+                      className="h-8 w-8 p-0 hover:bg-white dark:hover:bg-card rounded-full transition-colors"
                     >
                       <PanelLeftIcon className="h-4 w-4" />
                     </Button>
@@ -188,7 +187,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
                       size="sm"
                       variant="ghost"
                       title="New Chat"
-                      className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+                      className="h-8 w-8 p-0 hover:bg-white dark:hover:bg-card rounded-full transition-colors"
                     >
                       <PlusIcon className="h-4.25 w-4.25" />
                     </Button>
@@ -197,9 +196,10 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               </div>
 
               {/* Header */}
-              <div className="flex items-center justify-end p-4 border-b border-border/50">
+              <div className="flex items-center justify-between p-4 border-b border-border">
+                <div className="w-20"></div> {/* Spacer for floating buttons */}
                 <div className="flex items-center">
-                  <div className="bg-muted border border-border px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer" style={{ borderRadius: '20px' }} onClick={onNavigateToWelcome}>
+                  <div className="bg-white dark:bg-muted border border-border px-3 py-1.5 hover:bg-white dark:hover:bg-muted/80 transition-colors cursor-pointer" style={{ borderRadius: '20px' }} onClick={onNavigateToWelcome}>
                     <Logo size="sm" className="flex-shrink-0" />
                   </div>
                 </div>
@@ -271,12 +271,12 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               </div>
 
               {/* Footer with Account Button */}
-              <div className="border-t border-border/50 p-3">
+              <div className="border-t border-border p-3">
                 <div className="flex items-center justify-between">
                   <Button
                     onClick={onNavigateToAccount}
                     variant="ghost"
-                    className="flex-1 justify-start text-left h-10 px-3 hover:bg-muted transition-colors"
+                    className="flex-1 justify-start text-left h-10 px-3 hover:bg-white dark:hover:bg-muted transition-colors"
                   >
                     <UserIcon className="h-4 w-4 mr-3" />
                     <span className="text-sm font-medium">
@@ -285,15 +285,30 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
                         : user?.username || user?.firstName || "Account"}
                     </span>
                   </Button>
-                  <Button
-                    onClick={onNavigateToSettings}
-                    size="sm"
-                    variant="ghost"
-                    title="Settings"
-                    className="h-10 w-10 p-0 hover:bg-muted ml-2"
-                  >
-                    <SettingsIcon className="h-5 w-5" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      onClick={handleThemeToggle}
+                      size="sm"
+                      variant="ghost"
+                      title={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+                      className="h-10 w-10 p-0 hover:bg-white dark:hover:bg-muted"
+                    >
+                      {resolvedTheme === 'dark' ? (
+                        <SunIcon className="h-5 w-5" />
+                      ) : (
+                        <MoonIcon className="h-5 w-5" />
+                      )}
+                    </Button>
+                    <Button
+                      onClick={onNavigateToSettings}
+                      size="sm"
+                      variant="ghost"
+                      title="Settings"
+                      className="h-10 w-10 p-0 hover:bg-white dark:hover:bg-muted"
+                    >
+                      <SettingsIcon className="h-5 w-5" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -307,6 +322,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
 export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, collapsed, onToggleCollapse, onWidthChange }: SidebarProps) {
   const router = useRouter();
   const { user } = useUser();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
 
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
@@ -620,6 +636,10 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     });
   };
 
+  const handleThemeToggle = () => {
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+  };
+
   // Filter threads based on search query
   const filteredThreads = threads?.filter(thread =>
     thread.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -646,8 +666,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     
     return (
       <div
-        className={`group relative flex w-full items-center gap-3 rounded-lg p-2 text-left text-sm hover:bg-muted cursor-pointer ${
-                          currentThreadId === thread.id ? "bg-muted text-foreground" : "text-muted-foreground"
+        className={`group relative flex w-full items-center gap-3 rounded-lg p-2 text-left text-sm hover:bg-white dark:hover:bg-muted cursor-pointer ${
+                          currentThreadId === thread.id ? "bg-white dark:bg-muted text-foreground" : "text-muted-foreground"
         }`}
         onClick={() => !isEditing && onThreadSelect(thread.id)}
         onContextMenu={(e: React.MouseEvent) => handleRightClick(e, thread.id)}
@@ -732,7 +752,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                   size="sm"
                   variant="ghost"
                   disabled={updateThread.isLoading}
-                  className={`h-7 w-7 p-0 rounded bg-card/80 backdrop-blur-sm hover:bg-muted border border-border/50 ${isPinned ? 'text-primary' : ''} ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  className={`h-7 w-7 p-0 rounded bg-card/80 backdrop-blur-sm hover:bg-white dark:hover:bg-muted border border-border/50 ${isPinned ? 'text-primary' : ''} ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                   title={isPinned ? "Unpin" : "Pin"}
                 >
                   {isPinned ? <PinOffIcon className="h-4 w-4" /> : <PinIcon className="h-4 w-4" />}
@@ -766,33 +786,24 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           collapsed && !isTransitioning ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{
-          top: '40px',
-          left: '0px'
+          top: '16px', // Align with header padding
+          left: '16px' // Same as expanded state for proper alignment
         }}
       >
         <div 
-          className="bg-muted border border-border" 
+          className="bg-white dark:bg-muted border border-border shadow-sm" 
           style={{ 
-            borderRadius: '0 20px 20px 0',
+            borderRadius: '12px', // Rounded corner rectangle to match other elements
             padding: '4px'
           }}
         >
           <div className="flex gap-1">
             <Button
-              onClick={() => {/* TODO: Add search functionality */}}
-              size="sm"
-              variant="ghost"
-              title="Search"
-              className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
-            >
-              <SearchIcon className="h-4 w-4" />
-            </Button>
-            <Button
               onClick={onToggleCollapse}
               size="sm"
               variant="ghost"
               title="Expand Sidebar"
-              className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+              className="h-8 w-8 p-0 hover:bg-white dark:hover:bg-card rounded-full transition-colors"
             >
               <PanelLeftIcon className="h-4 w-4" />
             </Button>
@@ -801,9 +812,18 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               size="sm"
               variant="ghost"
               title="New Chat"
-              className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+              className="h-8 w-8 p-0 hover:bg-white dark:hover:bg-card rounded-full transition-colors"
             >
               <PlusIcon className="h-4.25 w-4.25" />
+            </Button>
+            <Button
+              onClick={() => {/* TODO: Add search functionality */}}
+              size="sm"
+              variant="ghost"
+              title="Search"
+              className="h-8 w-8 p-0 hover:bg-white dark:hover:bg-card rounded-full transition-colors"
+            >
+              <SearchIcon className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -815,14 +835,14 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           !collapsed && !isTransitioning ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{
-          top: '40px',
-          left: '40px'
+          top: '16px', // Align with header padding
+          left: '16px' // Align with header padding, accounting for flush design
         }}
       >
         <div 
-          className="bg-muted border border-border" 
+          className="bg-white dark:bg-muted border border-border shadow-sm" 
           style={{ 
-            borderRadius: '20px',
+            borderRadius: '12px',
             padding: '4px'
           }}
         >
@@ -832,7 +852,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               size="sm"
               variant="ghost"
               title="Collapse Sidebar"
-              className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+              className="h-8 w-8 p-0 hover:bg-white dark:hover:bg-card rounded-full transition-colors"
             >
               <PanelLeftIcon className="h-4 w-4" />
             </Button>
@@ -841,7 +861,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               size="sm"
               variant="ghost"
               title="New Chat"
-              className="h-8 w-8 p-0 hover:bg-card rounded-full transition-colors"
+              className="h-8 w-8 p-0 hover:bg-white dark:hover:bg-card rounded-full transition-colors"
             >
               <PlusIcon className="h-4.25 w-4.25" />
             </Button>
@@ -855,33 +875,30 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           collapsed ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'
         } hidden sm:flex`}
         style={{ 
-          width: `${sidebarWidth - 48}px`, // Subtract padding from both sides (24px each)
-          top: '24px', // Match chatbox spacing (24px from top)
-          bottom: '24px', // Match chatbox bottom-6 positioning (24px from bottom)
-          left: '24px' // Match consistent 24px spacing
+          width: `${sidebarWidth}px`, // Full width without padding
+          top: '0px', // Flush with top
+          bottom: '0px', // Flush with bottom  
+          left: '0px' // Flush with left
         }}
       >
         <div 
-          className="h-full relative shadow-xl dark:shadow-2xl dark:shadow-black/50"
-          style={{
-            borderRadius: '20px'
-          }}
+          className="h-full relative"
         >
-          {/* Background with border */}
+          {/* Background with black drop shadow */}
           <div 
-            className="absolute inset-0 bg-gray-50/50 dark:bg-gray-950 border border-border"
+            className="absolute inset-0 bg-gray-100 dark:bg-gray-950 border-r border-gray-400/30 dark:border-gray-500/30"
             style={{
-              borderRadius: '20px',
-              clipPath: 'inset(0 round 20px)'
+              borderRadius: '0', // No rounded corners
             }}
           />
+          
           {/* Content */}
-          <div className="relative z-10 h-full flex flex-col overflow-hidden rounded-2xl">
+          <div className="relative z-10 h-full flex flex-col overflow-hidden" style={{ borderRadius: '0 20px 20px 0' }}>
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border/50">
-            <div className="w-20"></div> {/* Spacer for floating buttons */}
-            <div className="flex items-center">
-              <div className="bg-muted border border-border px-3 py-1.5 hover:bg-muted/80 transition-colors cursor-pointer" style={{ borderRadius: '20px' }} onClick={onNavigateToWelcome}>
+          <div className="flex items-center p-4 border-b border-border gap-3">
+            <div className="w-20 flex-shrink-0"></div> {/* Spacer for floating buttons */}
+            <div className="flex-1 flex items-center justify-center">
+              <div className="bg-white dark:bg-muted border border-border shadow-sm px-3 py-1.5 hover:bg-white dark:hover:bg-muted/80 transition-colors cursor-pointer w-full max-w-none flex items-center justify-center" style={{ borderRadius: '12px' }} onClick={onNavigateToWelcome}>
                 <Logo size="sm" className="flex-shrink-0" />
               </div>
             </div>
@@ -953,42 +970,58 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           </div>
 
           {/* Footer with Account Button */}
-          <div className="border-t border-border/50 p-3">
-            <div className="flex items-center justify-between">
+          <div className="border-t border-border p-3">
+            <div className="flex items-center gap-2">
               <Button
                 onClick={onNavigateToAccount}
                 variant="ghost"
-                className="flex-1 justify-start text-left h-10 px-3 hover:bg-muted transition-colors"
+                className="flex-1 min-w-0 justify-start text-left h-10 px-3 hover:bg-white dark:hover:bg-muted transition-colors"
               >
-                <UserIcon className="h-4 w-4 mr-3" />
-                <span className="text-sm font-medium">
+                <UserIcon className="h-4 w-4 flex-shrink-0" />
+                <span className="text-sm font-medium ml-3 truncate">
                   {user?.firstName && user?.lastName 
                     ? `${user.firstName} ${user.lastName}`
                     : user?.username || user?.firstName || "Account"}
                 </span>
               </Button>
-              <Button
-                onClick={onNavigateToSettings}
-                size="sm"
-                variant="ghost"
-                title="Settings"
-                className="h-10 w-10 p-0 hover:bg-muted ml-2"
-              >
-                <SettingsIcon className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Button
+                  onClick={handleThemeToggle}
+                  size="sm"
+                  variant="ghost"
+                  title={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+                  className="h-10 w-10 p-0 hover:bg-white dark:hover:bg-muted flex-shrink-0"
+                >
+                  {resolvedTheme === 'dark' ? (
+                    <SunIcon className="h-5 w-5" />
+                  ) : (
+                    <MoonIcon className="h-5 w-5" />
+                  )}
+                </Button>
+                <Button
+                  onClick={onNavigateToSettings}
+                  size="sm"
+                  variant="ghost"
+                  title="Settings"
+                  className="h-10 w-10 p-0 hover:bg-white dark:hover:bg-muted flex-shrink-0"
+                >
+                  <SettingsIcon className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           </div>
 
+          </div>
+          
           {/* Resize Handle */}
           {!collapsed && (
             <div
-              className="absolute top-0 right-0 w-4 h-full cursor-col-resize bg-transparent hover:bg-primary/10 transition-colors group rounded-r-2xl"
+              className="absolute top-0 right-0 w-2 h-full cursor-col-resize bg-transparent hover:bg-primary/10 transition-colors group z-10"
               onMouseDown={() => setIsResizing(true)}
             >
-              <div className="w-1 h-full bg-transparent group-hover:bg-primary ml-auto rounded-full" />
+              <div className="w-0.5 h-full bg-transparent group-hover:bg-primary ml-auto transition-colors" />
             </div>
           )}
-          </div>
         </div>
       </div>
 
@@ -1076,7 +1109,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               const thread = threads?.find(t => t.id === contextMenu.threadId);
               handleRenameStart(contextMenu.threadId, thread?.title || "");
             }}
-                          className="w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2"
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-white dark:hover:bg-muted flex items-center gap-2"
           >
             <EditIcon className="h-3 w-3" />
             Rename
@@ -1084,7 +1117,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           <button
             onClick={() => handlePinThread(contextMenu.threadId)}
             disabled={updateThread.isLoading}
-                          className={`w-full px-3 py-2 text-left text-sm hover:bg-muted flex items-center gap-2 ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          className={`w-full px-3 py-2 text-left text-sm hover:bg-white dark:hover:bg-muted flex items-center gap-2 ${updateThread.isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             <PinIcon className="h-3 w-3" />
             {(threads?.find(t => t.id === contextMenu.threadId) as any)?.pinned ? "Unpin" : "Pin"}

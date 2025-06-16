@@ -47,7 +47,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   
   const inputRef = useRef<HTMLInputElement>(null);
   const previousThreadId = useRef<string | null>(null);
-
+  
   // Global stores
   const { 
     getMessages, 
@@ -59,7 +59,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   } = useChatStore();
   
   const { getImageState } = useImageStore();
-
+  
   // Custom hooks
   const {
     serverMessages,
@@ -96,7 +96,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   // Computed values
   const shouldShowBanner = hasAnyApiKeys === false && currentView !== 'settings';
   const localMessages = getMessages(threadId || '');
-
+  
   // Helper functions
   const shakeAnimation = createShakeAnimation();
   const triggerShakeAnimation = () => shakeAnimation.trigger(setShouldShakeBanner);
@@ -500,7 +500,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         inputRef.current?.focus();
       }, 50);
       
-      const currentMessages = getMessages(threadId);
+        const currentMessages = getMessages(threadId);
       const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
       if (messageIndex === -1) return;
 
@@ -743,19 +743,19 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         shouldShowBanner={shouldShowBanner}
         shouldShakeBanner={shouldShakeBanner}
         onNavigateToSettings={handleNavigateToSettings}
-        input={input}
-        onInputChange={handleInputChange}
-        onSubmit={handleSubmit}
-        uploadedFiles={uploadedFiles}
-        onFilesChange={setUploadedFiles}
-        selectedModel={selectedModel}
-        onModelChange={onModelChange}
-        isLoading={isLoading}
-        inputRef={inputRef}
-        searchGroundingEnabled={searchGroundingEnabled}
+                  input={input}
+                  onInputChange={handleInputChange}
+                  onSubmit={handleSubmit}
+                  uploadedFiles={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                  isLoading={isLoading}
+                  inputRef={inputRef}
+                  searchGroundingEnabled={searchGroundingEnabled}
         onSearchGroundingChange={setSearchGroundingEnabled}
-        onModelSelectorClick={triggerShakeAnimation}
-      />
+                  onModelSelectorClick={triggerShakeAnimation}
+                />
     );
   }
 
@@ -940,7 +940,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                                 >
                                   <CopyIcon className="h-4 w-4" />
                                 </ActionButton>
-
+                        
                                 <ActionButton
                                   variant="ghost"
                                   size="sm"
@@ -1002,7 +1002,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         </CustomScrollbar>
         
         {/* Chatbox */}
-        <div className="absolute bottom-6 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+        <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
           <div className="px-4 sm:hidden">
             <div className="max-w-[95%] w-full mx-auto">
               <Chatbox

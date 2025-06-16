@@ -11,6 +11,7 @@ export default defineSchema({
     authId: v.string(), // Maps to NextAuth user.id
     // User preferences
     defaultModel: v.optional(v.string()), // User's preferred default model ID
+    titleGenerationModel: v.optional(v.string()), // User's preferred model for generating chat titles
   }).index("by_email", ["email"]).index("by_auth_id", ["authId"]),
 
   threads: defineTable({

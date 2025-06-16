@@ -9,7 +9,7 @@ import { LoadingDots } from "@/components/LoadingDots";
 import { useChatStore } from "@/stores/chatStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Waves, MessageSquare, Zap, Shield, Key, ArrowLeftIcon, KeyIcon, CheckIcon, TrashIcon, EyeIcon, EyeOffIcon, LogOutIcon, UserIcon } from "lucide-react";
+import { Waves, MessageSquare, Zap, Shield, Key, ArrowLeftIcon, KeyIcon, CheckIcon, TrashIcon, EyeIcon, EyeOffIcon, LogOutIcon, UserIcon, TypeIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { ModelSelector, getProviderIcon } from "@/components/ModelSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -64,6 +64,8 @@ const Home: NextPage = () => {
   const [saved, setSaved] = useState(false);
   const [defaultModelSaved, setDefaultModelSaved] = useState(false);
   const [selectedDefaultModel, setSelectedDefaultModel] = useState<string>("");
+  const [titleGenerationModelSaved, setTitleGenerationModelSaved] = useState(false);
+  const [selectedTitleGenerationModel, setSelectedTitleGenerationModel] = useState<string>("");
 
   const [activeSettingsTab, setActiveSettingsTab] = useState<'api-keys' | 'account'>('account');
 
@@ -85,6 +87,7 @@ const Home: NextPage = () => {
   const { data: userPreferences } = trpc.userPreferences.getPreferences.useQuery();
   const { data: allModels } = trpc.models.getModels.useQuery();
   const setDefaultModelMutation = trpc.userPreferences.setDefaultModel.useMutation();
+  const setTitleGenerationModelMutation = trpc.userPreferences.setTitleGenerationModel.useMutation();
   const updateThreadMetadataMutation = trpc.chat.updateThreadMetadata.useMutation();
 
 
@@ -187,6 +190,9 @@ const Home: NextPage = () => {
   useEffect(() => {
     if (userPreferences?.defaultModel) {
       setSelectedDefaultModel(userPreferences.defaultModel);
+    }
+    if ((userPreferences as any)?.titleGenerationModel) {
+      setSelectedTitleGenerationModel((userPreferences as any).titleGenerationModel);
     }
   }, [userPreferences]);
 
@@ -314,6 +320,36 @@ const Home: NextPage = () => {
     }
   };
 
+  const handleSetTitleGenerationModel = async (modelId: string) => {
+    try {
+      await setTitleGenerationModelMutation.mutateAsync({ modelId });
+      setSelectedTitleGenerationModel(modelId);
+      setTitleGenerationModelSaved(true);
+      setTimeout(() => setTitleGenerationModelSaved(false), 2000);
+
+      toast.dismiss();
+      toast.success("Title generation model updated!");
+    } catch (error) {
+      console.error('Failed to set title generation model:', error);
+      toast.dismiss();
+      toast.error("Failed to set title generation model");
+    }
+  };
+
+  const handleClearTitleGenerationModel = async () => {
+    try {
+      await setTitleGenerationModelMutation.mutateAsync({ modelId: "gpt-4o-mini" }); // Reset to default
+      setSelectedTitleGenerationModel("");
+      setTitleGenerationModelSaved(false);
+      toast.dismiss();
+      toast.success("Title generation model reset to default!");
+    } catch (error) {
+      console.error('Failed to clear title generation model:', error);
+      toast.dismiss();
+      toast.error("Failed to clear title generation model");
+    }
+  };
+
   // Navigation functions that update URL without page refresh using query parameters
   const navigateToWelcome = () => {
     setCurrentView('welcome');
@@ -400,13 +436,16 @@ const Home: NextPage = () => {
   const getPageTitle = () => {
     switch (currentView) {
       case 'chat':
-        return `lll.chat - ${currentThreadId}`;
+        if (currentThread?.title) {
+          return `lll.chat — ${currentThread.title}`;
+        }
+        return 'lll.chat — Chat';
       case 'settings':
-        return activeSettingsTab === 'account' ? 'lll.chat - Account' : 'lll.chat - Settings';
+        return activeSettingsTab === 'account' ? 'lll.chat — Account' : 'lll.chat — Settings';
       case 'account':
-        return 'lll.chat - Account';
+        return 'lll.chat — Account';
       default:
-        return 'lll.chat';
+        return 'lll.chat — New Chat';
     }
   };
 
@@ -444,7 +483,7 @@ const Home: NextPage = () => {
         return (
           <div className="flex-1 overflow-y-auto">
             <main className="min-h-screen bg-background">
-              <div className="max-w-4xl mx-auto px-6 py-8">
+              <div className="max-w-4xl mx-auto px-6 py-8 pb-16">
                 <div className="space-y-8">
                   {/* Header */}
                   <div className="flex items-center gap-4">
@@ -641,10 +680,13 @@ const Home: NextPage = () => {
                             </div>
                           </div>
 
-                          {/* Default Model Section */}
+                          {/* Default Chat Model Section */}
                           <div className="pt-6 border-t border-border">
                             <div className="mb-4">
-                              <h3 className="text-lg font-medium text-foreground mb-2">Default Model</h3>
+                              <h3 className="text-lg font-medium text-foreground mb-2 flex items-center gap-2">
+                                <MessageSquare className="h-5 w-5 text-black dark:text-primary" />
+                                Default Chat Model
+                              </h3>
                               <p className="text-sm text-muted-foreground">
                                 Choose your preferred AI model for new conversations
                               </p>
@@ -678,6 +720,50 @@ const Home: NextPage = () => {
                               
                               <p className="text-xs text-muted-foreground">
                                 Only models with API keys are available for selection. When no default is set, the cheapest available model will be used automatically.
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Title Generation Model Section */}
+                          <div className="pt-6 border-t border-border">
+                            <div className="mb-4">
+                              <h3 className="text-lg font-medium text-foreground mb-2 flex items-center gap-2">
+                                <TypeIcon className="h-5 w-5 text-black dark:text-primary" />
+                                Default Title Generation Model
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                Choose the AI model used to automatically generate chat titles
+                              </p>
+                            </div>
+                            
+                            <div className="space-y-4">
+                              <div className="px-4 py-2 border border-border rounded-xl bg-muted">
+                                <ModelSelector
+                                  selectedModel={selectedTitleGenerationModel || "gpt-4o-mini"}
+                                  onModelChange={handleSetTitleGenerationModel}
+                                  size="lg"
+                                />
+                              </div>
+                              
+                              {selectedTitleGenerationModel && (
+                                <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl">
+                                  <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                                    <CheckIcon className="h-4 w-4" />
+                                    <span className="text-sm font-medium">
+                                      {titleGenerationModelSaved ? "Title generation model updated!" : "Title generation model set"}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={handleClearTitleGenerationModel}
+                                    className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-sm underline"
+                                  >
+                                    Reset to Default
+                                  </button>
+                                </div>
+                              )}
+                              
+                              <p className="text-xs text-muted-foreground">
+                                This model will be used to automatically generate descriptive titles for your conversations. Defaults to GPT-4o Mini for cost efficiency.
                               </p>
                             </div>
                           </div>

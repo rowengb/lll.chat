@@ -345,6 +345,13 @@ export const chatConvexRouter = createTRPCRouter({
         throw new Error("Failed to get or create user");
       }
 
+      // Get user preferences to check for title generation model
+      const preferences = await convex.query(api.users.getPreferences, {
+        userId: convexUser._id,
+      });
+
+      const titleGenerationModel = preferences?.titleGenerationModel || "gpt-4o-mini";
+
       // Get the user's OpenAI API key
       const apiKeyRecord = await convex.query(api.apiKeys.getByUserAndProvider, {
         userId: convexUser._id,
@@ -367,11 +374,12 @@ export const chatConvexRouter = createTRPCRouter({
         return { success: false, error: "Failed to decrypt API key" };
       }
 
-      // Generate the title using Convex function
+      // Generate the title using Convex function with user's preferred model
       const result = await convex.action(api.threads.generateTitle, {
         threadId: input.threadId as Id<"threads">,
         firstMessage: input.firstMessage,
         apiKey: apiKey,
+        modelId: titleGenerationModel,
       });
 
       return result;

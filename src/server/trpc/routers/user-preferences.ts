@@ -82,6 +82,26 @@ export const userPreferencesRouter = createTRPCRouter({
       return { success: true, defaultModel: input.modelId };
     }),
 
+  // Set user's title generation model
+  setTitleGenerationModel: protectedProcedure
+    .input(z.object({
+      modelId: z.string().min(1, "Model ID is required"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      await convex.mutation(api.users.updatePreferences, {
+        userId: convexUser._id,
+        titleGenerationModel: input.modelId,
+      });
+
+      return { success: true, titleGenerationModel: input.modelId };
+    }),
+
   // Get the best default model for user (either user's preference or cheapest available)
   getBestDefaultModel: protectedProcedure.query(async ({ ctx }) => {
     const convexUser = await getOrCreateConvexUser(ctx.userId);

@@ -934,32 +934,39 @@ export function Chatbox({
 
   return (
     <div 
-      className={`relative chatbox-stable shadow-xl dark:shadow-2xl dark:shadow-black/50 ${className} ${
+      className={`relative chatbox-stable ${className} ${
         isDragOver ? 'ring-2 ring-primary ring-offset-2' : ''
-      }`}
-      style={{
-        transform: 'translateY(-4px)',
-        borderRadius: '20px'
-      }}
+      } rounded-t-[20px] sm:rounded-t-[20px] sm:rounded-b-none`}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Glassmorphic background with subtle overlay */}
+      {/* Enhanced glassmorphic background with complex styling */}
       <div 
-        className={`absolute inset-0 bg-white/20 dark:bg-slate-900/20 backdrop-blur-xl border border-border ${
+        className={`absolute inset-0 bg-white/50 dark:bg-secondary/[0.045] backdrop-blur-md border border-b-0 border-white/50 dark:border-[hsl(0,0%,83%)]/[0.04] outline outline-4 outline-blue-500/20 dark:outline-blue-400/25 ${
           isDragOver ? 'bg-primary/5 border-primary/30' : ''
         }`}
         style={{
-          borderRadius: '20px',
-          clipPath: 'inset(0 round 20px)'
+          borderRadius: '16px 16px 0 0',
+          boxShadow: `
+            rgba(0, 0, 0, 0.1) 0px 80px 50px 0px,
+            rgba(0, 0, 0, 0.07) 0px 50px 30px 0px,
+            rgba(0, 0, 0, 0.06) 0px 30px 15px 0px,
+            rgba(0, 0, 0, 0.04) 0px 15px 8px,
+            rgba(0, 0, 0, 0.04) 0px 6px 4px,
+            rgba(0, 0, 0, 0.02) 0px 2px 2px
+          `
         }}
       />
       
+
+      
       {/* Drag overlay */}
       {isDragOver && (
-        <div className="absolute inset-0 flex items-center justify-center bg-primary/10 backdrop-blur-sm rounded-[20px] z-20">
+        <div 
+          className="absolute inset-0 flex items-center justify-center bg-primary/10 backdrop-blur-sm z-20 rounded-t-xl"
+        >
           <div className="text-center">
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-primary/20 flex items-center justify-center">
               <PaperclipIcon className="h-6 w-6 text-primary" />
@@ -973,7 +980,7 @@ export function Chatbox({
       )}
       
       {/* Content */}
-      <div className="relative z-10 px-5 py-4">
+      <div className="relative z-10 px-4 pt-3">
       <form onSubmit={onSubmit}>
         {/* Unified Files Display - All in rows */}
         {allFiles.length > 0 && (
@@ -1043,12 +1050,12 @@ export function Chatbox({
             {isStreaming ? (
               <SquareIcon className="h-5 w-5 text-destructive-foreground" fill="currentColor" />
             ) : (
-              <ArrowUpIcon className="h-6 w-6 text-primary-foreground" strokeWidth={1.8} strokeLinecap="square" />
+            <ArrowUpIcon className="h-6 w-6 text-primary-foreground" strokeWidth={1.8} strokeLinecap="square" />
             )}
           </Button>
         </div>
         
-        <div className="border-t border-border/50 mt-2 pt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+        <div className="border-t border-border/80 mt-2 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
           <div className="flex flex-row items-center gap-2">
             <div className="flex-1 sm:flex-initial sm:w-auto">
               <ModelSelector
