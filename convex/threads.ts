@@ -60,17 +60,29 @@ export const generateTitle = action({
     firstMessage: v.string(),
     apiKey: v.string(),
     modelId: v.optional(v.string()), // Optional model ID, defaults to gpt-4o-mini
+    provider: v.optional(v.string()), // Optional provider, defaults to openai
   },
   handler: async (ctx, args) => {
     try {
       const modelId = args.modelId || "gpt-4o-mini"; // Default fallback
+      const provider = args.provider || "openai"; // Default to OpenAI
       
-      // Use OpenAI to generate a concise title
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      // Determine the API endpoint based on provider
+      let apiUrl = "https://api.openai.com/v1/chat/completions";
+      if (provider === "openrouter") {
+        apiUrl = "https://openrouter.ai/api/v1/chat/completions";
+      }
+      
+      // Generate a concise title using the appropriate API
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${args.apiKey}`,
           "Content-Type": "application/json",
+          ...(provider === "openrouter" ? {
+            "HTTP-Referer": "https://lll.chat",
+            "X-Title": "lll.chat",
+          } : {}),
         },
         body: JSON.stringify({
           model: modelId, // Use the specified model or fallback
@@ -90,8 +102,9 @@ export const generateTitle = action({
       });
 
       if (!response.ok) {
-        console.error("OpenAI API error:", await response.text());
-        return { success: false, error: "Failed to generate title" };
+        const errorText = await response.text();
+        console.error(`${provider.toUpperCase()} API error:`, errorText);
+        return { success: false, error: `Failed to generate title using ${provider}` };
       }
 
       const data = await response.json();

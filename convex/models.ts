@@ -325,6 +325,68 @@ export const getModelById = query({
   },
 });
 
+// Add OpenRouter model IDs to existing models
+export const addOpenRouterModelIds = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Define OpenRouter model ID mappings
+    const openRouterMappings: Record<string, string> = {
+      // Gemini models
+      "gemini-2.5-pro-preview-06-05": "google/gemini-2.5-pro-preview",
+      "gemini-2.5-flash-preview-05-20": "google/gemini-2.5-flash-preview",
+      "gemini-2.0-flash": "google/gemini-2.0-flash",
+      "gemini-2.0-flash-lite": "google/gemini-2.0-flash-lite",
+      "gemini-1.5-pro": "google/gemini-1.5-pro",
+      "gemini-1.5-flash": "google/gemini-1.5-flash",
+      
+      // OpenAI models
+      "gpt-4o": "openai/gpt-4o",
+      "gpt-4o-mini": "openai/gpt-4o-mini",
+      "gpt-4": "openai/gpt-4",
+      "gpt-3.5-turbo": "openai/gpt-3.5-turbo",
+      "o4-mini": "openai/o4-mini",
+      "gpt-4.1": "openai/gpt-4.1",
+      "gpt-4.1-mini": "openai/gpt-4.1-mini",
+      
+      // Anthropic models
+      "claude-sonnet-4-20250514": "anthropic/claude-3.5-sonnet",
+      "claude-sonnet-4-20250514-reasoning": "anthropic/claude-3.5-sonnet",
+      "claude-3.5-sonnet": "anthropic/claude-3.5-sonnet",
+      "claude-3-opus": "anthropic/claude-3-opus",
+      "claude-3-haiku": "anthropic/claude-3-haiku",
+      
+      // DeepSeek models
+      "deepseek-r1-llama-70b": "deepseek/deepseek-r1-llama-70b",
+      "deepseek-chat": "deepseek/deepseek-chat",
+      "deepseek-coder": "deepseek/deepseek-coder",
+      
+      // Meta models
+      "llama-3.3-70b": "meta-llama/llama-3.3-70b-instruct",
+      "llama-3.1-405b": "meta-llama/llama-3.1-405b-instruct",
+      
+      // Other models that might be available on OpenRouter
+      "grok-3-beta": "x-ai/grok-3-beta",
+      "grok-3-mini-beta": "x-ai/grok-3-mini-beta",
+    };
+
+    // Update models with OpenRouter IDs
+    const allModels = await ctx.db.query("models").collect();
+    let updatedCount = 0;
+
+    for (const model of allModels) {
+      const openRouterModelId = openRouterMappings[model.id];
+      if (openRouterModelId) {
+        await ctx.db.patch(model._id, {
+          openrouterModelId: openRouterModelId
+        });
+        updatedCount++;
+      }
+    }
+
+    return { message: `Updated ${updatedCount} models with OpenRouter model IDs` };
+  },
+});
+
 // Clear and reseed models with updated accurate data
 export const updateModelsWithCorrectData = mutation({
   args: {},

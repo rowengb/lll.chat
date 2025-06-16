@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { ChevronDownIcon, CheckIcon, ZapIcon, SearchIcon, EyeIcon, GlobeIcon, FileTextIcon, BrainIcon, SparklesIcon, ChevronUpIcon, StarIcon, FilterIcon, ChevronLeftIcon, KeyIcon, FlaskConical, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/utils/trpc";
+import { OpenRouterAvatar } from '@/components/OpenRouterIcon';
+import { useOpenRouterStore } from '@/stores/openRouterStore';
 
 interface ModelSelectorProps {
   selectedModel: string;
@@ -19,11 +21,12 @@ interface ModelData {
   displayNameBottom?: string;
   description: string;
   provider: string;
+  apiUrl?: string;
+  openrouterModelId?: string;
   capabilities: string[];
   isFavorite: boolean;
   isActive: boolean;
   order: number;
-  apiUrl?: string;
   contextWindow?: number;
   maxTokens?: number;
   costPer1kTokens?: number;
@@ -161,6 +164,7 @@ const getCapabilityColor = (capability: string) => {
 };
 
 export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onClick }: ModelSelectorProps) {
+  const { useOpenRouter } = useOpenRouterStore();
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -189,8 +193,23 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
   };
   
   // Function to check if a model is disabled (no API key)
-  const isModelDisabled = (provider: string) => {
-    return !hasApiKey(provider);
+  const isModelDisabled = (model: ModelData) => {
+    const hasDirectProviderKey = hasApiKey(model.provider);
+    const hasOpenRouterSupport = hasApiKey('openrouter') && model.openrouterModelId;
+    
+    if (useOpenRouter) {
+      // In OpenRouter mode, only show models with OpenRouter support
+      return !hasOpenRouterSupport;
+    } else {
+      // In individual provider mode, only show models with direct provider keys
+      return !hasDirectProviderKey;
+    }
+  };
+
+  // Function to check if a model is using OpenRouter
+  const isUsingOpenRouter = (model: ModelData) => {
+    if (!useOpenRouter) return false;
+    return hasApiKey('openrouter') && model.openrouterModelId;
   };
 
   // Define filter categories based on the image
@@ -338,6 +357,11 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
           <span className={`font-medium ${size === 'lg' ? 'text-base' : 'text-sm'}`}>
             {selectedModelData?.name}
           </span>
+          {selectedModelData && isUsingOpenRouter(selectedModelData) && (
+            <div className="flex-shrink-0" title="Via OpenRouter">
+              <OpenRouterAvatar size={size === 'lg' ? 24 : 20} />
+            </div>
+          )}
           <span className={`text-muted-foreground bg-muted px-2 py-0.5 rounded-md ${
             size === 'lg' ? 'text-sm' : 'text-xs'
           }`}>
@@ -406,7 +430,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                       </div>
                     ) : (
                       filteredModels.filter(model => model.isFavorite).map((model: ModelData) => {
-                        const disabled = isModelDisabled(model.provider);
+                        const disabled = isModelDisabled(model);
                         return (
                         <button
                           type="button"
@@ -428,8 +452,13 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                         >
                           <div className="flex flex-col items-center gap-2 justify-between h-full">
                             <div className="flex flex-col items-center gap-2">
-                              <div className="flex items-center justify-center w-12 h-12 bg-muted rounded-xl text-xl font-medium">
+                              <div className="flex items-center justify-center w-12 h-12 bg-muted rounded-xl text-xl font-medium relative">
                                 {getProviderIcon(model.provider, model.name, 'lg')}
+                                {isUsingOpenRouter(model) && (
+                                  <div className="absolute -bottom-1 -right-1" title="Via OpenRouter">
+                                    <OpenRouterAvatar size={20} />
+                                  </div>
+                                )}
                               </div>
                               <div className="text-center">
                                 {model.displayNameTop && model.displayNameBottom ? (
@@ -497,7 +526,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                       </div>
                     ) : (
                       filteredModels.filter(model => !model.isFavorite).map((model: ModelData) => {
-                        const disabled = isModelDisabled(model.provider);
+                        const disabled = isModelDisabled(model);
                         return (
                         <button
                           type="button"
@@ -519,8 +548,13 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                         >
                           <div className="flex flex-col items-center gap-2 justify-between h-full">
                             <div className="flex flex-col items-center gap-2">
-                              <div className="flex items-center justify-center w-12 h-12 bg-muted rounded-xl text-xl font-medium">
+                              <div className="flex items-center justify-center w-12 h-12 bg-muted rounded-xl text-xl font-medium relative">
                                 {getProviderIcon(model.provider, model.name, 'lg')}
+                                {isUsingOpenRouter(model) && (
+                                  <div className="absolute -bottom-1 -right-1" title="Via OpenRouter">
+                                    <OpenRouterAvatar size={20} />
+                                  </div>
+                                )}
                               </div>
                               <div className="text-center">
                                 {model.displayNameTop && model.displayNameBottom ? (
@@ -628,7 +662,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                     </div>
                   ) : (
                     displayedModels.map((model: ModelData) => {
-                      const disabled = isModelDisabled(model.provider);
+                      const disabled = isModelDisabled(model);
                       return (
                       <button
                         type="button"
@@ -652,6 +686,11 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                             {model.capabilities.includes('experimental') && (
                               <div className="absolute -top-1 -left-1" title="Experimental">
                                 <FlaskConical className="h-3 w-3 text-muted-foreground" />
+                              </div>
+                            )}
+                            {isUsingOpenRouter(model) && (
+                              <div className="absolute -bottom-1 -right-1" title="Via OpenRouter">
+                                <OpenRouterAvatar size={20} />
                               </div>
                             )}
                           </div>

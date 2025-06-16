@@ -70,6 +70,12 @@ class MockAIClient implements AIClient {
 }
 
 class OpenAIClient implements AIClient {
+  private provider?: string;
+  
+  constructor(provider?: string) {
+    this.provider = provider;
+  }
+  
   async createChatCompletion(params: {
     messages: Array<{ role: string; content: string }>;
     model?: string;
@@ -77,11 +83,19 @@ class OpenAIClient implements AIClient {
     apiKey?: string;
     enableGrounding?: boolean;
   }): Promise<AsyncIterable<StreamChunk> | string> {
-    const client = new OpenAI({
+    // Configure API endpoint based on provider
+    const clientConfig: any = {
       apiKey: params.apiKey || process.env.OPENAI_API_KEY,
-    });
+    };
+    
+    // Use OpenRouter endpoint for OpenRouter provider
+    if (this.provider === "openrouter") {
+      clientConfig.baseURL = "https://openrouter.ai/api/v1";
+    }
+    
+    const client = new OpenAI(clientConfig);
 
-    console.log(`🔍 [OPENAI-DEBUG] Creating completion with model: ${params.model || "gpt-3.5-turbo"}, stream: ${params.stream}`);
+    console.log(`🔍 [${this.provider?.toUpperCase() || 'OPENAI'}-DEBUG] Creating completion with model: ${params.model || "gpt-3.5-turbo"}, stream: ${params.stream}`);
     
     const completion = await client.chat.completions.create({
       model: params.model || "gpt-3.5-turbo",
@@ -90,31 +104,31 @@ class OpenAIClient implements AIClient {
       stream_options: params.stream ? { include_usage: true } : undefined,
     });
     
-    console.log(`🔍 [OPENAI-DEBUG] Completion request sent successfully`);
+    console.log(`🔍 [${this.provider?.toUpperCase() || 'OPENAI'}-DEBUG] Completion request sent successfully`);
 
     if (params.stream) {
-      return this.createOpenAIStream(completion as any);
+      return this.createOpenAIStream(completion as any, this.provider);
     }
 
     return (completion as any).choices[0]?.message?.content || "";
   }
 
-  private async *createOpenAIStream(stream: any): AsyncIterable<StreamChunk> {
+  private async *createOpenAIStream(stream: any, provider?: string): AsyncIterable<StreamChunk> {
     let totalTokens = 0;
     let inputTokens = 0;
     let outputTokens = 0;
     let contentChunks = 0;
 
-    console.log(`🔍 [OPENAI-DEBUG] Starting stream processing...`);
+    console.log(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Starting stream processing...`);
 
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content;
       const usage = chunk.usage;
       const finishReason = chunk.choices[0]?.finish_reason;
       
-      // Debug what we're actually getting
-      if (contentChunks < 3) {
-        console.log(`🔍 [OPENAI-DEBUG] Chunk ${contentChunks + 1} - Content: "${content}", Usage: ${JSON.stringify(usage)}, FinishReason: ${finishReason}`);
+      // Debug what we're actually getting (only log chunks with content or usage)
+      if (contentChunks < 3 && (content || usage)) {
+        console.log(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Chunk ${contentChunks + 1} - Content: "${content}", Usage: ${JSON.stringify(usage)}, FinishReason: ${finishReason}`);
       }
 
       // Track token usage when it comes in (usually at the end)
@@ -123,7 +137,7 @@ class OpenAIClient implements AIClient {
         outputTokens = usage.completion_tokens || 0;
         totalTokens = usage.total_tokens || 0;
         
-        console.log(`🔍 [OPENAI-DEBUG] Usage chunk received - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${totalTokens}`);
+        console.log(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Usage chunk received - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${totalTokens}`);
         
         // Send a token update chunk
         yield {
@@ -426,10 +440,10 @@ export const getAiClient = (provider?: string, apiKey?: string): AIClient => {
       case "xai":
       case "alibaba":
         // These providers use OpenAI-compatible APIs
-        return new OpenAIClient();
+        return new OpenAIClient(provider);
       case "openai":
       default:
-        return new OpenAIClient();
+        return new OpenAIClient(provider);
     }
   }
 

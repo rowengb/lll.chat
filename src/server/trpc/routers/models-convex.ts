@@ -42,4 +42,9 @@ export const modelsConvexRouter = createTRPCRouter({
     .mutation(async () => {
       return await convex.mutation(api.models.seedModels);
     }),
+
+  addOpenRouterModelIds: protectedProcedure
+    .mutation(async () => {
+      return await convex.mutation(api.models.addOpenRouterModelIds);
+    }),
 }); 

@@ -2,7 +2,7 @@ import { type NextPage } from "next";
 import { useUser, SignInButton, UserProfile, SignOutButton } from "@clerk/nextjs";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { ChatWindow } from "@/components/ChatWindow";
 import { LoadingDots } from "@/components/LoadingDots";
@@ -10,6 +10,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Waves, MessageSquare, Zap, Shield, Key, ArrowLeftIcon, KeyIcon, CheckIcon, TrashIcon, EyeIcon, EyeOffIcon, LogOutIcon, UserIcon, TypeIcon } from "lucide-react";
+import { OpenRouterAvatar } from '@/components/OpenRouterIcon';
 import toast from "react-hot-toast";
 import { ModelSelector, getProviderIcon } from "@/components/ModelSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -17,6 +18,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import Logo from '../components/Logo';
 
 import { trpc } from "@/utils/trpc";
+import { useOpenRouterStore } from '@/stores/openRouterStore';
 
 
 interface ApiKeys {
@@ -25,6 +27,7 @@ interface ApiKeys {
   gemini: string;
   deepseek: string;
   meta: string;
+  openrouter: string;
 }
 
 const Home: NextPage = () => {
@@ -53,6 +56,7 @@ const Home: NextPage = () => {
     gemini: "",
     deepseek: "",
     meta: "",
+    openrouter: "",
   });
   const [showKeys, setShowKeys] = useState<Record<keyof ApiKeys, boolean>>({
     openai: false,
@@ -60,6 +64,7 @@ const Home: NextPage = () => {
     gemini: false,
     deepseek: false,
     meta: false,
+    openrouter: false,
   });
   const [saved, setSaved] = useState(false);
   const [defaultModelSaved, setDefaultModelSaved] = useState(false);
@@ -67,6 +72,9 @@ const Home: NextPage = () => {
   const [titleGenerationModelSaved, setTitleGenerationModelSaved] = useState(false);
   const [selectedTitleGenerationModel, setSelectedTitleGenerationModel] = useState<string>("");
 
+  // Remove local useOpenRouter state and use Zustand store instead
+  const { useOpenRouter, setUseOpenRouter } = useOpenRouterStore();
+  
   const [activeSettingsTab, setActiveSettingsTab] = useState<'api-keys' | 'account'>('account');
 
   // Get user's best default model
@@ -183,6 +191,7 @@ const Home: NextPage = () => {
         gemini: dbApiKeys.gemini || "",
         deepseek: dbApiKeys.deepseek || "",
         meta: dbApiKeys.meta || "",
+        openrouter: dbApiKeys.openrouter || "",
       });
     }
   }, [dbApiKeys]);
@@ -196,24 +205,54 @@ const Home: NextPage = () => {
     }
   }, [userPreferences]);
 
+  // Initialize toggle state based on existing API keys
+  useEffect(() => {
+    if (dbApiKeys) {
+      const hasIndividualKeys = Object.entries(dbApiKeys)
+        .filter(([provider]) => provider !== 'openrouter')
+        .some(([, key]) => key && key.trim());
+      const hasOpenRouterKey = dbApiKeys.openrouter && dbApiKeys.openrouter.trim();
+      
+      // If user has OpenRouter key but no individual keys, default to OpenRouter mode
+      // If user has individual keys but no OpenRouter key, default to individual mode
+      // If user has both, keep current toggle state
+      if (hasOpenRouterKey && !hasIndividualKeys) {
+        setUseOpenRouter(true);
+      } else if (hasIndividualKeys && !hasOpenRouterKey) {
+        setUseOpenRouter(false);
+      }
+      // If user has both or neither, keep current toggle state
+    }
+  }, [dbApiKeys]);
+
   // Settings page helper functions
   const getAvailableModels = () => {
     if (!allModels || !dbApiKeys) return [];
     
     const availableProviders = new Set();
+    const hasOpenRouterKey = dbApiKeys.openrouter && dbApiKeys.openrouter.trim();
+    
     Object.entries(dbApiKeys).forEach(([provider, key]) => {
       if (key && key.trim()) {
         availableProviders.add(provider);
       }
     });
 
-    return allModels.filter(model => 
-      availableProviders.has(model.provider) && model.isActive
-    );
+    return allModels.filter(model => {
+      if (!model.isActive) return false;
+      
+      if (useOpenRouter) {
+        // In OpenRouter mode, only show models with OpenRouter support
+        return hasOpenRouterKey && model.openrouterModelId;
+      } else {
+        // In individual mode, only show models with direct provider keys
+        return availableProviders.has(model.provider);
+      }
+    });
   };
 
-  const availableModels = getAvailableModels();
-  const selectedModelData = availableModels.find(model => model.id === selectedDefaultModel);
+  const availableModels = useMemo(() => getAvailableModels(), [allModels, dbApiKeys, useOpenRouter]);
+  const selectedModelData = availableModels.find((model: any) => model.id === selectedDefaultModel);
 
   const handleKeyChange = (provider: keyof ApiKeys, value: string) => {
     setApiKeys(prev => ({
@@ -229,18 +268,136 @@ const Home: NextPage = () => {
     }));
   };
 
+  const handleToggleMode = (newUseOpenRouter: boolean) => {
+    setUseOpenRouter(newUseOpenRouter);
+    
+    // Check if current default model is still available in the new mode
+    if (selectedDefaultModel && allModels && dbApiKeys) {
+      const currentDefaultModel = allModels.find(model => model.id === selectedDefaultModel);
+      
+      if (currentDefaultModel) {
+        const hasDirectProviderKey = dbApiKeys[currentDefaultModel.provider as keyof typeof dbApiKeys]?.trim();
+        const hasOpenRouterSupport = dbApiKeys.openrouter?.trim() && currentDefaultModel.openrouterModelId;
+        
+        let isModelAvailableInNewMode = false;
+        
+        if (newUseOpenRouter) {
+          // In OpenRouter mode, model needs OpenRouter support
+          isModelAvailableInNewMode = !!hasOpenRouterSupport;
+        } else {
+          // In individual mode, model needs direct provider key
+          isModelAvailableInNewMode = !!hasDirectProviderKey;
+        }
+        
+        // If current default model is not available in new mode, reset it
+        if (!isModelAvailableInNewMode) {
+          setSelectedDefaultModel("");
+        }
+      }
+    }
+    
+    // Check if current selected chat model is still available in the new mode
+    if (selectedModel && allModels && dbApiKeys) {
+      const currentSelectedModel = allModels.find(model => model.id === selectedModel);
+      
+      if (currentSelectedModel) {
+        const hasDirectProviderKey = dbApiKeys[currentSelectedModel.provider as keyof typeof dbApiKeys]?.trim();
+        const hasOpenRouterSupport = dbApiKeys.openrouter?.trim() && currentSelectedModel.openrouterModelId;
+        
+        let isModelAvailableInNewMode = false;
+        
+        if (newUseOpenRouter) {
+          // In OpenRouter mode, model needs OpenRouter support
+          isModelAvailableInNewMode = !!hasOpenRouterSupport;
+        } else {
+          // In individual mode, model needs direct provider key
+          isModelAvailableInNewMode = !!hasDirectProviderKey;
+        }
+        
+        // If current selected model is not available in new mode, reset to best available
+        if (!isModelAvailableInNewMode) {
+          // Find the best available model in the new mode
+          const availableModelsInNewMode = allModels.filter(model => {
+            if (!model.isActive) return false;
+            
+            const modelHasDirectKey = dbApiKeys[model.provider as keyof typeof dbApiKeys]?.trim();
+            const modelHasOpenRouterSupport = dbApiKeys.openrouter?.trim() && model.openrouterModelId;
+            
+            if (newUseOpenRouter) {
+              return !!modelHasOpenRouterSupport;
+            } else {
+              return !!modelHasDirectKey;
+            }
+          });
+          
+          // Set to the first available model (usually the cheapest/default)
+          if (availableModelsInNewMode.length > 0 && availableModelsInNewMode[0]) {
+            setSelectedModel(availableModelsInNewMode[0].id);
+          }
+        }
+      }
+    }
+    
+    // Check if current title generation model is still available in the new mode
+    if (selectedTitleGenerationModel && allModels && dbApiKeys) {
+      const currentTitleModel = allModels.find(model => model.id === selectedTitleGenerationModel);
+      
+      if (currentTitleModel) {
+        const hasDirectProviderKey = dbApiKeys[currentTitleModel.provider as keyof typeof dbApiKeys]?.trim();
+        const hasOpenRouterSupport = dbApiKeys.openrouter?.trim() && currentTitleModel.openrouterModelId;
+        
+        let isModelAvailableInNewMode = false;
+        
+        if (newUseOpenRouter) {
+          // In OpenRouter mode, model needs OpenRouter support
+          isModelAvailableInNewMode = !!hasOpenRouterSupport;
+        } else {
+          // In individual mode, model needs direct provider key
+          isModelAvailableInNewMode = !!hasDirectProviderKey;
+        }
+        
+        // If current title generation model is not available in new mode, reset it
+        if (!isModelAvailableInNewMode) {
+          setSelectedTitleGenerationModel("");
+        }
+      }
+    }
+    
+    toast.dismiss();
+    const newAvailableModels = getAvailableModels();
+    toast.success(`Switched to ${newUseOpenRouter ? 'OpenRouter' : 'Individual Provider'} mode${
+      (selectedDefaultModel && newAvailableModels && !newAvailableModels.find(m => m.id === selectedDefaultModel)) ||
+      (selectedModel && newAvailableModels && !newAvailableModels.find(m => m.id === selectedModel))
+        ? '. Models updated to match available options.'
+        : ''
+    }`);
+  };
+
   const handleSave = async () => {
     try {
       const savePromises = [];
       
-      for (const [provider, key] of Object.entries(apiKeys)) {
-        if (key.trim()) {
+      if (useOpenRouter) {
+        // Only save OpenRouter key
+        if (apiKeys.openrouter.trim()) {
           savePromises.push(
             saveApiKeyMutation.mutateAsync({
-              provider: provider as "openai" | "anthropic" | "gemini" | "deepseek" | "meta",
-              key: key.trim(),
+              provider: "openrouter",
+              key: apiKeys.openrouter.trim(),
             })
           );
+        }
+      } else {
+        // Only save individual provider keys
+        for (const [provider, key] of Object.entries(apiKeys)) {
+          if (provider !== 'openrouter' && key.trim()) {
+            savePromises.push(
+              saveApiKeyMutation.mutateAsync({
+                provider: provider as "openai" | "anthropic" | "gemini" | "deepseek" | "meta",
+                key: key.trim(),
+              })
+            );
+          }
         }
       }
       
@@ -304,6 +461,7 @@ const Home: NextPage = () => {
       gemini: { name: "Google Gemini", placeholder: "AI..." },
       deepseek: { name: "DeepSeek", placeholder: "sk-..." },
       meta: { name: "Meta (Llama)", placeholder: "..." },
+      openrouter: { name: "OpenRouter", placeholder: "sk-or-..." },
     };
     return info[provider];
   };
@@ -614,9 +772,54 @@ const Home: NextPage = () => {
                               Configure your API keys for different AI providers
                             </p>
                           </div>
+
+                          {/* Mode Toggle */}
+                          <div className="p-4 bg-muted/50 border border-border rounded-xl">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 flex items-center gap-3">
+                                {useOpenRouter && (
+                                  <OpenRouterAvatar size={32} />
+                                )}
+                                <div>
+                                  <h3 className="text-sm font-medium text-foreground mb-1">
+                                    {useOpenRouter ? 'OpenRouter Mode' : 'Individual Provider Mode'}
+                                  </h3>
+                                  <p className="text-xs text-muted-foreground">
+                                    {useOpenRouter 
+                                      ? 'Use one OpenRouter key to access all supported models' 
+                                      : 'Use individual API keys for each provider'
+                                    }
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className={`text-xs font-medium ${!useOpenRouter ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                  Individual
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleMode(!useOpenRouter)}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                                    useOpenRouter ? 'bg-primary' : 'bg-muted-foreground/20'
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                      useOpenRouter ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                                  />
+                                </button>
+                                <span className={`text-xs font-medium ${useOpenRouter ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                  OpenRouter
+                                </span>
+                              </div>
+                            </div>
+                          </div>
                           
                           <div className="space-y-6">
-                            {(Object.keys(apiKeys) as Array<keyof ApiKeys>).map((provider) => (
+                            {(Object.keys(apiKeys) as Array<keyof ApiKeys>)
+                              .filter(provider => useOpenRouter ? provider === 'openrouter' : provider !== 'openrouter')
+                              .map((provider) => (
                               <div key={provider} className="space-y-3">
                                 <div className="flex items-center justify-between">
                                   <label className="text-sm font-medium text-foreground">
@@ -1021,7 +1224,7 @@ const Home: NextPage = () => {
                     <svg viewBox="28 28 128 132" xmlns="http://www.w3.org/2000/svg" fill="none" width="48" height="50">
                       <path fill="#F3B01C" d="M108.092 130.021c18.166-2.018 35.293-11.698 44.723-27.854-4.466 39.961-48.162 65.218-83.83 49.711-3.286-1.425-6.115-3.796-8.056-6.844-8.016-12.586-10.65-28.601-6.865-43.135 10.817 18.668 32.81 30.111 54.028 28.122Z"/>
                       <path fill="#8D2676" d="M53.401 90.174c-7.364 17.017-7.682 36.94 1.345 53.336-31.77-23.902-31.423-75.052-.388-98.715 2.87-2.187 6.282-3.485 9.86-3.683 14.713-.776 29.662 4.91 40.146 15.507-21.3.212-42.046 13.857-50.963 33.555Z"/>
-                      <path fill="#EE342F" d="M114.637 61.855C103.89 46.87 87.069 36.668 68.639 36.358c35.625-16.17 79.446 10.047 84.217 48.807.444 3.598-.139 7.267-1.734 10.512-6.656 13.518-18.998 24.002-33.42 27.882 10.567-19.599 9.263-43.544-3.065-61.704Z"/>
+                      <path fill="#EE342F" d="M114.637 61.855C103.89 46.87 87.069 36.668 68.639 36.358c35.625-16.17 79.446 10.047 84.217 48.807.444 3.598-.139 7.267-1.734 10.512-6.656 13.518-18.998 24.002-33.42 27.882 10.567-19.599 9.263-43.544Z"/>
                     </svg>
                   </div>
                   <span className="text-xs text-muted-foreground font-medium">Convex</span>

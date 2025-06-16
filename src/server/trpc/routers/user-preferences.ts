@@ -16,11 +16,12 @@ interface ModelData {
   displayNameBottom?: string;
   description: string;
   provider: string;
+  apiUrl?: string;
+  openrouterModelId?: string;
   capabilities: string[];
   isFavorite: boolean;
   isActive: boolean;
   order: number;
-  apiUrl?: string;
   contextWindow?: number;
   maxTokens?: number;
   costPer1kTokens?: number;

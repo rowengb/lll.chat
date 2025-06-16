@@ -445,20 +445,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
 
   try {
+    // Get model data from database to check for OpenRouter model ID
+    const modelFromDb = await convex.query(api.models.getModelById, { modelId: model });
+    
     // Determine provider from model
     const modelData = getModelProvider(model);
     
-    // Get API key from Convex database
-    const apiKey = await getApiKeyFromDatabase(convexUser._id, modelData.provider);
+    // Get API key from Convex database - try specific provider first, then fall back to OpenRouter
+    let apiKey = await getApiKeyFromDatabase(convexUser._id, modelData.provider);
+    let actualProvider = modelData.provider;
+    let actualModelId = model; // Default to original model ID
+    
+    // If no specific provider key found, try OpenRouter as fallback
+    if (!apiKey) {
+      apiKey = await getApiKeyFromDatabase(convexUser._id, "openrouter");
+      if (apiKey) {
+        actualProvider = "openrouter";
+        // Use OpenRouter model ID if available, otherwise use original model ID
+        if (modelFromDb?.openrouterModelId) {
+          actualModelId = modelFromDb.openrouterModelId;
+          console.log(`🔀 [LLL.CHAT] Using OpenRouter API key with model ID: ${actualModelId} (original: ${model})`);
+        } else {
+          console.log(`🔀 [LLL.CHAT] Using OpenRouter API key for ${modelData.provider} model: ${model} (no OpenRouter model ID found)`);
+        }
+      }
+    }
     
     if (!apiKey) {
-      console.log(`⚠️  [LLL.CHAT] No API key found for ${modelData.provider}`);
-      res.write(`f:{"error":"No API key found for ${modelData.provider}. Please add one in Settings."}\n`);
+      console.log(`⚠️  [LLL.CHAT] No API key found for ${modelData.provider} or OpenRouter`);
+      res.write(`f:{"error":"No API key found for ${modelData.provider}. Please add a ${modelData.provider} API key or an OpenRouter API key in Settings."}\n`);
       res.end();
       return;
     }
 
-    console.log(`🔑 [LLL.CHAT] Using ${modelData.provider} API key`);
+    console.log(`🔑 [LLL.CHAT] Using ${actualProvider} API key for ${modelData.provider} model`);
     
     const aiCallStart = Date.now();
     console.log(`🤖 [LLL.CHAT] Starting AI API call at ${new Date().toISOString()}`);
@@ -658,10 +678,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Create AI client and stream response for text models
-    const aiClient = getAiClient(modelData.provider, apiKey);
+    const aiClient = getAiClient(actualProvider, apiKey);
     const stream = await aiClient.createChatCompletion({
       messages: aiMessages,
-      model: model,
+      model: actualModelId,
       stream: true,
       apiKey,
       enableGrounding: searchGrounding,

@@ -80,6 +80,7 @@ export default defineSchema({
     subtitle: v.optional(v.string()), // Optional subtitle (e.g., "(Reasoning)", "(Thinking)")
     provider: v.string(), // Provider name (e.g., "openai", "anthropic")
     apiUrl: v.optional(v.string()), // API endpoint URL
+    openrouterModelId: v.optional(v.string()), // OpenRouter-specific model ID (e.g., "google/gemini-2.5-pro-preview")
     capabilities: v.array(v.string()), // Array of capabilities (e.g., ["vision", "reasoning", "experimental"])
     isFavorite: v.boolean(), // Whether it's in the favorites section
     isActive: v.boolean(), // Whether the model is available

@@ -352,17 +352,42 @@ export const chatConvexRouter = createTRPCRouter({
 
       const titleGenerationModel = preferences?.titleGenerationModel || "gpt-4o-mini";
 
-      // Get the user's OpenAI API key
-      const apiKeyRecord = await convex.query(api.apiKeys.getByUserAndProvider, {
+      // Get model data from database to check for OpenRouter model ID
+      const modelFromDb = await convex.query(api.models.getModelById, { modelId: titleGenerationModel });
+      
+      // Determine provider from model
+      const modelData = await getModelProvider(titleGenerationModel);
+      
+      // Try to get API key for the specific provider first, then fall back to OpenRouter
+      let apiKeyRecord = await convex.query(api.apiKeys.getByUserAndProvider, {
         userId: convexUser._id,
-        provider: "openai",
+        provider: modelData.provider,
       });
-
+      
+      let actualProvider = modelData.provider;
+      let actualModelId = titleGenerationModel;
+      
+      // If no specific provider key found, try OpenRouter as fallback
       if (!apiKeyRecord?.keyValue) {
-        return { success: false, error: "OpenAI API key not found" };
+        apiKeyRecord = await convex.query(api.apiKeys.getByUserAndProvider, {
+          userId: convexUser._id,
+          provider: "openrouter",
+        });
+        
+        if (apiKeyRecord?.keyValue) {
+          actualProvider = "openrouter";
+          // Use OpenRouter model ID if available, otherwise use original model ID
+          if (modelFromDb?.openrouterModelId) {
+            actualModelId = modelFromDb.openrouterModelId;
+          }
+        }
       }
 
-      // Decrypt the API key (assuming it's encrypted)
+      if (!apiKeyRecord?.keyValue) {
+        return { success: false, error: `No API key found for ${modelData.provider} or OpenRouter. Please add an API key in Settings.` };
+      }
+
+      // Decrypt the API key
       const ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || "default-secret-key-change-in-production";
       
       let apiKey: string;
@@ -374,12 +399,13 @@ export const chatConvexRouter = createTRPCRouter({
         return { success: false, error: "Failed to decrypt API key" };
       }
 
-      // Generate the title using Convex function with user's preferred model
+      // Generate the title using Convex function with the correct provider and model
       const result = await convex.action(api.threads.generateTitle, {
         threadId: input.threadId as Id<"threads">,
         firstMessage: input.firstMessage,
         apiKey: apiKey,
-        modelId: titleGenerationModel,
+        modelId: actualModelId,
+        provider: actualProvider,
       });
 
       return result;
