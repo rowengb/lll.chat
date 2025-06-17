@@ -1024,7 +1024,7 @@ export function Chatbox({
         )}
         
         <div className="flex flex-row items-start gap-3 py-1">
-          <div className="textarea-container flex-1 pt-0.5">
+          <div className="textarea-container flex-1 pt-0.5" style={{ contain: 'none', transform: 'none' }}>
             <textarea
               ref={inputRef}
               value={input}
@@ -1038,7 +1038,12 @@ export function Chatbox({
                 boxShadow: 'none',
                 height: '20px',
                 minHeight: '20px',
-                maxHeight: '120px'
+                maxHeight: '120px',
+                // Fix cursor positioning on mobile
+                transform: 'none',
+                WebkitTransform: 'none',
+                position: 'relative',
+                zIndex: 1
               }}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}

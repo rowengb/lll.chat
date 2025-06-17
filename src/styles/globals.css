@@ -376,7 +376,13 @@ pre code {
   /* Prevent flex item from changing size unexpectedly */
   flex: 1 1 0%;
   min-width: 0;
-  contain: layout;
+  /* Remove contain: layout on mobile to fix cursor positioning */
+}
+
+@media (min-width: 640px) {
+  .textarea-container {
+    contain: layout;
+  }
 }
 
 /* Hide scrollbars completely */
@@ -549,6 +555,17 @@ pre code {
   /* Make sure scrollable containers take priority */
   [class*="overflow-y-auto"] {
     touch-action: pan-y;
+  }
+  
+  /* Fix textarea cursor positioning on mobile */
+  textarea {
+    /* Ensure cursor appears in correct position */
+    transform: none !important;
+    -webkit-transform: none !important;
+    contain: none !important;
+    /* Fix mobile cursor issues */
+    -webkit-appearance: none;
+    appearance: none;
   }
 }
 
