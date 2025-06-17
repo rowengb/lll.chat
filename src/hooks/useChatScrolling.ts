@@ -1,9 +1,24 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 export const useChatScrolling = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messagesContainer, setMessagesContainer] = useState<HTMLDivElement | null>(null);
   const scrollLocked = useRef<boolean>(false);
+
+  // "Activate" scroll container on mobile to prevent first-scroll pull-to-refresh
+  useEffect(() => {
+    if (messagesContainer && typeof window !== 'undefined' && window.innerWidth <= 640) {
+      // Tiny scroll to activate the container and prevent pull-to-refresh on first gesture
+      const activateScroll = setTimeout(() => {
+        messagesContainer.scrollTop = 1;
+        const resetScroll = setTimeout(() => {
+          messagesContainer.scrollTop = 0;
+        }, 10);
+        return () => clearTimeout(resetScroll);
+      }, 100);
+      return () => clearTimeout(activateScroll);
+    }
+  }, [messagesContainer]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

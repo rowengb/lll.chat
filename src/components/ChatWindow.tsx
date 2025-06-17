@@ -780,6 +780,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         <div 
           ref={setMessagesContainer}
           className="h-full overflow-y-auto"
+          style={{ touchAction: 'pan-y' }}
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>
             <div></div>

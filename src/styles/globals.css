@@ -535,13 +535,20 @@ pre code {
 /* Simple mobile optimizations */
 @media (max-width: 640px) {
   /* Just prevent pull-to-refresh, nothing fancy */
-  body {
+  html, body {
     overscroll-behavior-y: contain;
+    /* Prevent document-level scrolling on first touch */
+    touch-action: manipulation;
   }
   
   /* Prevent iOS zoom on inputs */
   input, textarea, select {
     font-size: 16px !important;
+  }
+  
+  /* Make sure scrollable containers take priority */
+  [class*="overflow-y-auto"] {
+    touch-action: pan-y;
   }
 }
 
