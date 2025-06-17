@@ -943,38 +943,19 @@ export function Chatbox({
 
   return (
     <div 
-      className={`relative chatbox-stable ${className} ${
-        isDragOver ? 'ring-2 ring-primary ring-offset-2' : ''
-      } rounded-t-2xl sm:rounded-t-2xl sm:rounded-b-none`}
+      className={`bg-background border-t border-border ${className} ${
+        isDragOver ? 'bg-primary/5' : ''
+      }`}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      style={{ touchAction: 'manipulation' }}
     >
-      {/* Enhanced glassmorphic background with complex styling */}
-      <div 
-        className={`absolute inset-0 bg-white/50 dark:bg-secondary/[0.045] backdrop-blur-md border border-b-0 border-white/50 dark:border-[hsl(0,0%,83%)]/[0.04] outline outline-4 outline-blue-500/20 dark:outline-blue-400/25 ${
-          isDragOver ? 'bg-primary/5 border-primary/30' : ''
-        }`}
-        style={{
-          borderRadius: '16px 16px 0 0',
-          boxShadow: `
-            rgba(0, 0, 0, 0.1) 0px 80px 50px 0px,
-            rgba(0, 0, 0, 0.07) 0px 50px 30px 0px,
-            rgba(0, 0, 0, 0.06) 0px 30px 15px 0px,
-            rgba(0, 0, 0, 0.04) 0px 15px 8px,
-            rgba(0, 0, 0, 0.04) 0px 6px 4px,
-            rgba(0, 0, 0, 0.02) 0px 2px 2px
-          `
-        }}
-      />
-      
-
-      
-      {/* Drag overlay */}
+      {/* Simple drag overlay */}
       {isDragOver && (
         <div 
-          className="absolute inset-0 flex items-center justify-center bg-primary/10 backdrop-blur-sm z-20 rounded-t-xl"
+          className="absolute inset-0 flex items-center justify-center bg-primary/10 z-20"
         >
           <div className="text-center">
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-primary/20 flex items-center justify-center">
@@ -989,7 +970,7 @@ export function Chatbox({
       )}
       
       {/* Content */}
-      <div className="relative z-10 px-4 pt-3">
+      <div className="px-4 pt-3">
       <form onSubmit={onSubmit}>
         {/* Unified Files Display - All in rows */}
         {allFiles.length > 0 && (
@@ -1054,7 +1035,7 @@ export function Chatbox({
               type={isStreaming ? "button" : "submit"}
               onClick={isStreaming ? onStop : undefined}
               disabled={isStreaming ? false : ((!input.trim() && uploadedFiles.length === 0) || isLoading)}
-              className={`h-10 w-10 shadow-sm transition-all mobile-button ${
+              className={`h-10 w-10 shadow-sm transition-all ${
                 isStreaming 
                   ? 'bg-destructive hover:bg-destructive/90' 
                   : 'bg-gradient-to-b from-blue-600 via-blue-600 to-blue-600 hover:from-blue-700 hover:via-blue-700 hover:to-blue-700 text-white dark:text-black'
@@ -1102,7 +1083,7 @@ export function Chatbox({
                   size="sm"
                   onClick={() => onSearchGroundingChange(!searchGroundingEnabled)}
                   disabled={isLoading}
-                  className={`h-7 transition-colors border rounded-full mobile-button ${
+                  className={`h-7 transition-colors border rounded-full ${
                     searchGroundingEnabled 
                       ? 'text-primary bg-primary/10 border-primary/20 hover:bg-primary/20 hover:border-primary/30' 
                       : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border hover:border-border/80'
