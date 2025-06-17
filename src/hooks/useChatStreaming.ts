@@ -113,7 +113,7 @@ export const useChatStreaming = () => {
     selectedModel: string,
     files: FileAttachmentData[] = [],
     searchGroundingEnabled: boolean = true,
-    inputRef: React.RefObject<HTMLInputElement | null>,
+    inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>,
     scrollToBottomPinned: () => void,
     saveStreamedMessage: any,
     updateFileAssociations: any,

@@ -378,7 +378,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               <div className="px-4 py-3 pb-2">
                 <Button
                   onClick={onNewChat}
-                  className="w-full bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700 text-white dark:text-black h-10 text-sm font-medium transition-all duration-200 shadow-sm"
+                  className="w-full bg-gradient-to-b from-blue-600 via-blue-600 to-blue-600 hover:from-blue-700 hover:via-blue-700 hover:to-blue-700 text-white dark:text-black h-10 text-sm font-medium transition-all duration-200 shadow-sm"
                   style={{ borderRadius: '12px' }}
                 >
                   New Chat
@@ -402,7 +402,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               </div>
 
               {/* Thread List */}
-              <div className="overflow-y-auto hidden-scrollbar max-h-[50vh] min-h-0 mobile-scroll-optimized ios-scroll-fix">
+              <div className="overflow-y-auto hidden-scrollbar max-h-[50vh] min-h-0 mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated">
                 <div className="px-3 py-2">
                   {/* Pinned Threads Section */}
                   {sortedPinnedThreads.length > 0 && (
@@ -1110,7 +1110,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           <div className="px-4 py-3 pb-2">
             <Button
               onClick={handleNewChat}
-              className="w-full bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700 text-white dark:text-black h-10 text-sm font-medium transition-all duration-200 shadow-sm"
+              className="w-full bg-gradient-to-b from-blue-600 via-blue-600 to-blue-600 hover:from-blue-700 hover:via-blue-700 hover:to-blue-700 text-white dark:text-black h-10 text-sm font-medium transition-all duration-200 shadow-sm"
               style={{ borderRadius: '12px' }}
             >
               New Chat
@@ -1134,7 +1134,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           </div>
 
           {/* Thread List */}
-          <div className="flex-1 overflow-y-auto hidden-scrollbar">
+          <div className="flex-1 overflow-y-auto hidden-scrollbar mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated">
             <div className="px-3 py-2">
               {/* Pinned Threads Section */}
               {sortedPinnedThreads.length > 0 && (

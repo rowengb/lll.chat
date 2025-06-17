@@ -3,6 +3,8 @@ import { ArrowUpIcon, PaperclipIcon, XIcon, FileIcon, ImageIcon, FileTextIcon, V
 import { Button } from '@/components/ui/button';
 import { ModelSelector } from './ModelSelector';
 import { UploadedFile } from './FileUpload';
+import { VoiceInput } from './VoiceInput';
+import { useVoiceInput } from '@/hooks/useVoiceInput';
 import toast from 'react-hot-toast';
 import { trpc } from '@/utils/trpc';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,7 +23,7 @@ interface ChatboxProps {
   isLoading: boolean;
   isStreaming?: boolean;
   onStop?: () => void;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
   className?: string;
   searchGroundingEnabled?: boolean;
   onSearchGroundingChange?: (enabled: boolean) => void;
@@ -239,6 +241,13 @@ export function Chatbox({
   onModelSelectorClick
 }: ChatboxProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Voice input functionality
+  const { appendToInput } = useVoiceInput((transcript) => {
+    // This callback is called when voice input provides a transcript
+    const newInput = appendToInput(input, transcript);
+    onInputChange(newInput);
+  });
   
   // Modal state
   const [selectedFile, setSelectedFile] = useState<any>(null);
@@ -936,7 +945,7 @@ export function Chatbox({
     <div 
       className={`relative chatbox-stable ${className} ${
         isDragOver ? 'ring-2 ring-primary ring-offset-2' : ''
-      } rounded-t-[20px] sm:rounded-t-[20px] sm:rounded-b-none`}
+      } rounded-t-2xl sm:rounded-t-2xl sm:rounded-b-none`}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -1014,10 +1023,10 @@ export function Chatbox({
           </div>
         )}
         
-        <div className="flex flex-row items-center gap-3">
-          <div className="textarea-container flex-1">
+        <div className="flex flex-row items-start gap-3 py-1">
+          <div className="textarea-container flex-1 pt-0.5">
             <textarea
-              ref={inputRef as any}
+              ref={inputRef}
               value={input}
               onChange={(e) => onInputChange(e.target.value)}
               placeholder="Type your message..."
@@ -1035,25 +1044,40 @@ export function Chatbox({
               onPaste={handlePaste}
             />
           </div>
-          <Button 
-            type={isStreaming ? "button" : "submit"}
-            onClick={isStreaming ? onStop : undefined}
-            disabled={isStreaming ? false : ((!input.trim() && uploadedFiles.length === 0) || isLoading)}
-            className={`h-12 w-12 shadow-sm transition-all mobile-button ${
-              isStreaming 
-                ? 'bg-destructive hover:bg-destructive/90' 
-                : 'bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 hover:from-blue-700 hover:via-blue-600 hover:to-blue-700 text-white dark:text-black'
-            }`}
-            style={{ borderRadius: '12px' }}
-            size="sm"
-            title={isStreaming ? "Stop generation" : "Send message"}
-          >
-            {isStreaming ? (
-              <SquareIcon className="h-5 w-5 text-destructive-foreground" fill="currentColor" />
-            ) : (
-            <ArrowUpIcon className="h-6 w-6 text-primary-foreground" strokeWidth={1.8} strokeLinecap="square" />
-            )}
-          </Button>
+          <div className="flex items-center bg-muted/50 rounded-2xl p-1 gap-1 shadow-sm border border-blue-200 dark:border-blue-900 mt-0" style={{ boxShadow: 'inset 0 1px 2px rgba(59, 130, 246, 0.1)' }}>
+            <Button 
+              type={isStreaming ? "button" : "submit"}
+              onClick={isStreaming ? onStop : undefined}
+              disabled={isStreaming ? false : ((!input.trim() && uploadedFiles.length === 0) || isLoading)}
+              className={`h-10 w-10 shadow-sm transition-all mobile-button ${
+                isStreaming 
+                  ? 'bg-destructive hover:bg-destructive/90' 
+                  : 'bg-gradient-to-b from-blue-600 via-blue-600 to-blue-600 hover:from-blue-700 hover:via-blue-700 hover:to-blue-700 text-white dark:text-black'
+              }`}
+              style={{ 
+                borderRadius: '10px',
+                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+              }}
+              size="sm"
+              title={isStreaming ? "Stop generation" : "Send message"}
+            >
+              {isStreaming ? (
+                <SquareIcon className="h-4 w-4 text-destructive-foreground" fill="currentColor" />
+              ) : (
+              <ArrowUpIcon className="h-4 w-4 text-primary-foreground" strokeWidth={1.8} strokeLinecap="square" />
+              )}
+            </Button>
+            <VoiceInput
+              onTranscript={(transcript) => {
+                const newInput = appendToInput(input, transcript);
+                onInputChange(newInput);
+              }}
+              disabled={isLoading}
+              variant="compact"
+              showTranscriptAboveTextarea={true}
+              textareaRef={inputRef}
+            />
+          </div>
         </div>
         
         <div className="border-t border-border/80 mt-2 py-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-0">

@@ -45,7 +45,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [shouldShakeBanner, setShouldShakeBanner] = useState(false);
   
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const previousThreadId = useRef<string | null>(null);
   
   // Global stores
@@ -285,7 +285,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     selectedModel: string,
     files: FileAttachmentData[] = [],
     searchGroundingEnabled: boolean = true,
-    inputRef: React.RefObject<HTMLInputElement | null>,
+    inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>,
     scrollToBottomPinned: () => void,
     saveAssistantMessage: any,
     updateFileAssociations: any,
@@ -778,7 +778,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       {/* Messages + Chatbox Area */}
       <div className="flex-1 overflow-hidden relative mobile-scroll-isolated">
         <CustomScrollbar 
-          className={`h-full mobile-scroll-optimized ios-scroll-fix ${scrollLocked.current ? 'scroll-locked' : ''}`}
+          className={`h-full mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated ${scrollLocked.current ? 'scroll-locked' : ''}`}
           onRef={setMessagesContainer}
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>
@@ -894,7 +894,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           </div>
 
                           {/* Message Actions */}
-                          <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100 mobile-no-hover"} transition-opacity`}>
+                          <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity mobile-no-hover`}>
                             {message.role === "assistant" && (
                               <div className="flex items-center gap-1 mr-1">
                                 <div className="flex items-center gap-1 text-sm text-muted-foreground px-5">

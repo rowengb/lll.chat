@@ -482,12 +482,170 @@ pre code {
     color: inherit !important;
     transform: none !important;
   }
+  
+  /* Disable all hover effects on touch devices */
+  .group:hover .group-hover\:opacity-100 {
+    opacity: 0 !important;
+  }
+  
+  /* Disable hover effects on buttons and interactive elements */
+  button:hover,
+  .hover\:bg-muted:hover,
+  .hover\:bg-accent:hover,
+  .hover\:text-foreground:hover,
+  .hover\:border-border\/80:hover {
+    background-color: inherit !important;
+    color: inherit !important;
+    border-color: inherit !important;
+  }
+  
+  /* Disable hover transitions on touch devices */
+  * {
+    transition-property: none !important;
+  }
+  
+  /* Re-enable only essential transitions */
+  .transition-transform,
+  .transition-opacity {
+    transition-property: transform, opacity !important;
+    transition-duration: 0.15s !important;
+  }
 }
 
 /* Prevent iOS zoom on input focus */
 @media screen and (max-width: 640px) {
   input, textarea, select {
     font-size: 16px !important;
+  }
+}
+
+/* Enhanced mobile touch scrolling */
+@media (max-width: 640px) {
+  /* Global touch action optimization */
+  * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+  
+  /* Optimize scrollable containers */
+  .mobile-scroll-optimized {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    /* Hardware acceleration */
+    will-change: scroll-position;
+    transform: translateZ(0);
+    /* Prevent momentum interference */
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+  }
+  
+  /* Prevent scroll chaining on mobile */
+  .mobile-scroll-isolated {
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    /* Isolate scroll context */
+    contain: layout style paint;
+  }
+  
+  /* Fix for iOS Safari scroll issues */
+  .ios-scroll-fix {
+    -webkit-overflow-scrolling: touch;
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+    /* Prevent rubber band scrolling */
+    overscroll-behavior-y: contain;
+  }
+  
+  /* Optimize textarea and input elements */
+  textarea,
+  input {
+    /* Prevent touch interference */
+    touch-action: manipulation;
+    /* Remove iOS styling */
+    -webkit-appearance: none;
+    appearance: none;
+    /* Improve text selection */
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  
+  /* Specific textarea optimizations */
+  .mobile-textarea {
+    /* Prevent textarea from interfering with scrolling */
+    touch-action: manipulation;
+    /* Ensure proper text selection */
+    -webkit-user-select: text;
+    user-select: text;
+    /* Prevent iOS zoom */
+    font-size: 16px !important;
+    /* Remove any outline or focus rings that might interfere */
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    /* Prevent momentum scrolling interference */
+    -webkit-overflow-scrolling: auto;
+    /* Isolate from parent scroll */
+    overscroll-behavior: contain;
+  }
+  
+  /* Optimize buttons for touch */
+  button,
+  .mobile-button {
+    /* Prevent accidental touches */
+    touch-action: manipulation;
+    /* Remove iOS button styling */
+    -webkit-appearance: none;
+    appearance: none;
+    /* Remove tap highlight */
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Disable problematic hover effects */
+  .group:hover .group-hover\:opacity-100,
+  .opacity-0.group-hover\:opacity-100 {
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  
+  /* Completely hide message action buttons on mobile to prevent scroll interference */
+  .mobile-no-hover {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+  
+  /* Improve scroll performance */
+  .custom-scrollbar-container,
+  .hidden-scrollbar {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: auto;
+    overscroll-behavior: contain;
+  }
+  
+  /* Prevent scroll interference from fixed elements */
+  .fixed,
+  .absolute {
+    /* Prevent fixed elements from interfering with scroll */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+  
+  /* Optimize message containers */
+  .group {
+    /* Prevent group hover from interfering */
+    pointer-events: auto;
+  }
+  
+  .group > * {
+    /* Ensure child elements don't block scrolling */
+    pointer-events: auto;
+  }
+  
+  /* Prevent text selection from interfering with scrolling */
+  .group:active {
+    -webkit-user-select: none;
+    user-select: none;
   }
 }
 

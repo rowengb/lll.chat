@@ -31,7 +31,7 @@ interface WelcomeScreenProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
   isLoading: boolean;
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  inputRef: React.RefObject<HTMLTextAreaElement | null>;
   
   // Search grounding props
   searchGroundingEnabled: boolean;
