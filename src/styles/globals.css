@@ -5,9 +5,6 @@
 /* Import JetBrains Mono font */
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
 
-/* Import Inter font */
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
-
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -81,10 +78,6 @@
   html, body {
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE/Edge */
-    height: 100%;
-    font-family: inherit;
-    /* Global scrollbar gutter for consistency */
-    scrollbar-gutter: stable;
   }
   
   html::-webkit-scrollbar,
@@ -93,11 +86,8 @@
   }
   
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-background text-foreground;
     line-height: 1.5;
-    color: hsl(var(--foreground));
-    background: hsl(var(--background));
-    font-feature-settings: "rlig" 1, "calt" 1;
   }
   
   /* Apply 1.5 line height globally */
@@ -238,6 +228,8 @@ pre code {
   word-break: normal !important;
   display: block !important;
 }
+
+
 
 /* Custom markdown styles */
 .prose {
@@ -405,92 +397,6 @@ pre code {
   display: none; /* Chrome, Safari, Edge */
 }
 
-/* T3-Style Dynamic Scrollbars */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 4px;
-  border: 1px solid transparent;
-  background-clip: content-box;
-  transition: background 0.2s ease-in-out;
-}
-
-/* Scrollbar gutter - prevent layout shift */
-.dynamic-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-  scrollbar-gutter: stable;
-  transition: scrollbar-color 0.2s ease-in-out;
-}
-
-.dynamic-scrollbar::-webkit-scrollbar-thumb {
-  background: transparent;
-  transition: background 0.2s ease-in-out;
-}
-
-.dynamic-scrollbar[data-scrolling="true"] {
-  scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
-}
-
-.dynamic-scrollbar[data-scrolling="true"]::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.4);
-}
-
-.dynamic-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.6) !important;
-}
-
-/* Small scrollbars for compact areas */
-.small-scrollbar {
-  scrollbar-gutter: stable;
-}
-
-.small-scrollbar::-webkit-scrollbar {
-  width: 4px !important;
-  height: 4px !important;
-}
-
-.small-scrollbar::-webkit-scrollbar-thumb {
-  background: transparent;
-  transition: background 0.2s ease-in-out;
-}
-
-.small-scrollbar[data-scrolling="true"]::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.4);
-}
-
-.small-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.6) !important;
-}
-
-/* Scroll shadow fade effects */
-.scroll-shadow:not([data-shadow="false"]) {
-  --shadow-height: 20px;
-  --scrollbar-width: 8px;
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--shadow-height),
-    #000 calc(100% - var(--shadow-height)),
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--shadow-height),
-    #000 calc(100% - var(--shadow-height)),
-    transparent 100%
-  );
-}
-
 /* Only hide scrollbars on desktop (sm and above) */
 @media (min-width: 640px) {
   .sm\:hidden-scrollbar {
@@ -634,9 +540,9 @@ pre code {
 
 /* Simple mobile optimizations */
 @media (max-width: 640px) {
-  /* T3-style mobile touch optimization */
+  /* Just prevent pull-to-refresh, nothing fancy */
   html, body {
-    overscroll-behavior-y: none;
+    overscroll-behavior-y: contain;
     /* Prevent document-level scrolling on first touch */
     touch-action: manipulation;
   }
@@ -660,65 +566,6 @@ pre code {
     /* Fix mobile cursor issues */
     -webkit-appearance: none;
     appearance: none;
-  }
-  
-  /* Hide scrollbars on mobile - use native */
-  .dynamic-scrollbar,
-  .small-scrollbar {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-  
-  .dynamic-scrollbar::-webkit-scrollbar,
-  .small-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-}
-
-/* Cross-browser support */
-@supports (-moz-appearance: none) {
-  .firefox-scrollbar-margin-fix {
-    --firefox-scrollbar: 10px;
-    padding-right: var(--firefox-scrollbar);
-  }
-}
-
-/* Fallback for browsers without scrollbar-gutter support */
-@supports not (scrollbar-gutter: stable) {
-  .dynamic-scrollbar {
-    /* Reserve space for 8px scrollbar + 2px margin */
-    padding-right: 10px;
-    margin-right: -10px;
-    box-sizing: content-box;
-  }
-  
-  .small-scrollbar {
-    /* Reserve space for 4px scrollbar + 1px margin */
-    padding-right: 5px;
-    margin-right: -5px;
-    box-sizing: content-box;
-  }
-  
-  /* Adjust for mobile where we don't show custom scrollbars */
-  @media (max-width: 640px) {
-    .dynamic-scrollbar,
-    .small-scrollbar {
-      padding-right: 0;
-      margin-right: 0;
-    }
-  }
-}
-
-/* PWA and mobile app optimizations */
-@media (max-width: 767px) and (any-pointer: coarse) {
-  .min-h-pwa, body, html {
-    overscroll-behavior-y: none;
-  }
-  
-  /* Disable rubber band scrolling */
-  .touch-scroll-optimized {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
   }
 }
 
@@ -747,16 +594,17 @@ pre code {
 
 .custom-scrollbar-thumb {
   position: absolute;
-  right: 0;
-  width: 8px;
-  background: hsl(var(--muted-foreground) / 0.6);
-  border-radius: 4px;
+  right: 1px;
+  width: 6px;
+  background: hsl(var(--muted-foreground) / 0.4);
+  border-radius: 3px;
+  transition: background 0.2s ease;
   cursor: grab;
-  transition: background-color 0.2s ease;
+  min-height: 20px;
 }
 
 .custom-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.8);
+  background: hsl(var(--muted-foreground) / 0.6);
 }
 
 /* Mobile-specific scroll improvements */
