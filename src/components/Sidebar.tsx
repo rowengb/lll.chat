@@ -10,6 +10,7 @@ import toast from "react-hot-toast";
 import Logo from './Logo';
 import { useChatStore } from "../stores/chatStore";
 import { useTheme } from '@/hooks/useTheme';
+import { CustomScrollbar } from './CustomScrollbar';
 
 
 // Helper function to get provider from model name using database
@@ -402,7 +403,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               </div>
 
               {/* Thread List */}
-              <div className="overflow-y-auto max-h-[50vh] min-h-0">
+                              <div className="overflow-y-auto mobile-hidden-scrollbar max-h-[50vh] min-h-0">
                 <div className="px-3 py-2">
                   {/* Pinned Threads Section */}
                   {sortedPinnedThreads.length > 0 && (
@@ -1134,7 +1135,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           </div>
 
           {/* Thread List */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Mobile: Native scrollbar with mobile-hidden */}
+          <div className="flex-1 overflow-y-auto mobile-hidden-scrollbar sm:hidden">
             <div className="px-3 py-2">
               {/* Pinned Threads Section */}
               {sortedPinnedThreads.length > 0 && (
@@ -1170,6 +1172,47 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Desktop: Custom scrollbar */}
+          <div className="hidden sm:block flex-1 overflow-hidden">
+            <CustomScrollbar className="h-full">
+              <div className="px-3 py-2">
+                {/* Pinned Threads Section */}
+                {sortedPinnedThreads.length > 0 && (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 px-1 py-2 mb-2">
+                      <PinIcon className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground tracking-wide">
+                        Pinned
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {sortedPinnedThreads.map((thread) => (
+                        <ThreadItem key={thread.id} thread={thread} isPinned={true} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Time-based Thread Categories */}
+                {timeCategories.map((category, categoryIndex) => (
+                  <div key={category} className={categoryIndex > 0 || sortedPinnedThreads.length > 0 ? "mt-4" : ""}>
+                    <div className="flex items-center gap-2 px-1 py-2 mb-2">
+                      <MessageSquareIcon className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground tracking-wide">
+                        {category}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {groupedUnpinnedThreads[category].map((thread: any) => (
+                        <ThreadItem key={thread.id} thread={thread} isPinned={false} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CustomScrollbar>
           </div>
 
           {/* Footer with Account Button */}

@@ -1031,13 +1031,13 @@ export function Chatbox({
               onChange={(e) => onInputChange(e.target.value)}
               placeholder="Type your message..."
               disabled={isLoading}
-              className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none text-foreground placeholder:text-muted-foreground"
+              className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none text-foreground placeholder:text-muted-foreground hidden-scrollbar"
               style={{ 
                 border: 'none', 
                 outline: 'none', 
                 boxShadow: 'none',
-                height: '20px',
-                minHeight: '20px',
+                height: '44px',
+                minHeight: '44px',
                 maxHeight: '120px',
                 // Fix cursor positioning on mobile
                 transform: 'none',

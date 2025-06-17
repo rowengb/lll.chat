@@ -92,8 +92,15 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       return;
     }
 
+    // Clear any previous audio chunks
+    audioChunksRef.current = [];
+
     try {
       console.log('🎤 [VoiceInput] Requesting microphone permission...');
+      
+      // Set recording state immediately to update UI
+      setIsRecording(true);
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -123,15 +130,28 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
         
         if (audioChunksRef.current.length > 0) {
           await processAudioWithWhisper();
+        } else {
+          // Reset processing state if no audio was recorded
+          setIsProcessing(false);
         }
       };
 
+      mediaRecorder.onerror = (error) => {
+        console.error('🎤 [VoiceInput] MediaRecorder error:', error);
+        setIsRecording(false);
+        setIsProcessing(false);
+        stream.getTracks().forEach(track => track.stop());
+        toast.error('Recording error occurred. Please try again.');
+      };
+
       mediaRecorder.start();
-      setIsRecording(true);
       toast.success('Recording started! Click stop when finished.');
       
     } catch (error) {
       console.error('🎤 [VoiceInput] Error starting recording:', error);
+      // Reset state on error
+      setIsRecording(false);
+      setIsProcessing(false);
       toast.error('Could not access microphone. Please check permissions.');
     }
   };
@@ -192,7 +212,10 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       console.error('🎤 [VoiceInput] Error processing audio:', error);
       toast.error('Failed to transcribe audio. Please try again.');
     } finally {
+      // Clean up state
       setIsProcessing(false);
+      setIsRecording(false);
+      audioChunksRef.current = [];
     }
   };
 

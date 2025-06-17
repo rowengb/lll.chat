@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* Import JetBrains Mono font */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap");
 
 @layer base {
   :root {
@@ -73,32 +73,48 @@
   * {
     @apply border-border;
   }
-  
+
   /* Hide browser scrollbars app-wide */
-  html, body {
+  html,
+  body {
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE/Edge */
   }
-  
+
   html::-webkit-scrollbar,
   body::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Edge */
   }
-  
+
   body {
     @apply bg-background text-foreground;
     line-height: 1.5;
   }
-  
+
   /* Apply 1.5 line height globally */
-  p, div, span, h1, h2, h3, h4, h5, h6, li, td, th, label, button, input, textarea {
+  p,
+  div,
+  span,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  li,
+  td,
+  th,
+  label,
+  button,
+  input,
+  textarea {
     line-height: 1.5;
   }
 }
 
 /* Syntax highlighting for code blocks */
-@import 'highlight.js/styles/github.css';
-@import 'highlight.js/styles/github-dark.css';
+@import "highlight.js/styles/github.css";
+@import "highlight.js/styles/github-dark.css";
 
 /* Clean syntax highlighting for light mode */
 .light .hljs {
@@ -209,8 +225,12 @@ code,
 .hljs,
 [class*="language-"],
 .font-mono {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace !important;
-  font-feature-settings: 'liga' 1, 'calt' 1;
+  font-family:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace !important;
+  font-feature-settings:
+    "liga" 1,
+    "calt" 1;
   font-variant-ligatures: contextual;
 }
 
@@ -229,8 +249,6 @@ pre code {
   display: block !important;
 }
 
-
-
 /* Custom markdown styles */
 .prose {
   color: inherit;
@@ -244,7 +262,12 @@ pre code {
   box-sizing: border-box;
 }
 
-.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
   color: inherit;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
@@ -255,7 +278,8 @@ pre code {
   margin-bottom: 0.5rem;
 }
 
-.prose ul, .prose ol {
+.prose ul,
+.prose ol {
   margin-top: 0.5rem;
   margin-bottom: 0.5rem;
   padding-left: 1.5rem;
@@ -282,7 +306,8 @@ pre code {
   word-wrap: break-word;
 }
 
-.prose th, .prose td {
+.prose th,
+.prose td {
   border: 1px solid hsl(var(--border));
   padding: 0.5rem;
   text-align: left;
@@ -318,13 +343,21 @@ pre code {
 
 /* Shake animation for API key banner */
 @keyframes shake {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateX(-50%) translateY(0);
   }
-  10%, 30%, 50%, 70%, 90% {
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
     transform: translateX(-50%) translateY(0) translateX(-5px);
   }
-  20%, 40%, 60%, 80% {
+  20%,
+  40%,
+  60%,
+  80% {
     transform: translateX(-50%) translateY(0) translateX(5px);
   }
 }
@@ -501,12 +534,12 @@ pre code {
     color: inherit !important;
     transform: none !important;
   }
-  
+
   /* Disable all hover effects on touch devices */
   .group:hover .group-hover\:opacity-100 {
     opacity: 0 !important;
   }
-  
+
   /* Disable hover effects on buttons and interactive elements */
   button:hover,
   .hover\:bg-muted:hover,
@@ -517,12 +550,12 @@ pre code {
     color: inherit !important;
     border-color: inherit !important;
   }
-  
+
   /* Disable hover transitions on touch devices */
   * {
     transition-property: none !important;
   }
-  
+
   /* Re-enable only essential transitions */
   .transition-transform,
   .transition-opacity {
@@ -533,7 +566,9 @@ pre code {
 
 /* Prevent iOS zoom on input focus */
 @media screen and (max-width: 640px) {
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     font-size: 16px !important;
   }
 }
@@ -541,22 +576,25 @@ pre code {
 /* Simple mobile optimizations */
 @media (max-width: 640px) {
   /* Just prevent pull-to-refresh, nothing fancy */
-  html, body {
+  html,
+  body {
     overscroll-behavior-y: contain;
     /* Prevent document-level scrolling on first touch */
     touch-action: manipulation;
   }
-  
+
   /* Prevent iOS zoom on inputs */
-  input, textarea, select {
+  input,
+  textarea,
+  select {
     font-size: 16px !important;
   }
-  
+
   /* Make sure scrollable containers take priority */
   [class*="overflow-y-auto"] {
     touch-action: pan-y;
   }
-  
+
   /* Fix textarea cursor positioning on mobile */
   textarea {
     /* Ensure cursor appears in correct position */
@@ -566,6 +604,16 @@ pre code {
     /* Fix mobile cursor issues */
     -webkit-appearance: none;
     appearance: none;
+  }
+
+  /* Hide scrollbars on mobile only */
+  .mobile-hidden-scrollbar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+
+  .mobile-hidden-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Edge */
   }
 }
 
@@ -618,13 +666,13 @@ pre code {
     will-change: scroll-position;
     transform: translateZ(0);
   }
-  
+
   /* Prevent scroll chaining on mobile */
   .mobile-scroll-isolated {
     overscroll-behavior: contain;
     touch-action: pan-y;
   }
-  
+
   /* Fix for iOS Safari scroll issues */
   .ios-scroll-fix {
     -webkit-overflow-scrolling: touch;
@@ -632,5 +680,3 @@ pre code {
     transform: translate3d(0, 0, 0);
   }
 }
-
- 

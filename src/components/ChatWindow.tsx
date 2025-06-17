@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { useChatStore } from "../stores/chatStore";
 import { useImageStore } from "../stores/imageStore";
 
+import { CustomScrollbar } from './CustomScrollbar';
 import { ActionButton } from './ActionButton';
 import { UploadedFile } from './FileUpload';
 import { Chatbox } from './Chatbox';
@@ -753,7 +754,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   // Main chat interface when threadId exists
   return (
     <div 
-      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900 left-0 sm:left-auto mobile-no-refresh"
+      className="fixed inset-0 flex flex-col bg-white dark:bg-slate-900 sm:left-auto mobile-no-refresh"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
         transition: 'left 0.3s ease-out'
@@ -776,10 +777,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       />
 
       {/* Messages + Chatbox Area */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-hidden relative min-h-0">
+        {/* Mobile: Native scrollbars */}
         <div 
-          ref={setMessagesContainer}
-          className="h-full overflow-y-auto"
+ref={setMessagesContainer}
+          className="block sm:hidden absolute inset-0 overflow-y-auto mobile-hidden-scrollbar"
           style={{ touchAction: 'pan-y' }}
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>
@@ -1006,10 +1008,265 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           </div>
         </div>
         
-        {/* Chatbox */}
-        <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
-          <div className="px-4 sm:hidden">
-            <div className="max-w-[95%] w-full mx-auto">
+        {/* Desktop: Custom scrollbars */}
+        <div className="hidden sm:block absolute inset-0">
+        <CustomScrollbar 
+            className="h-full"
+onRef={setMessagesContainer}
+        >
+          <div className={`${sharedGridClasses} pt-8 pb-48`}>
+            <div></div>
+            <div className="w-full">
+              <div className={sharedLayoutClasses} id="messages-container">
+                <div className="space-y-0">
+                  {filterOutEmptyOptimisticMessages(localMessages).map((message: Message) => (
+                    <div key={message.id} className="flex justify-start">
+                      <div className="w-full max-w-full min-w-0">
+                        <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
+                          <div
+                            className={`rounded-xl px-4 max-w-full overflow-hidden min-w-0 ${
+                              message.role === "user"
+                                ? "py-2" 
+                                : "pt-1 pb-1"
+                            } ${
+                              message.role === "user"
+                                ? "bg-primary/10 text-foreground border border-primary shadow-sm backdrop-blur-sm dark:bg-primary/30 dark:border-primary/50"
+                                : message.isError
+                                ? "bg-destructive/10 text-destructive border border-destructive/30 shadow-sm"
+                                : "text-foreground"
+                            }`}
+                          >
+                            {editingMessageId === message.id ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  value={editingContent}
+                                  onChange={(e) => setEditingContent(e.target.value)}
+                                  className="w-full p-2 border border-border rounded-lg text-sm resize-none bg-background text-foreground"
+                                  rows={Math.max(2, editingContent.split('\n').length)}
+                                  autoFocus
+                                />
+                                <div className="flex gap-2">
+                                  <Button
+                                    onClick={() => handleSaveEdit(message.id)}
+                                    size="sm"
+                                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                                  >
+                                    Save
+                                  </Button>
+                                  <Button
+                                    onClick={handleCancelEdit}
+                                    size="sm"
+                                    variant="outline"
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : message.role === "user" ? (
+                              <div>
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                                  {message.content}
+                                </p>
+                                {message.attachments && message.attachments.length > 0 && (
+                                  <div className="mt-2 w-full">
+                                    <div className="flex flex-col gap-2 w-full max-w-2xl">
+                                      {message.attachments.map((file) => (
+                                        <div key={file.id} className="w-full">
+                                          <FileAttachmentWithUrl fileId={file.id} />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div>
+                                {message.isError ? (
+                                  <div className="flex items-center gap-3">
+                                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+                                    <div className="flex-1">
+                                <ChunkedMarkdown 
+                                  content={message.content}
+                                  chunkSize={75}
+                                />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <ChunkedMarkdown 
+                                    content={message.content}
+                                    chunkSize={75}
+                                  />
+                                )}
+                                
+                                {message.role === "assistant" && message.groundingMetadata && (
+                                  <GroundingSources
+                                    sources={message.groundingMetadata.sources}
+                                    messageId={message.id}
+                                    onToggle={handleGroundingSourcesToggle}
+                                  />
+                                )}
+                                
+                                {message.role === "assistant" && message.imageUrl && (
+                                  <div className="mt-4">
+                                    <MessageImage imageUrl={message.imageUrl} />
+                                  </div>
+                                )}
+                                
+                                {message.role === "assistant" && message.stoppedByUser && (
+                                  <div className="mt-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                                    <div className="flex items-center gap-2">
+                                      <SquareIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="currentColor" />
+                                      <span className="text-sm text-amber-700 dark:text-amber-300">
+                                        Stopped by user
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Message Actions */}
+                          <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity mobile-no-hover`}>
+                            {message.role === "assistant" && (
+                              <div className="flex items-center gap-1 mr-1">
+                                <div className="flex items-center gap-1 text-sm text-muted-foreground px-5">
+                                  {getProviderFromModel(message.model, allModels)}
+                                  <span>•</span>
+                                  <span>{message.model}</span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {message.role === "user" ? (
+                              <>
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRetryMessage(message.id, message.role === "user")}
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                                >
+                                  <RotateCcwIcon className="h-4 w-4" />
+                                </ActionButton>
+                        
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEditMessage(message.id)}
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                                >
+                                  <EditIcon className="h-4 w-4" />
+                                </ActionButton>
+                        
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCopyMessage(message.content)}
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                                >
+                                  <CopyIcon className="h-4 w-4" />
+                                </ActionButton>
+                              </>
+                            ) : (
+                              <>
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCopyMessage(message.content)}
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                                >
+                                  <CopyIcon className="h-4 w-4" />
+                                </ActionButton>
+                        
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleBranchOff(message.id)}
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                                >
+                                  <GitBranchIcon className="h-4 w-4" />
+                                </ActionButton>
+                                
+                                <ActionButton
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRetryMessage(message.id, message.role === "user")}
+                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                                >
+                                  <RotateCcwIcon className="h-4 w-4" />
+                                </ActionButton>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+            
+                  {isLoading && (
+                    <div className="flex justify-start">
+                      <div className="w-full flex">
+                        {isImageGenerationModel(selectedModel) ? (
+                          <div className="w-full">
+                            <div className="px-4">
+                              <div className="mt-4">
+                                <ImageSkeleton />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex items-center space-x-1">
+                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"></div>
+                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
+                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
+                              </div>
+                              <span className="text-sm text-muted-foreground animate-pulse">AI is thinking...</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+            
+                  <div ref={messagesEndRef} />
+                </div>
+              </div>
+            </div>
+            <div></div>
+          </div>
+        </CustomScrollbar>
+        </div>
+        
+      </div>
+      
+      {/* Chatbox - positioned relative to the main container, not the messages area */}
+      <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+        <div className="px-4 sm:hidden">
+          <div className="max-w-[95%] w-full mx-auto">
+            <Chatbox
+              input={input}
+              onInputChange={handleInputChange}
+              onSubmit={handleSubmit}
+              uploadedFiles={uploadedFiles}
+              onFilesChange={setUploadedFiles}
+              selectedModel={selectedModel}
+              onModelChange={onModelChange}
+              isLoading={isLoading}
+              isStreaming={isStreaming}
+              onStop={stopStream}
+              inputRef={inputRef}
+              searchGroundingEnabled={searchGroundingEnabled}
+              onSearchGroundingChange={setSearchGroundingEnabled}
+              onModelSelectorClick={triggerShakeAnimation}
+            />
+          </div>
+        </div>
+        <div className={`hidden sm:block ${chatboxGridClasses}`}>
+          <div></div>
+          <div className="w-full">
+            <div className={chatboxLayoutClasses}>
               <Chatbox
                 input={input}
                 onInputChange={handleInputChange}
@@ -1026,29 +1283,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 onSearchGroundingChange={setSearchGroundingEnabled}
                 onModelSelectorClick={triggerShakeAnimation}
               />
-            </div>
-          </div>
-          <div className={`hidden sm:block ${chatboxGridClasses}`}>
-            <div></div>
-            <div className="w-full">
-              <div className={chatboxLayoutClasses}>
-                <Chatbox
-                  input={input}
-                  onInputChange={handleInputChange}
-                  onSubmit={handleSubmit}
-                  uploadedFiles={uploadedFiles}
-                  onFilesChange={setUploadedFiles}
-                  selectedModel={selectedModel}
-                  onModelChange={onModelChange}
-                  isLoading={isLoading}
-                  isStreaming={isStreaming}
-                  onStop={stopStream}
-                  inputRef={inputRef}
-                  searchGroundingEnabled={searchGroundingEnabled}
-                  onSearchGroundingChange={setSearchGroundingEnabled}
-                  onModelSelectorClick={triggerShakeAnimation}
-                />
-              </div>
             </div>
           </div>
         </div>
