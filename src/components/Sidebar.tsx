@@ -402,7 +402,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               </div>
 
               {/* Thread List */}
-              <div className="overflow-y-auto sm:hidden-scrollbar max-h-[50vh] min-h-0 mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated">
+              <div className="overflow-y-auto sm:hidden-scrollbar max-h-[50vh] min-h-0 mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated mobile-no-refresh">
                 <div className="px-3 py-2">
                   {/* Pinned Threads Section */}
                   {sortedPinnedThreads.length > 0 && (
@@ -1134,7 +1134,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           </div>
 
           {/* Thread List */}
-          <div className="flex-1 overflow-y-auto sm:hidden-scrollbar mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated">
+          <div className="flex-1 overflow-y-auto sm:hidden-scrollbar mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated mobile-no-refresh">
             <div className="px-3 py-2">
               {/* Pinned Threads Section */}
               {sortedPinnedThreads.length > 0 && (

@@ -778,7 +778,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       {/* Messages + Chatbox Area */}
       <div className="flex-1 overflow-hidden relative mobile-scroll-isolated">
         <CustomScrollbar 
-          className={`h-full mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated ${scrollLocked.current ? 'scroll-locked' : ''}`}
+          className={`h-full mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated mobile-no-refresh ${scrollLocked.current ? 'scroll-locked' : ''}`}
           onRef={setMessagesContainer}
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>

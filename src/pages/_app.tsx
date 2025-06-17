@@ -8,6 +8,7 @@ import { ConvexClientProvider } from "@/lib/convex";
 import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
+import { useEffect } from "react";
 
 // Wrapper component that can access the theme
 function ClerkWrapper({ children }: { children: React.ReactNode }) {
@@ -32,6 +33,52 @@ const MyApp: AppType = ({
   pageProps,
 }) => {
   const router = useRouter();
+  
+  // Prevent pull-to-refresh on mobile
+  useEffect(() => {
+    // Prevent pull-to-refresh and bounce scrolling on mobile
+    const preventDefault = (e: TouchEvent) => {
+      // Check if this is a pull-to-refresh gesture
+      if (e.touches.length > 1) return; // Allow multi-touch
+      
+      const touch = e.touches[0];
+      if (!touch) return;
+      
+      const target = e.target as Element;
+      
+      // Find the nearest scrollable parent
+      let scrollableParent = target.closest('[class*="overflow-"], [class*="scroll-"]');
+      
+      // If we're at the top of a scrollable container and pulling down, prevent
+      if (scrollableParent) {
+        const scrollTop = scrollableParent.scrollTop;
+        if (scrollTop === 0 && e.type === 'touchstart') {
+          // Store the initial touch position
+          (scrollableParent as any)._initialTouchY = touch.clientY;
+        } else if (e.type === 'touchmove' && (scrollableParent as any)._initialTouchY) {
+          const deltaY = touch.clientY - (scrollableParent as any)._initialTouchY;
+          if (scrollTop === 0 && deltaY > 0) {
+            e.preventDefault();
+          }
+        }
+      }
+    };
+    
+    // Add event listeners with passive: false to allow preventDefault
+    document.addEventListener('touchstart', preventDefault, { passive: false });
+    document.addEventListener('touchmove', preventDefault, { passive: false });
+    
+    // Set CSS properties on document
+    if (typeof window !== 'undefined' && window.innerWidth <= 640) {
+      document.body.style.overscrollBehaviorY = 'contain';
+      document.documentElement.style.overscrollBehaviorY = 'contain';
+    }
+    
+    return () => {
+      document.removeEventListener('touchstart', preventDefault);
+      document.removeEventListener('touchmove', preventDefault);
+    };
+  }, []);
   
   // Create a key that only changes for different page types, not different chat threads
   const getPageKey = () => {

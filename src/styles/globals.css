@@ -534,6 +534,28 @@ pre code {
 
 /* Enhanced mobile touch scrolling */
 @media (max-width: 640px) {
+  /* Prevent pull-to-refresh at document level */
+  html, body {
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    /* Prevent document scroll chaining */
+    overscroll-behavior: contain;
+  }
+  
+  /* More aggressive pull-to-refresh prevention */
+  body {
+    /* Prevent iOS pull-to-refresh */
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    /* Reset positioning for normal flow */
+    position: static;
+    /* Ensure body doesn't scroll */
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
   /* Global touch action optimization */
   * {
     -webkit-tap-highlight-color: transparent;
@@ -544,6 +566,7 @@ pre code {
   .mobile-scroll-optimized {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
     touch-action: pan-y;
     /* Hardware acceleration */
     will-change: scroll-position;
@@ -556,9 +579,21 @@ pre code {
   /* Prevent scroll chaining on mobile */
   .mobile-scroll-isolated {
     overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
     touch-action: pan-y;
     /* Isolate scroll context */
     contain: layout style paint;
+  }
+  
+  /* Enhanced pull-to-refresh prevention */
+  .mobile-no-refresh {
+    overscroll-behavior-y: contain !important;
+    overscroll-behavior-x: contain !important;
+    /* Prevent pull-to-refresh specifically */
+    -webkit-overflow-scrolling: touch;
+    /* Additional Safari fix */
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
   }
   
   /* Fix for iOS Safari scroll issues */
@@ -567,7 +602,8 @@ pre code {
     -webkit-transform: translate3d(0, 0, 0);
     transform: translate3d(0, 0, 0);
     /* Prevent rubber band scrolling */
-    overscroll-behavior-y: contain;
+    overscroll-behavior-y: contain !important;
+    overscroll-behavior-x: contain !important;
   }
   
   /* Optimize textarea and input elements */
@@ -634,31 +670,7 @@ pre code {
     -webkit-overflow-scrolling: touch;
     scroll-behavior: auto;
     overscroll-behavior: contain;
-  }
-  
-  /* Prevent scroll interference from fixed elements */
-  .fixed,
-  .absolute {
-    /* Prevent fixed elements from interfering with scroll */
-    -webkit-transform: translateZ(0);
-    transform: translateZ(0);
-  }
-  
-  /* Optimize message containers */
-  .group {
-    /* Prevent group hover from interfering */
-    pointer-events: auto;
-  }
-  
-  .group > * {
-    /* Ensure child elements don't block scrolling */
-    pointer-events: auto;
-  }
-  
-  /* Prevent text selection from interfering with scrolling */
-  .group:active {
-    -webkit-user-select: none;
-    user-select: none;
+    overscroll-behavior-y: contain;
   }
 }
 
