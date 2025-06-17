@@ -779,8 +779,9 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       <div className="flex-1 overflow-hidden relative">
         <div 
           ref={setMessagesContainer}
-          className="h-full overflow-y-auto"
+          className="h-full overflow-y-auto dynamic-scrollbar scroll-shadow touch-scroll-optimized"
           style={{ touchAction: 'pan-y' }}
+          data-scrolling="false"
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>
             <div></div>

@@ -4,6 +4,22 @@ export const useChatScrolling = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messagesContainer, setMessagesContainer] = useState<HTMLDivElement | null>(null);
   const scrollLocked = useRef<boolean>(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // T3-style dynamic scrollbar visibility
+  const handleScrollStart = (container: HTMLDivElement) => {
+    container.setAttribute('data-scrolling', 'true');
+    
+    // Clear existing timeout
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
+    }
+    
+    // Hide scrollbar after scrolling stops
+    scrollTimeoutRef.current = setTimeout(() => {
+      container.setAttribute('data-scrolling', 'false');
+    }, 1000);
+  };
 
   // "Activate" scroll container on mobile to prevent first-scroll pull-to-refresh
   useEffect(() => {
@@ -18,6 +34,24 @@ export const useChatScrolling = () => {
       }, 100);
       return () => clearTimeout(activateScroll);
     }
+  }, [messagesContainer]);
+
+  // Add scroll listener for dynamic scrollbar
+  useEffect(() => {
+    if (!messagesContainer) return;
+    
+    const handleScroll = () => {
+      handleScrollStart(messagesContainer);
+    };
+    
+    messagesContainer.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      messagesContainer.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
   }, [messagesContainer]);
 
   const scrollToBottom = () => {
@@ -95,6 +129,37 @@ export const useChatScrolling = () => {
     scrollToBottom,
     scrollToBottomImmediate,
     scrollToBottomPinned,
-    handleGroundingSourcesToggle
+    handleGroundingSourcesToggle,
+    handleScrollStart
   };
+};
+
+// Utility function for adding T3-style scrollbar behavior to any element
+export const useDynamicScrollbar = () => {
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const attachScrollBehavior = (element: HTMLElement) => {
+    const handleScroll = () => {
+      element.setAttribute('data-scrolling', 'true');
+      
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      
+      scrollTimeoutRef.current = setTimeout(() => {
+        element.setAttribute('data-scrolling', 'false');
+      }, 1000);
+    };
+    
+    element.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      element.removeEventListener('scroll', handleScroll);
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  };
+  
+  return { attachScrollBehavior };
 }; 
