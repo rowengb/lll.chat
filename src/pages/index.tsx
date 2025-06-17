@@ -43,6 +43,7 @@ const Home: NextPage = () => {
   
   // Add SPA state management for authenticated users
   const [currentView, setCurrentView] = useState<'welcome' | 'chat' | 'settings' | 'account'>('welcome');
+  const [isChatboxDisabled, setIsChatboxDisabled] = useState(false);
   
   const { 
     sidebarCollapsed, 
@@ -660,6 +661,7 @@ const Home: NextPage = () => {
               onOpenSearch={openSearch}
               currentView={currentView}
               onNavigateToSettings={navigateToSettings}
+              isChatboxDisabled={isChatboxDisabled}
             />
           );
         }
@@ -1038,6 +1040,7 @@ const Home: NextPage = () => {
               onOpenSearch={openSearch}
               currentView={currentView}
               onNavigateToSettings={navigateToSettings}
+              isChatboxDisabled={isChatboxDisabled}
             />
           );
         }
@@ -1342,6 +1345,8 @@ const Home: NextPage = () => {
               onToggleCollapse={toggleSidebar}
           onWidthChange={setSidebarWidth}
               onOpenSearch={openSearch}
+              isChatboxDisabled={isChatboxDisabled}
+              onToggleChatbox={setIsChatboxDisabled}
         />
         </div>
           <div className="flex-1 flex items-center justify-center">
@@ -1383,6 +1388,8 @@ const Home: NextPage = () => {
               onToggleCollapse={toggleSidebar}
               onWidthChange={setSidebarWidth}
               onOpenSearch={openSearch}
+              isChatboxDisabled={isChatboxDisabled}
+              onToggleChatbox={setIsChatboxDisabled}
             />
           </div>
           

@@ -9,6 +9,7 @@ export interface ChatWindowProps {
   onOpenSearch?: () => void;
   currentView?: string;
   onNavigateToSettings?: () => void;
+  isChatboxDisabled?: boolean;
 }
 
 export interface Message {

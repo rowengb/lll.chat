@@ -34,7 +34,7 @@ import { ChatWindowProps, Message, FileAttachmentData } from '../types/chat';
 // Constants
 import { sharedLayoutClasses, sharedGridClasses, chatboxLayoutClasses, chatboxGridClasses } from '../constants/chatLayout';
 
-const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth, onToggleSidebar, onOpenSearch, currentView, onNavigateToSettings }: ChatWindowProps) => {
+const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth, onToggleSidebar, onOpenSearch, currentView, onNavigateToSettings, isChatboxDisabled }: ChatWindowProps) => {
   // Local state
   const [input, setInput] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -1006,31 +1006,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         </CustomScrollbar>
         
         {/* Chatbox */}
-        <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
-          <div className="px-4 sm:hidden">
-            <div className="max-w-[95%] w-full mx-auto">
-              <Chatbox
-                input={input}
-                onInputChange={handleInputChange}
-                onSubmit={handleSubmit}
-                uploadedFiles={uploadedFiles}
-                onFilesChange={setUploadedFiles}
-                selectedModel={selectedModel}
-                onModelChange={onModelChange}
-                isLoading={isLoading}
-                isStreaming={isStreaming}
-                onStop={stopStream}
-                inputRef={inputRef}
-                searchGroundingEnabled={searchGroundingEnabled}
-                onSearchGroundingChange={setSearchGroundingEnabled}
-                onModelSelectorClick={triggerShakeAnimation}
-              />
-            </div>
-          </div>
-          <div className={`hidden sm:block ${chatboxGridClasses}`}>
-            <div></div>
-            <div className="w-full">
-              <div className={chatboxLayoutClasses}>
+        {!isChatboxDisabled && (
+          <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+            <div className="px-4 sm:hidden">
+              <div className="max-w-[95%] w-full mx-auto">
                 <Chatbox
                   input={input}
                   onInputChange={handleInputChange}
@@ -1049,8 +1028,31 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 />
               </div>
             </div>
+            <div className={`hidden sm:block ${chatboxGridClasses}`}>
+              <div></div>
+              <div className="w-full">
+                <div className={chatboxLayoutClasses}>
+                  <Chatbox
+                    input={input}
+                    onInputChange={handleInputChange}
+                    onSubmit={handleSubmit}
+                    uploadedFiles={uploadedFiles}
+                    onFilesChange={setUploadedFiles}
+                    selectedModel={selectedModel}
+                    onModelChange={onModelChange}
+                    isLoading={isLoading}
+                    isStreaming={isStreaming}
+                    onStop={stopStream}
+                    inputRef={inputRef}
+                    searchGroundingEnabled={searchGroundingEnabled}
+                    onSearchGroundingChange={setSearchGroundingEnabled}
+                    onModelSelectorClick={triggerShakeAnimation}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

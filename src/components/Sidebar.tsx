@@ -93,6 +93,8 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   onWidthChange?: (width: number) => void;
   onOpenSearch?: () => void;
+  isChatboxDisabled?: boolean;
+  onToggleChatbox?: (disabled: boolean) => void;
 }
 
 interface MobileSidebarProps {
@@ -105,6 +107,8 @@ interface MobileSidebarProps {
   onNavigateToAccount?: () => void;
   onNavigateToWelcome?: () => void;
   onOpenSearch?: () => void;
+  isChatboxDisabled?: boolean;
+  onToggleChatbox?: (disabled: boolean) => void;
 }
 
 interface ContextMenu {
@@ -114,7 +118,7 @@ interface ContextMenu {
 }
 
 // Mobile Sidebar Component
-function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, onOpenSearch }: MobileSidebarProps) {
+function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, onOpenSearch, isChatboxDisabled, onToggleChatbox }: MobileSidebarProps) {
   const { user } = useUser();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
@@ -457,6 +461,15 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
                   </Button>
                   <div className="flex items-center gap-1">
                     <Button
+                      onClick={() => onToggleChatbox?.(!isChatboxDisabled)}
+                      size="sm"
+                      variant="ghost"
+                      title={`${isChatboxDisabled ? 'Enable' : 'Disable'} chatbox`}
+                      className={`h-10 w-10 p-0 hover:bg-white dark:hover:bg-muted ${isChatboxDisabled ? 'bg-red-100 dark:bg-red-900/20' : ''}`}
+                    >
+                      <MessageSquareIcon className={`h-5 w-5 ${isChatboxDisabled ? 'text-red-600 dark:text-red-400' : ''}`} />
+                    </Button>
+                    <Button
                       onClick={handleThemeToggle}
                       size="sm"
                       variant="ghost"
@@ -508,7 +521,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
   );
 }
 
-export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, collapsed, onToggleCollapse, onWidthChange, onOpenSearch }: SidebarProps) {
+export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, collapsed, onToggleCollapse, onWidthChange, onOpenSearch, isChatboxDisabled, onToggleChatbox }: SidebarProps) {
   const router = useRouter();
   const { user } = useUser();
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -1189,6 +1202,15 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
               </Button>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <Button
+                  onClick={() => onToggleChatbox?.(!isChatboxDisabled)}
+                  size="sm"
+                  variant="ghost"
+                  title={`${isChatboxDisabled ? 'Enable' : 'Disable'} chatbox`}
+                  className={`h-10 w-10 p-0 hover:bg-white dark:hover:bg-muted flex-shrink-0 ${isChatboxDisabled ? 'bg-red-100 dark:bg-red-900/20' : ''}`}
+                >
+                  <MessageSquareIcon className={`h-5 w-5 ${isChatboxDisabled ? 'text-red-600 dark:text-red-400' : ''}`} />
+                </Button>
+                <Button
                   onClick={handleThemeToggle}
                   size="sm"
                   variant="ghost"
@@ -1299,6 +1321,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           onToggleCollapse(); // Close sidebar after navigation
         }}
         onOpenSearch={onOpenSearch}
+        isChatboxDisabled={isChatboxDisabled}
+        onToggleChatbox={onToggleChatbox}
       />
 
       {/* Context Menu */}
