@@ -93,8 +93,6 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   onWidthChange?: (width: number) => void;
   onOpenSearch?: () => void;
-  isChatboxDisabled?: boolean;
-  onToggleChatbox?: (disabled: boolean) => void;
 }
 
 interface MobileSidebarProps {
@@ -107,8 +105,6 @@ interface MobileSidebarProps {
   onNavigateToAccount?: () => void;
   onNavigateToWelcome?: () => void;
   onOpenSearch?: () => void;
-  isChatboxDisabled?: boolean;
-  onToggleChatbox?: (disabled: boolean) => void;
 }
 
 interface ContextMenu {
@@ -118,7 +114,7 @@ interface ContextMenu {
 }
 
 // Mobile Sidebar Component
-function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, onOpenSearch, isChatboxDisabled, onToggleChatbox }: MobileSidebarProps) {
+function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, onOpenSearch }: MobileSidebarProps) {
   const { user } = useUser();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState("");
@@ -406,7 +402,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               </div>
 
               {/* Thread List */}
-              <div className="overflow-y-auto hidden-scrollbar max-h-[50vh] min-h-0 mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated">
+              <div className="overflow-y-auto sm:hidden-scrollbar max-h-[50vh] min-h-0 mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated">
                 <div className="px-3 py-2">
                   {/* Pinned Threads Section */}
                   {sortedPinnedThreads.length > 0 && (
@@ -461,15 +457,6 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
                   </Button>
                   <div className="flex items-center gap-1">
                     <Button
-                      onClick={() => onToggleChatbox?.(!isChatboxDisabled)}
-                      size="sm"
-                      variant="ghost"
-                      title={`${isChatboxDisabled ? 'Enable' : 'Disable'} chatbox`}
-                      className={`h-10 w-10 p-0 hover:bg-white dark:hover:bg-muted ${isChatboxDisabled ? 'bg-red-100 dark:bg-red-900/20' : ''}`}
-                    >
-                      <MessageSquareIcon className={`h-5 w-5 ${isChatboxDisabled ? 'text-red-600 dark:text-red-400' : ''}`} />
-                    </Button>
-                    <Button
                       onClick={handleThemeToggle}
                       size="sm"
                       variant="ghost"
@@ -521,7 +508,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
   );
 }
 
-export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, collapsed, onToggleCollapse, onWidthChange, onOpenSearch, isChatboxDisabled, onToggleChatbox }: SidebarProps) {
+export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigateToSettings, onNavigateToAccount, onNavigateToWelcome, collapsed, onToggleCollapse, onWidthChange, onOpenSearch }: SidebarProps) {
   const router = useRouter();
   const { user } = useUser();
   const { theme, setTheme, resolvedTheme } = useTheme();
@@ -1147,7 +1134,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           </div>
 
           {/* Thread List */}
-          <div className="flex-1 overflow-y-auto hidden-scrollbar mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated">
+          <div className="flex-1 overflow-y-auto sm:hidden-scrollbar mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated">
             <div className="px-3 py-2">
               {/* Pinned Threads Section */}
               {sortedPinnedThreads.length > 0 && (
@@ -1201,15 +1188,6 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                 </span>
               </Button>
               <div className="flex items-center gap-1 flex-shrink-0">
-                <Button
-                  onClick={() => onToggleChatbox?.(!isChatboxDisabled)}
-                  size="sm"
-                  variant="ghost"
-                  title={`${isChatboxDisabled ? 'Enable' : 'Disable'} chatbox`}
-                  className={`h-10 w-10 p-0 hover:bg-white dark:hover:bg-muted flex-shrink-0 ${isChatboxDisabled ? 'bg-red-100 dark:bg-red-900/20' : ''}`}
-                >
-                  <MessageSquareIcon className={`h-5 w-5 ${isChatboxDisabled ? 'text-red-600 dark:text-red-400' : ''}`} />
-                </Button>
                 <Button
                   onClick={handleThemeToggle}
                   size="sm"
@@ -1321,8 +1299,6 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           onToggleCollapse(); // Close sidebar after navigation
         }}
         onOpenSearch={onOpenSearch}
-        isChatboxDisabled={isChatboxDisabled}
-        onToggleChatbox={onToggleChatbox}
       />
 
       {/* Context Menu */}

@@ -1031,7 +1031,7 @@ export function Chatbox({
               onChange={(e) => onInputChange(e.target.value)}
               placeholder="Type your message..."
               disabled={isLoading}
-              className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none hidden-scrollbar text-foreground placeholder:text-muted-foreground mobile-textarea"
+              className="w-full border-0 bg-transparent focus:outline-none focus:ring-0 focus:border-transparent focus:shadow-none text-base py-0 px-0 transition-colors resize-none sm:hidden-scrollbar text-foreground placeholder:text-muted-foreground mobile-textarea"
               style={{ 
                 border: 'none', 
                 outline: 'none', 

@@ -182,7 +182,7 @@ export function CustomScrollbar({ children, className = '', style = {}, onRef }:
     >
       <div 
         ref={contentRef}
-        className="hidden-scrollbar h-full"
+        className="sm:hidden-scrollbar h-full"
         style={{ overflow: 'auto' }}
       >
         {children}
@@ -190,7 +190,7 @@ export function CustomScrollbar({ children, className = '', style = {}, onRef }:
       
       {showScrollbar && (
         <div 
-          className="custom-scrollbar-track"
+          className="custom-scrollbar-track hidden sm:block"
           onClick={handleTrackClick}
         >
           <div
@@ -199,7 +199,7 @@ export function CustomScrollbar({ children, className = '', style = {}, onRef }:
             style={{
               height: `${thumbHeight}px`,
               top: `${thumbTop}px`,
-              cursor: isDragging ? 'grabbing' : 'grab'
+              opacity: isDragging ? 0.8 : 0.6
             }}
             onMouseDown={handleThumbMouseDown}
           />

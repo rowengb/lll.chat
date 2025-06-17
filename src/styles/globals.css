@@ -391,6 +391,19 @@ pre code {
   display: none; /* Chrome, Safari, Edge */
 }
 
+/* Only hide scrollbars on desktop (sm and above) */
+@media (min-width: 640px) {
+  .sm\:hidden-scrollbar {
+    /* Hide scrollbars but keep functionality */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+
+  .sm\:hidden-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Edge */
+  }
+}
+
 /* Hide horizontal scrollbars */
 .scrollbar-hide {
   /* Hide scrollbars but keep functionality */
