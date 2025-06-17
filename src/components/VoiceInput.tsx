@@ -26,6 +26,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   const [isSupported, setIsSupported] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [textareaPosition, setTextareaPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [forceUpdate, setForceUpdate] = useState(0);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -101,6 +102,11 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       // Set recording state immediately to update UI
       setIsRecording(true);
       
+      // Force a re-render on mobile browsers
+      setTimeout(() => {
+        setForceUpdate(prev => prev + 1);
+      }, 10);
+      
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -161,6 +167,10 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       console.log('🎤 [VoiceInput] Stopping recording...');
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      // Force UI update on mobile
+      setTimeout(() => {
+        setForceUpdate(prev => prev + 1);
+      }, 10);
     }
   };
 
