@@ -101,11 +101,8 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       
       // Set recording state immediately to update UI
       setIsRecording(true);
-      
-      // Force a re-render on mobile browsers
-      setTimeout(() => {
-        setForceUpdate(prev => prev + 1);
-      }, 10);
+      // Force re-render to ensure mobile CSS updates
+      setForceUpdate(prev => prev + 1);
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -167,10 +164,8 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       console.log('🎤 [VoiceInput] Stopping recording...');
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      // Force UI update on mobile
-      setTimeout(() => {
-        setForceUpdate(prev => prev + 1);
-      }, 10);
+      // Force re-render to ensure mobile CSS updates
+      setForceUpdate(prev => prev + 1);
     }
   };
 
@@ -294,22 +289,26 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
           variant="ghost"
           onClick={toggleRecording}
           disabled={disabled || isProcessing}
-          className={`group h-10 w-10 shadow-sm transition-all mobile-button ${
+          className={`group h-10 w-10 shadow-sm transition-colors mobile-button ${
             isRecording 
-              ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' 
+              ? 'bg-red-500 text-white animate-pulse' 
               : isProcessing
-              ? 'bg-red-500 hover:bg-red-600 text-white'
-              : 'bg-foreground/5 hover:bg-foreground/10 text-foreground border border-foreground/15 dark:border-gray-800'
+              ? 'bg-red-500 text-white'
+              : 'bg-foreground/5 text-foreground border border-foreground/15 dark:border-gray-800'
           }`}
           style={{ 
             borderRadius: '10px',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+            // Force specific background on mobile to override hover states
+            ...(isRecording ? { backgroundColor: '#ef4444 !important' } : {}),
+            ...(isProcessing ? { backgroundColor: '#ef4444 !important' } : {})
           }}
           size="sm"
           title={
             isProcessing ? 'Processing with Whisper...' :
             isRecording ? `Recording... ${formatTime(recordingTime)}` : 'Start voice recording'
           }
+          key={forceUpdate} // Force re-render with key prop
         >
           {isProcessing ? (
             <div className="flex items-center justify-center">

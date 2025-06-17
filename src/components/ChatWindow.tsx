@@ -1012,7 +1012,7 @@ ref={setMessagesContainer}
         <div className="hidden sm:block absolute inset-0">
         <CustomScrollbar 
             className="h-full"
-onRef={setMessagesContainer}
+          onRef={setMessagesContainer}
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>
             <div></div>
@@ -1242,31 +1242,9 @@ onRef={setMessagesContainer}
       </div>
       
       {/* Chatbox - positioned relative to the main container, not the messages area */}
-      <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
-        <div className="px-4 sm:hidden">
-          <div className="max-w-[95%] w-full mx-auto">
-            <Chatbox
-              input={input}
-              onInputChange={handleInputChange}
-              onSubmit={handleSubmit}
-              uploadedFiles={uploadedFiles}
-              onFilesChange={setUploadedFiles}
-              selectedModel={selectedModel}
-              onModelChange={onModelChange}
-              isLoading={isLoading}
-              isStreaming={isStreaming}
-              onStop={stopStream}
-              inputRef={inputRef}
-              searchGroundingEnabled={searchGroundingEnabled}
-              onSearchGroundingChange={setSearchGroundingEnabled}
-              onModelSelectorClick={triggerShakeAnimation}
-            />
-          </div>
-        </div>
-        <div className={`hidden sm:block ${chatboxGridClasses}`}>
-          <div></div>
-          <div className="w-full">
-            <div className={chatboxLayoutClasses}>
+        <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+          <div className="px-4 sm:hidden">
+            <div className="max-w-[95%] w-full mx-auto">
               <Chatbox
                 input={input}
                 onInputChange={handleInputChange}
@@ -1283,6 +1261,28 @@ onRef={setMessagesContainer}
                 onSearchGroundingChange={setSearchGroundingEnabled}
                 onModelSelectorClick={triggerShakeAnimation}
               />
+            </div>
+          </div>
+          <div className={`hidden sm:block ${chatboxGridClasses}`}>
+            <div></div>
+            <div className="w-full">
+              <div className={chatboxLayoutClasses}>
+                <Chatbox
+                  input={input}
+                  onInputChange={handleInputChange}
+                  onSubmit={handleSubmit}
+                  uploadedFiles={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                  selectedModel={selectedModel}
+                  onModelChange={onModelChange}
+                  isLoading={isLoading}
+                  isStreaming={isStreaming}
+                  onStop={stopStream}
+                  inputRef={inputRef}
+                  searchGroundingEnabled={searchGroundingEnabled}
+                  onSearchGroundingChange={setSearchGroundingEnabled}
+                  onModelSelectorClick={triggerShakeAnimation}
+                />
             </div>
           </div>
         </div>

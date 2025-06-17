@@ -526,6 +526,27 @@ pre code {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Force immediate style updates on mobile for voice input button */
+@media (max-width: 640px) {
+  .mobile-button {
+    /* Force immediate style recalculation */
+    transform: translateZ(0);
+    /* Disable hover states that can get stuck */
+    pointer-events: auto;
+  }
+  
+  .mobile-button:hover {
+    /* Override any hover styles on touch devices */
+    background-color: inherit !important;
+  }
+  
+  /* Force specific styles for voice button states */
+  .mobile-button.bg-red-500 {
+    background-color: #ef4444 !important;
+    color: white !important;
+  }
+}
+
 /* Mobile hover state fixes */
 @media (hover: none) and (pointer: coarse) {
   /* Remove hover states on touch devices */
