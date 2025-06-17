@@ -83,17 +83,26 @@ export const SearchCommand: React.FC<SearchCommandProps> = ({
   }, [isOpen]);
 
   const handleSelect = (value: string) => {
-    const [type, id] = value.split(':');
+    const [type, ...rest] = value.split(':');
+    const fullId = rest.join(':'); // Rejoin in case there are colons in the ID
     
     switch (type) {
       case 'thread':
-        onThreadSelect(id);
+        // Extract just the thread ID (first part before the space)
+        const threadId = fullId.split(' ')[0];
+        if (threadId) {
+          onThreadSelect(threadId);
+        }
         break;
       case 'model':
-        onModelChange?.(id);
+        // For models, extract just the model ID (first part before the space)
+        const modelId = fullId.split(' ')[0];
+        if (modelId && onModelChange) {
+          onModelChange(modelId);
+        }
         break;
       case 'action':
-        switch (id) {
+        switch (fullId) {
           case 'new-chat':
             onNewChat();
             break;
@@ -209,13 +218,16 @@ export const SearchCommand: React.FC<SearchCommandProps> = ({
 
             {/* Recent Threads */}
             {threads.length > 0 && (
-              <Command.Group heading="Recent Threads" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide">
+              <Command.Group heading="Conversations" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide">
                 {threads
-                  .slice(0, 8)
-                  .map(thread => (
+                  .map(thread => {
+                    const threadModel = (thread as any).model || 'Unknown';
+                    const threadTitle = thread.title || `${threadModel} conversation`;
+                    const searchValue = `thread:${thread.id} ${threadTitle} ${threadModel} conversation chat thread`;
+                    return (
                     <Command.Item
                       key={thread.id}
-                      value={`thread:${thread.id}`}
+                      value={searchValue}
                       onSelect={handleSelect}
                       className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
                     >
@@ -240,7 +252,8 @@ export const SearchCommand: React.FC<SearchCommandProps> = ({
                         <div className="text-xs text-primary font-medium">Current</div>
                       )}
                     </Command.Item>
-                  ))}
+                  );
+                  })}
               </Command.Group>
             )}
 
@@ -248,11 +261,10 @@ export const SearchCommand: React.FC<SearchCommandProps> = ({
             {onModelChange && allModels.length > 0 && (
               <Command.Group heading="Models" className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide">
                 {allModels
-                  .slice(0, 6)
                   .map(model => (
                     <Command.Item
                       key={model.id}
-                      value={`model:${model.id}`}
+                      value={`model:${model.id} ${model.name} ${model.provider} ${model.description || ''} ai model llm`}
                       onSelect={handleSelect}
                       className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 py-1.5 rounded-lg cursor-pointer hover:bg-muted/50 data-[selected=true]:bg-muted"
                     >
