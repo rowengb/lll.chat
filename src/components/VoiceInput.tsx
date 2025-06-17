@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { MicIcon, MicOffIcon, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
@@ -31,6 +32,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
 
   // Check browser support on mount
   useEffect(() => {
@@ -66,12 +68,23 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     }
   }, [isRecording, textareaRef, showTranscriptAboveTextarea]);
 
-  // Recording timer
+  // Simple recording timer - let React handle everything
   useEffect(() => {
     if (isRecording) {
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
+      let startTime = Date.now();
+      
+      const updateTimer = () => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        setRecordingTime(elapsed);
+        console.log('🎤 Timer updated:', elapsed, 'seconds');
+      };
+      
+      // Set up interval timer
+      recordingIntervalRef.current = setInterval(updateTimer, 1000);
+      
+      // Initial update
+      updateTimer();
+      
     } else {
       if (recordingIntervalRef.current) {
         clearInterval(recordingIntervalRef.current);
@@ -99,10 +112,11 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     try {
       console.log('🎤 [VoiceInput] Requesting microphone permission...');
       
-      // Set recording state immediately to update UI
-      setIsRecording(true);
-      // Force re-render to ensure mobile CSS updates
-      setForceUpdate(prev => prev + 1);
+      // Set recording state immediately with synchronous update
+      flushSync(() => {
+        setIsRecording(true);
+        setForceUpdate(prev => prev + 1);
+      });
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -164,6 +178,17 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       console.log('🎤 [VoiceInput] Stopping recording...');
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      
+      // Clean up direct styles when stopping
+      setTimeout(() => {
+        if (buttonRef.current) {
+          buttonRef.current.style.backgroundColor = '';
+          buttonRef.current.style.color = '';
+          buttonRef.current.classList.remove('animate-pulse');
+          buttonRef.current.offsetHeight; // Force reflow
+        }
+      }, 0);
+      
       // Force re-render to ensure mobile CSS updates
       setForceUpdate(prev => prev + 1);
     }
@@ -234,6 +259,16 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     }
   };
 
+  // Mobile-specific touch handler to force immediate visual feedback
+  const handleTouchStart = () => {
+    if (isProcessing || isRecording) return;
+    
+    // Force immediate React state update
+    flushSync(() => {
+      setForceUpdate(prev => prev + 1);
+    });
+  };
+
   // Format recording time
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -241,7 +276,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  console.log('🎤 [VoiceInput] Rendering. Supported:', isSupported, 'Recording:', isRecording, 'Processing:', isProcessing);
+  console.log('🎤 [VoiceInput] Rendering. Supported:', isSupported, 'Recording:', isRecording, 'Processing:', isProcessing, 'RecordingTime:', recordingTime, 'Variant:', variant);
 
   // Show not supported state
   if (!isSupported) {
@@ -282,53 +317,80 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
 
   // Compact variant
   if (variant === 'compact') {
+    // Calculate current recording time to force fresh renders
+    const currentTime = isRecording ? recordingTime : 0;
+    const timeDisplay = formatTime(currentTime);
+    
+    console.log('🎤 [VoiceInput] Compact variant - currentTime:', currentTime, 'timeDisplay:', timeDisplay, 'isRecording:', isRecording);
+    
+    // Force complete re-render by using different elements for different states
+    const buttonContent = isProcessing ? (
+      <div className="flex items-center justify-center">
+        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+      </div>
+    ) : isRecording ? (
+      <>
+        {/* Timer - clean and visible */}
+        <div className="flex flex-col items-center justify-center text-xs font-mono text-white">
+          <div className="text-xs leading-none text-white font-medium">{timeDisplay}</div>
+        </div>
+      </>
+    ) : (
+      <MicIcon className="h-6 w-6" />
+    );
+
     return (
       <div className={`relative ${className}`}>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={toggleRecording}
-          disabled={disabled || isProcessing}
-          className={`group h-10 w-10 shadow-sm transition-colors mobile-button ${
-            isRecording 
-              ? 'bg-red-500 text-white animate-pulse' 
-              : isProcessing
-              ? 'bg-red-500 text-white'
-              : 'bg-foreground/5 text-foreground border border-foreground/15 dark:border-gray-800'
-          }`}
-          style={{ 
-            borderRadius: '10px',
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-            // Force specific background on mobile to override hover states
-            ...(isRecording ? { backgroundColor: '#ef4444 !important' } : {}),
-            ...(isProcessing ? { backgroundColor: '#ef4444 !important' } : {})
-          }}
-          size="sm"
-          title={
-            isProcessing ? 'Processing with Whisper...' :
-            isRecording ? `Recording... ${formatTime(recordingTime)}` : 'Start voice recording'
-          }
-          key={forceUpdate} // Force re-render with key prop
-        >
-          {isProcessing ? (
-            <div className="flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            </div>
-          ) : isRecording ? (
-            <>
-              {/* Timer - visible by default */}
-              <div className="flex flex-col items-center justify-center text-xs font-mono text-white group-hover:opacity-0 transition-opacity duration-200 ease-in-out">
-                <div className="text-[10px] leading-none text-white">{formatTime(recordingTime)}</div>
-              </div>
-              {/* Stop icon - visible on hover */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out">
-                <Square className="h-6 w-6 fill-current text-white" />
-              </div>
-            </>
-          ) : (
+        {isRecording || isProcessing ? (
+          // Recording/Processing button - red background
+          <button
+            ref={buttonRef}
+            type="button"
+            onClick={toggleRecording}
+            disabled={disabled || isProcessing}
+            className="group h-10 w-10 shadow-sm transition-colors mobile-button bg-red-500 text-white animate-pulse"
+            style={{ 
+              borderRadius: '10px',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+              backgroundColor: '#ef4444',
+              color: 'white',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              position: 'relative'
+            }}
+
+            title={
+              isProcessing ? 'Processing with Whisper...' :
+              `Recording... ${formatTime(recordingTime)}`
+            }
+          >
+            {buttonContent}
+          </button>
+        ) : (
+          // Normal button - default styling
+          <Button
+            ref={buttonRef}
+            type="button"
+            variant="ghost"
+            onClick={toggleRecording}
+            onTouchStart={handleTouchStart}
+            disabled={disabled}
+            className="group h-10 w-10 shadow-sm transition-colors mobile-button bg-foreground/5 text-foreground border border-foreground/15 dark:border-gray-800"
+            style={{ 
+              borderRadius: '10px',
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            size="sm"
+            title="Start voice recording"
+          >
             <MicIcon className="h-6 w-6" />
-          )}
-        </Button>
+          </Button>
+        )}
         
         {/* Fallback recording indicator (when not using textarea positioning) */}
         {(isRecording || isProcessing) && !showTranscriptAboveTextarea && (
