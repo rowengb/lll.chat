@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 
 import { useChatStore } from "../stores/chatStore";
 import { useImageStore } from "../stores/imageStore";
-import { CustomScrollbar } from './CustomScrollbar';
+
 import { ActionButton } from './ActionButton';
 import { UploadedFile } from './FileUpload';
 import { Chatbox } from './Chatbox';
@@ -776,10 +776,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       />
 
       {/* Messages + Chatbox Area */}
-      <div className="flex-1 overflow-hidden relative mobile-scroll-isolated">
-        <CustomScrollbar 
-          className={`h-full mobile-scroll-optimized ios-scroll-fix mobile-scroll-isolated mobile-no-refresh ${scrollLocked.current ? 'scroll-locked' : ''}`}
-          onRef={setMessagesContainer}
+      <div className="flex-1 overflow-hidden relative">
+        <div 
+          ref={setMessagesContainer}
+          className="h-full overflow-y-auto"
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>
             <div></div>
@@ -1003,7 +1003,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             </div>
             <div></div>
           </div>
-        </CustomScrollbar>
+        </div>
         
         {/* Chatbox */}
         <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
