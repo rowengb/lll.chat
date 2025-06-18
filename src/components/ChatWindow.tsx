@@ -7,6 +7,7 @@ import { useChatStore } from "../stores/chatStore";
 import { useImageStore } from "../stores/imageStore";
 
 import { CustomScrollbar } from './CustomScrollbar';
+import { ScrollArea } from './ui/scroll-area';
 import { ActionButton } from './ActionButton';
 import { UploadedFile } from './FileUpload';
 import { Chatbox } from './Chatbox';
@@ -1019,10 +1020,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
       {/* Messages + Chatbox Area */}
       <div className="flex-1 overflow-hidden relative min-h-0">
-        {/* Mobile: Natural body scrolling */}
-        <div 
-          ref={setMessagesContainer}
-          className="block sm:hidden h-full overflow-y-auto overflow-x-hidden"
+        {/* Mobile: Scroll container */}
+        <ScrollArea
+          onViewportRef={setMessagesContainer}
+          className="block sm:hidden h-full"
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>
             <div></div>
@@ -1064,7 +1065,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             </div>
             <div></div>
           </div>
-        </div>
+        </ScrollArea>
         
         {/* Desktop: Custom scrollbars */}
         <div className="hidden sm:block absolute inset-0">
