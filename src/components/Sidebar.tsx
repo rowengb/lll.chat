@@ -519,7 +519,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
   const [editingThread, setEditingThread] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [showFloatingButtons, setShowFloatingButtons] = useState(true);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+
   const [sidebarWidth, setSidebarWidth] = useState(288); // Default 18rem = 288px
   const [isResizing, setIsResizing] = useState(false);
   
@@ -637,18 +637,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     // Remove onSettled to avoid unnecessary refetch since we have optimistic updates
   });
 
-  // Handle floating buttons transition animation
-  useEffect(() => {
-    // Start transition (fade out)
-    setIsTransitioning(true);
-    
-    // After a short delay, fade back in
-    const timer = setTimeout(() => {
-      setIsTransitioning(false);
-    }, 200); // Quicker fade out and back in
-    
-    return () => clearTimeout(timer);
-  }, [collapsed]);
+
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -986,7 +975,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
       {/* Floating buttons - Collapsed state (with search) */}
       <div 
         className={`hidden sm:block fixed z-50 transition-opacity duration-200 ease-out ${
-          collapsed && !isTransitioning ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          collapsed ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{
           top: '16px', // Align with header padding
@@ -1035,7 +1024,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
       {/* Floating buttons - Expanded state (no search) */}
       <div 
         className={`hidden sm:block fixed z-50 transition-opacity duration-200 ease-out ${
-          !collapsed && !isTransitioning ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          !collapsed ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{
           top: '16px', // Align with header padding
