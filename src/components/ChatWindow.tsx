@@ -1020,7 +1020,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
       {/* Messages + Chatbox Area */}
       <div className="flex-1 overflow-hidden relative min-h-0">
-        {/* Mobile: Scroll container */}
+        {/* Mobile: ScrollArea for custom scrollbar and no overscroll */}
         <ScrollArea
           onViewportRef={setMessagesContainer}
           className="block sm:hidden h-full"

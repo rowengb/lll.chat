@@ -101,6 +101,12 @@
     display: none; /* Chrome, Safari, Edge */
   }
 
+  /* Ensure ScrollArea scrollbars are visible */
+  [data-radix-scroll-area-scrollbar] {
+    display: flex !important;
+    opacity: 1 !important;
+  }
+
   body {
     @apply bg-background text-foreground;
     line-height: 1.5;
