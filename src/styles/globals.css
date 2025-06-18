@@ -594,14 +594,12 @@ pre code {
   }
 }
 
-/* Simple mobile optimizations */
+/* Simplified mobile scrolling - remove body locking */
 @media (max-width: 640px) {
-  /* Just prevent pull-to-refresh, nothing fancy */
+  /* Allow natural body scrolling, just prevent pull-to-refresh */
   html,
   body {
     overscroll-behavior-y: contain;
-    /* Prevent document-level scrolling on first touch */
-    touch-action: manipulation;
   }
 
   /* Prevent iOS zoom on inputs */
@@ -611,8 +609,9 @@ pre code {
     font-size: 16px !important;
   }
 
-  /* Make sure scrollable containers take priority */
+  /* Enable smooth touch scrolling for containers */
   [class*="overflow-y-auto"] {
+    -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
   }
 
@@ -678,6 +677,79 @@ pre code {
   .dark .model-name-fade {
     background: linear-gradient(90deg, transparent 0%, rgba(15,23,42,0.8) 50%, rgb(15 23 42) 100%);
   }
+}
+
+/* Enforce width constraints for chat messages */
+.prose pre,
+.prose code {
+  max-width: 100%;
+  overflow-x: auto;
+  word-break: break-all;
+  word-wrap: break-word;
+  box-sizing: border-box;
+}
+
+.prose pre code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 100%;
+  display: block;
+}
+
+/* Force code blocks to respect container bounds */
+pre {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+pre code {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  display: block !important;
+}
+
+/* Mobile-specific overflow prevention */
+@media (max-width: 640px) {
+  .prose,
+  .prose *,
+  pre,
+  pre *,
+  code,
+  table,
+  table * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+  }
+  
+  /* Prevent any horizontal overflow on mobile */
+  pre {
+    overflow-x: auto !important;
+    white-space: pre-wrap !important;
+  }
+  
+  /* Ensure tables don't break layout */
+  table {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
+}
+
+/* Force break long words in all message content */
+.prose p,
+.prose div,
+.prose span {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+/* Ensure tables don't overflow */
+.prose table {
+  max-width: 100%;
+  table-layout: fixed;
+  word-wrap: break-word;
 }
 
 /* Custom overlay scrollbar */

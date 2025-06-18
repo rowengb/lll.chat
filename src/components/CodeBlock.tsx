@@ -37,7 +37,7 @@ export function CodeBlock({ children, className, language }: CodeBlockProps) {
   };
 
   return (
-    <div className="relative my-3 w-full min-w-0">
+    <div className="relative my-3 w-full min-w-0 max-w-full overflow-hidden">
       {/* Copy button */}
       <button
         onClick={handleCopy}
@@ -59,8 +59,8 @@ export function CodeBlock({ children, className, language }: CodeBlockProps) {
       )}
       
       {/* Code content */}
-      <pre className="group text-foreground p-4 rounded-xl overflow-x-auto dark-scrollbar text-xs font-mono w-full min-w-0 bg-gray-100 dark:bg-muted border border-gray-300 dark:border-border whitespace-pre">
-        <code className={`${className} block whitespace-pre`}>
+      <pre className="group text-foreground p-4 rounded-xl overflow-x-auto dark-scrollbar text-xs font-mono w-full min-w-0 max-w-full bg-gray-100 dark:bg-muted border border-gray-300 dark:border-border whitespace-pre">
+        <code className={`${className} block whitespace-pre max-w-full overflow-x-auto`}>
           {children}
         </code>
       </pre>

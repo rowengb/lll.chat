@@ -262,7 +262,7 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
             
             return isInline ? (
               <code 
-                className="text-foreground px-2 py-1 rounded text-xs font-mono bg-gray-100 dark:bg-muted border border-gray-300 dark:border-border" 
+                className="text-foreground px-2 py-1 rounded text-xs font-mono bg-gray-100 dark:bg-muted border border-gray-300 dark:border-border break-all max-w-full" 
                 {...props}
               >
                 {children}
@@ -281,10 +281,12 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
             if (!language && !className) {
               return (
                 <pre 
-                  className="text-foreground p-4 rounded-xl overflow-x-auto dark-scrollbar text-xs font-mono w-full min-w-0 my-3 bg-gray-100 dark:bg-muted border border-gray-300 dark:border-border whitespace-pre" 
+                  className="text-foreground p-4 rounded-xl overflow-x-auto dark-scrollbar text-xs font-mono w-full min-w-0 max-w-full my-3 bg-gray-100 dark:bg-muted border border-gray-300 dark:border-border whitespace-pre" 
                   {...props}
                 >
-                  {children}
+                  <code className="block whitespace-pre max-w-full overflow-x-auto">
+                    {children}
+                  </code>
                 </pre>
               );
             }
@@ -333,9 +335,10 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
           ),
           // Style tables
           table: ({ node, ...props }) => (
-            <div className="overflow-x-auto my-4">
+            <div className="overflow-x-auto my-4 max-w-full">
               <table 
-                className="min-w-full border-collapse border border-border"
+                className="w-full border-collapse border border-border table-fixed"
+                style={{ tableLayout: 'fixed', wordWrap: 'break-word' }}
                 {...props}
               />
             </div>
@@ -398,7 +401,7 @@ MemoizedChunk.displayName = 'MemoizedChunk';
 
 export const ChunkedMarkdown: React.FC<ChunkedMarkdownProps> = ({ 
   content, 
-  className = "w-full min-w-0 overflow-hidden",
+  className = "w-full min-w-0 max-w-full overflow-hidden",
   chunkSize = 100 
 }) => {
   const chunks = useMemo(() => {

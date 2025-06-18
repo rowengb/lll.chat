@@ -5,18 +5,12 @@ export const useChatScrolling = () => {
   const [messagesContainer, setMessagesContainer] = useState<HTMLDivElement | null>(null);
   const scrollLocked = useRef<boolean>(false);
 
-  // "Activate" scroll container on mobile to prevent first-scroll pull-to-refresh
+  // Simple scroll container setup - no artificial activation needed
   useEffect(() => {
-    if (messagesContainer && typeof window !== 'undefined' && window.innerWidth <= 640) {
-      // Tiny scroll to activate the container and prevent pull-to-refresh on first gesture
-      const activateScroll = setTimeout(() => {
-        messagesContainer.scrollTop = 1;
-        const resetScroll = setTimeout(() => {
-          messagesContainer.scrollTop = 0;
-        }, 10);
-        return () => clearTimeout(resetScroll);
-      }, 100);
-      return () => clearTimeout(activateScroll);
+    // Natural scrolling works without hacks
+    if (messagesContainer) {
+      // Just ensure scroll is at bottom on mount
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
   }, [messagesContainer]);
 

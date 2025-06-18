@@ -70,10 +70,10 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
   return (
     <div 
-      className="fixed top-0 right-0 bottom-0 flex flex-col bg-white dark:bg-slate-900 left-0 sm:left-auto mobile-no-refresh"
+      className="sm:fixed sm:top-0 sm:right-0 sm:bottom-0 min-h-screen flex flex-col bg-white dark:bg-slate-900 sm:left-auto"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
-        transition: 'left 0.3s ease-out'
+        transition: window.innerWidth >= 640 ? 'left 0.3s ease-out' : 'none'
       }}
     >
       {/* API Key Warning Banner */}
@@ -92,9 +92,9 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         onOpenSearch={onOpenSearch}
       />
 
-      {/* Welcome Content Area with proper scrolling container for chatbox alignment */}
-      <div className="flex-1 overflow-hidden relative mobile-scroll-isolated">
-        <div className="h-full overflow-y-auto mobile-scroll-optimized ios-scroll-fix">
+      {/* Welcome Content Area with natural scrolling */}
+      <div className="flex-1 overflow-hidden relative">
+        <div className="h-full overflow-y-auto">
           <div className={`${sharedGridClasses} min-h-full flex items-center justify-center pb-32`}>
             <div></div>
             <div className="w-full">
@@ -215,7 +215,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         </div>
         
         {/* Chatbox - Using shared component */}
-        <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0 sm:right-0">
+        <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0 sm:right-0">
           <div className="px-3 sm:hidden">
             {/* Mobile: Center middle chatbox */}
             <div className="max-w-[95%] w-full mx-auto">

@@ -647,11 +647,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
        
     return (
       <div key={message.id} className="flex justify-start">
-        <div className="w-full max-w-full min-w-0">
+        <div className="w-full max-w-full min-w-0 overflow-hidden">
           <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
             <div
               tabIndex={-1}
-              className={`rounded-xl px-4 max-w-full overflow-hidden min-w-0 ${isMobile ? 'cursor-pointer' : 'sm:cursor-default'} ${
+              className={`rounded-xl px-4 max-w-full overflow-hidden min-w-0 break-words ${isMobile ? 'cursor-pointer max-w-[calc(100vw-2rem)]' : 'sm:cursor-default'} ${
                 message.role === "user"
                   ? "py-2" 
                   : "pt-1 pb-1"
@@ -1000,10 +1000,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   // Main chat interface when threadId exists
   return (
     <div 
-      className="fixed inset-0 flex flex-col bg-white dark:bg-slate-900 sm:left-auto mobile-no-refresh"
+      className="sm:fixed sm:inset-0 min-h-screen flex flex-col bg-white dark:bg-slate-900 sm:left-auto overflow-hidden"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
-        transition: 'left 0.3s ease-out'
+        transition: window.innerWidth >= 640 ? 'left 0.3s ease-out' : 'none'
       }}
     >
       {/* API Key Warning Banner */}
@@ -1024,11 +1024,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
       {/* Messages + Chatbox Area */}
       <div className="flex-1 overflow-hidden relative min-h-0">
-        {/* Mobile: Native scrollbars */}
+        {/* Mobile: Natural body scrolling */}
         <div 
-ref={setMessagesContainer}
-          className="block sm:hidden absolute inset-0 overflow-y-auto mobile-hidden-scrollbar"
-          style={{ touchAction: 'pan-y' }}
+          ref={setMessagesContainer}
+          className="block sm:hidden h-full overflow-y-auto overflow-x-hidden"
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>
             <div></div>
@@ -1123,8 +1122,8 @@ ref={setMessagesContainer}
         
       </div>
       
-      {/* Chatbox - positioned relative to the main container, not the messages area */}
-        <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+      {/* Chatbox - fixed at bottom on mobile, absolute on desktop */}
+        <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
           <div className="px-3 sm:hidden">
             <div className="max-w-[95%] w-full mx-auto">
               <Chatbox
