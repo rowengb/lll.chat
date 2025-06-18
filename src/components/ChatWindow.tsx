@@ -1243,7 +1243,7 @@ ref={setMessagesContainer}
       
       {/* Chatbox - positioned relative to the main container, not the messages area */}
         <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
-          <div className="px-4 sm:hidden">
+          <div className="px-3 sm:hidden">
             <div className="max-w-[95%] w-full mx-auto">
               <Chatbox
                 input={input}

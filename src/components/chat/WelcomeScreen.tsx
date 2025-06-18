@@ -216,7 +216,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         
         {/* Chatbox - Using shared component */}
         <div className="absolute bottom-0 left-0 z-20 right-0 sm:left-0 sm:right-0">
-          <div className="px-4 sm:hidden">
+          <div className="px-3 sm:hidden">
             {/* Mobile: Center middle chatbox */}
             <div className="max-w-[95%] w-full mx-auto">
               <Chatbox
