@@ -193,8 +193,6 @@
     /* Prevent overscroll bounce on iOS */
     overscroll-behavior: contain !important;
     -webkit-overscroll-behavior: contain !important;
-    /* Force minimum height to ensure scrollable content */
-    min-height: 100% !important;
   }
 
   body {

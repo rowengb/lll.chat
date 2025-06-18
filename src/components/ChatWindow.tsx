@@ -92,7 +92,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     scrollLocked,
     scrollToBottomPinned,
     handleGroundingSourcesToggle
-  } = useChatScrolling();
+  } = useChatScrolling(threadId || undefined);
 
   const { streamResponse, stopStream, isStreamingRef, lastStreamCompletedAt } = useChatStreaming();
 
@@ -1021,9 +1021,13 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       <div className="flex-1 relative min-h-0">
         {/* Mobile: Native scrolling with iOS scrollbar styling */}
         <div 
-          className="block sm:hidden h-full overflow-y-auto ios-native-scroll"
+          className="block sm:hidden overflow-y-auto ios-native-scroll"
           ref={setMessagesContainer}
-          style={{ height: '100%', minHeight: '100%' }}
+          style={{ 
+            height: 'calc(100vh - 120px)', // Explicit height: viewport minus header/banner space
+            minHeight: 'calc(100vh - 120px)',
+            maxHeight: 'calc(100vh - 120px)'
+          }}
         >
           <div className={`${sharedGridClasses} pt-8 pb-64 sm:pb-48`} style={{ minHeight: 'calc(100vh + 200px)' }}>
             <div></div>

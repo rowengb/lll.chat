@@ -1,16 +1,35 @@
 import { useRef, useState, useEffect } from "react";
 
-export const useChatScrolling = () => {
+export const useChatScrolling = (threadId?: string) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [messagesContainer, setMessagesContainer] = useState<HTMLDivElement | null>(null);
   const scrollLocked = useRef<boolean>(false);
 
-  // Simple scroll container setup - no artificial activation needed
+  // Reset scroll container when threadId changes (fixes navigation bug)
   useEffect(() => {
-    // Natural scrolling works without hacks
+    setMessagesContainer(null);
+    scrollLocked.current = false;
+  }, [threadId]);
+
+  // Simple scroll container setup - with iOS Safari fixes
+  useEffect(() => {
     if (messagesContainer) {
-      // Just ensure scroll is at bottom on mount
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      // Force scroll recognition on iOS Safari
+      const forceScrollRecognition = () => {
+        // Force layout recalculation
+        messagesContainer.style.overflow = 'hidden';
+        messagesContainer.offsetHeight; // Force reflow
+        messagesContainer.style.overflow = 'auto';
+        
+        // Ensure scroll is at bottom on mount
+        setTimeout(() => {
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, 0);
+      };
+      
+      // Run immediately and after a short delay
+      forceScrollRecognition();
+      setTimeout(forceScrollRecognition, 100);
     }
   }, [messagesContainer]);
 
