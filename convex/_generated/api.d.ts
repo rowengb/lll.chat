@@ -17,6 +17,7 @@ import type * as apiKeys from "../apiKeys.js";
 import type * as files from "../files.js";
 import type * as messages from "../messages.js";
 import type * as models from "../models.js";
+import type * as seedUserFavorites from "../seedUserFavorites.js";
 import type * as threads from "../threads.js";
 import type * as users from "../users.js";
 
@@ -33,6 +34,7 @@ declare const fullApi: ApiFromModules<{
   files: typeof files;
   messages: typeof messages;
   models: typeof models;
+  seedUserFavorites: typeof seedUserFavorites;
   threads: typeof threads;
   users: typeof users;
 }>;

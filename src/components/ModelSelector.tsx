@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronDownIcon, CheckIcon, ZapIcon, SearchIcon, EyeIcon, GlobeIcon, FileTextIcon, BrainIcon, SparklesIcon, ChevronUpIcon, StarIcon, FilterIcon, ChevronLeftIcon, KeyIcon, FlaskConical, Palette, ImagePlus } from "lucide-react";
+import { ChevronDownIcon, CheckIcon, ZapIcon, SearchIcon, EyeIcon, GlobeIcon, FileTextIcon, BrainIcon, SparklesIcon, ChevronUpIcon, StarIcon, FilterIcon, ChevronLeftIcon, KeyIcon, FlaskConical, Palette, ImagePlus, PinIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/utils/trpc";
 import { OpenRouterAvatar } from '@/components/OpenRouterIcon';
 import { useOpenRouterStore } from '@/stores/openRouterStore';
+import { useUser } from '@clerk/nextjs';
 
 interface ModelSelectorProps {
   selectedModel: string;
@@ -176,6 +177,7 @@ const getCapabilityColor = (capability: string) => {
 
 export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onClick }: ModelSelectorProps) {
   const { useOpenRouter } = useOpenRouterStore();
+  const { isSignedIn } = useUser();
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -199,7 +201,61 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
   // Get tRPC utils for query invalidation
   const utils = trpc.useUtils();
   
-  // Function to check if a model has an API key
+  // Mutation for toggling favorites
+  const toggleFavoriteMutation = trpc.models.toggleUserModelFavorite.useMutation({
+    onMutate: async ({ modelId }) => {
+      // Cancel any outgoing refetches
+      await utils.models.getFavoriteModels.cancel();
+      await utils.models.getOtherModels.cancel();
+      
+      // Snapshot the previous values
+      const previousFavorites = utils.models.getFavoriteModels.getData();
+      const previousOthers = utils.models.getOtherModels.getData();
+      
+      // Optimistically update the UI
+      const targetModel = [...(previousFavorites || []), ...(previousOthers || [])].find(m => m.id === modelId);
+      
+      if (targetModel) {
+        const isFavorite = previousFavorites?.some(m => m.id === modelId);
+        
+        if (isFavorite) {
+          // Moving from favorites to others
+          utils.models.getFavoriteModels.setData(undefined, (old) => 
+            old?.filter(m => m.id !== modelId) || []
+          );
+          utils.models.getOtherModels.setData(undefined, (old) => 
+            [...(old || []), targetModel].sort((a, b) => a.order - b.order)
+          );
+        } else {
+          // Moving from others to favorites
+          utils.models.getOtherModels.setData(undefined, (old) => 
+            old?.filter(m => m.id !== modelId) || []
+          );
+          utils.models.getFavoriteModels.setData(undefined, (old) => 
+            [...(old || []), targetModel].sort((a, b) => a.order - b.order)
+          );
+        }
+      }
+      
+      return { previousFavorites, previousOthers };
+    },
+    onError: (err, variables, context) => {
+      // Revert optimistic updates on error
+      if (context?.previousFavorites) {
+        utils.models.getFavoriteModels.setData(undefined, context.previousFavorites);
+      }
+      if (context?.previousOthers) {
+        utils.models.getOtherModels.setData(undefined, context.previousOthers);
+      }
+    },
+    onSettled: () => {
+      // Always refetch after mutation (success or error) to ensure consistency
+      utils.models.getFavoriteModels.invalidate();
+      utils.models.getOtherModels.invalidate();
+    },
+  });
+
+    // Function to check if a model has an API key
   const hasApiKey = (provider: string) => {
     if (!apiKeys) return false;
     const key = apiKeys[provider as keyof typeof apiKeys];
@@ -296,6 +352,14 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
   const clearFilters = () => {
     setSelectedFilters([]);
   };
+
+  const handleToggleFavorite = (e: React.MouseEvent, modelId: string) => {
+    e.stopPropagation(); // Prevent model selection
+    if (!isSignedIn) return; // Don't allow favoriting if not signed in
+    toggleFavoriteMutation.mutate({ modelId });
+  };
+
+
 
   // Function to close dropdown with animation
   const closeDropdown = () => {
@@ -531,18 +595,29 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                               <FlaskConical className="h-4 w-4 text-muted-foreground" />
                             </div>
                           )}
+
                           {selectedModel === model.id && (
-                            <CheckIcon className="absolute top-2 right-2 h-4 w-4 text-primary" />
+                            <CheckIcon className="absolute top-2 left-2 h-4 w-4 text-primary" />
                           )}
-                          {(model.provider === 'anthropic' || model.provider === 'openai') && !disabled && (
-                            <div className="absolute top-2 right-2">
+                          {/* Pin icon for favorites - only show for signed in users */}
+                          {isSignedIn && selectedModel !== model.id && (
+                            <button
+                              onClick={(e) => handleToggleFavorite(e, model.id)}
+                              className="absolute top-2 right-2 p-1 rounded-md bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors"
+                              title="Remove from favorites"
+                            >
+                              <PinIcon className="h-3 w-3" />
+                            </button>
+                          )}
+                          {(model.provider === 'anthropic' || model.provider === 'openai') && !disabled && selectedModel !== model.id && !isSignedIn && (
+                            <div className="absolute top-2 left-2">
                               <span className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-1 py-0.5 rounded flex items-center">
                                 <ZapIcon className="h-3 w-3" />
                               </span>
                             </div>
                           )}
-                          {disabled && (
-                            <div className="absolute top-2 right-2" title={getDisabledTooltip(model)}>
+                          {disabled && selectedModel !== model.id && (
+                            <div className="absolute top-2 left-2" title={getDisabledTooltip(model)}>
                               <KeyIcon className="h-4 w-4 text-muted-foreground" />
                             </div>
                           )}
@@ -626,11 +701,22 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                               <FlaskConical className="h-4 w-4 text-muted-foreground" />
                             </div>
                           )}
+
                           {selectedModel === model.id && (
-                            <CheckIcon className="absolute top-2 right-2 h-4 w-4 text-primary" />
+                            <CheckIcon className="absolute top-2 left-2 h-4 w-4 text-primary" />
                           )}
-                          {disabled && (
-                            <div className="absolute top-2 right-2" title={getDisabledTooltip(model)}>
+                          {/* Pin icon for adding to favorites - only show for signed in users */}
+                          {isSignedIn && selectedModel !== model.id && (
+                            <button
+                              onClick={(e) => handleToggleFavorite(e, model.id)}
+                              className="absolute top-2 right-2 p-1 rounded-md bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                              title="Add to favorites"
+                            >
+                              <PinIcon className="h-3 w-3" />
+                            </button>
+                          )}
+                          {disabled && selectedModel !== model.id && (
+                            <div className="absolute top-2 left-2" title={getDisabledTooltip(model)}>
                               <KeyIcon className="h-4 w-4 text-muted-foreground" />
                             </div>
                           )}

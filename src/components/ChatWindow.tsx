@@ -1029,7 +1029,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           ref={setMessagesContainer}
           className="block sm:hidden h-full overflow-y-auto overflow-x-hidden"
         >
-          <div className={`${sharedGridClasses} pt-8 pb-48`}>
+          <div className={`${sharedGridClasses} pt-8 pb-64`}>
             <div></div>
             <div className="w-full">
               <div className={sharedLayoutClasses} id="messages-container">

@@ -33,6 +33,9 @@ const Home: NextPage = () => {
     { enabled: !!user }
   );
 
+  const utils = trpc.useUtils();
+  const updateThreadMetadataMutation = trpc.chat.updateThreadMetadata.useMutation();
+
   // Initialize selectedModel based on user preferences
   useEffect(() => {
     if (bestDefaultModel && selectedModel === null) {

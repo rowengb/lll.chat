@@ -25,7 +25,24 @@ export const create = mutation({
       });
     } else {
       // Create new user
-      return await ctx.db.insert("users", args);
+      const userId = await ctx.db.insert("users", args);
+      
+      // Seed default favorites for the new user  
+      const defaultFavorites = await ctx.db
+        .query("models")
+        .withIndex("by_favorite", (q) => q.eq("isFavorite", true))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+      
+      // Insert user's default favorites
+      for (const model of defaultFavorites) {
+        await ctx.db.insert("userModelFavorites", {
+          userId,
+          modelId: model.id,
+        });
+      }
+      
+      return userId;
     }
   },
 });

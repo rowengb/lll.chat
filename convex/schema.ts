@@ -83,7 +83,7 @@ export default defineSchema({
     apiUrl: v.optional(v.string()), // API endpoint URL
     openrouterModelId: v.optional(v.string()), // OpenRouter-specific model ID (e.g., "google/gemini-2.5-pro-preview")
     capabilities: v.array(v.string()), // Array of capabilities (e.g., ["vision", "reasoning", "experimental"])
-    isFavorite: v.boolean(), // Whether it's in the favorites section
+    isFavorite: v.boolean(), // Whether it's in the default favorites section (for new users)
     isActive: v.boolean(), // Whether the model is available
     order: v.number(), // Sort order for display
     contextWindow: v.optional(v.number()), // Context window size
@@ -93,4 +93,10 @@ export default defineSchema({
     .index("by_active", ["isActive"])
     .index("by_favorite", ["isFavorite"])
     .index("by_order", ["order"]),
+
+  userModelFavorites: defineTable({
+    userId: v.id("users"),
+    modelId: v.string(), // Reference to models.id field
+  }).index("by_user", ["userId"])
+    .index("by_user_model", ["userId", "modelId"]),
 }); 

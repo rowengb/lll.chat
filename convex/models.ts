@@ -1,6 +1,22 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
+// Helper function to seed default favorites for a new user
+async function seedUserDefaultFavorites(ctx: any, userId: any) {
+  const defaultFavorites = await ctx.db
+    .query("models")
+    .withIndex("by_favorite", (q: any) => q.eq("isFavorite", true))
+    .filter((q: any) => q.eq(q.field("isActive"), true))
+    .collect();
+  
+  for (const model of defaultFavorites) {
+    await ctx.db.insert("userModelFavorites", {
+      userId,
+      modelId: model.id,
+    });
+  }
+}
+
 // Get all active models ordered by favorites first, then by order
 export const getModels = query({
   args: {},
@@ -31,29 +47,183 @@ export const getModelsByProvider = query({
   },
 });
 
-// Get favorite models
+// Get user's favorite models (or default favorites if user has none set)
 export const getFavoriteModels = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
-      .query("models")
-      .withIndex("by_favorite", (q) => q.eq("isFavorite", true))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .order("asc")
+    const identity = await ctx.auth.getUserIdentity();
+    
+    if (!identity) {
+      // User not authenticated, return default favorites
+      return await ctx.db
+        .query("models")
+        .withIndex("by_favorite", (q) => q.eq("isFavorite", true))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .order("asc")
+        .collect();
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q) => q.eq("authId", identity.subject))
+      .unique();
+
+    if (!user) {
+      // User not found, return default favorites
+      return await ctx.db
+        .query("models")
+        .withIndex("by_favorite", (q) => q.eq("isFavorite", true))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .order("asc")
+        .collect();
+    }
+
+    // Get user's custom favorites
+    const userFavorites = await ctx.db
+      .query("userModelFavorites")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
+
+    if (userFavorites.length > 0) {
+      // User has custom favorites, return those
+      const favoriteModelIds = userFavorites.map(f => f.modelId);
+      const models = await ctx.db
+        .query("models")
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+      
+      return models
+        .filter(model => favoriteModelIds.includes(model.id))
+        .sort((a, b) => a.order - b.order);
+    } else {
+      // User has no custom favorites, return default favorites
+      return await ctx.db
+        .query("models")
+        .withIndex("by_favorite", (q) => q.eq("isFavorite", true))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .order("asc")
+        .collect();
+    }
   },
 });
 
-// Get other (non-favorite) models
+// Get user's favorite models by userId (for server-side calls)
+export const getFavoriteModelsByUserId = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    // Get user's custom favorites
+    const userFavorites = await ctx.db
+      .query("userModelFavorites")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    if (userFavorites.length > 0) {
+      // User has custom favorites, return those
+      const favoriteModelIds = userFavorites.map(f => f.modelId);
+      const models = await ctx.db
+        .query("models")
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .collect();
+      
+      return models
+        .filter(model => favoriteModelIds.includes(model.id))
+        .sort((a, b) => a.order - b.order);
+    } else {
+      // User has no custom favorites, return default favorites
+      return await ctx.db
+        .query("models")
+        .withIndex("by_favorite", (q) => q.eq("isFavorite", true))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .order("asc")
+        .collect();
+    }
+  },
+});
+
+// Get other (non-favorite) models for the user
 export const getOtherModels = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
-      .query("models")
-      .withIndex("by_favorite", (q) => q.eq("isFavorite", false))
-      .filter((q) => q.eq(q.field("isActive"), true))
-      .order("asc")
+    const identity = await ctx.auth.getUserIdentity();
+    
+    if (!identity) {
+      // User not authenticated, return non-default favorites
+      return await ctx.db
+        .query("models")
+        .withIndex("by_favorite", (q) => q.eq("isFavorite", false))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .order("asc")
+        .collect();
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q) => q.eq("authId", identity.subject))
+      .unique();
+
+    if (!user) {
+      // User not found, return non-default favorites
+      return await ctx.db
+        .query("models")
+        .withIndex("by_favorite", (q) => q.eq("isFavorite", false))
+        .filter((q) => q.eq(q.field("isActive"), true))
+        .order("asc")
+        .collect();
+    }
+
+    // Get user's custom favorites
+    const userFavorites = await ctx.db
+      .query("userModelFavorites")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
+
+    const favoriteModelIds = userFavorites.map(f => f.modelId);
+    const models = await ctx.db
+      .query("models")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    if (userFavorites.length > 0) {
+      // User has custom favorites, return non-favorites
+      return models
+        .filter(model => !favoriteModelIds.includes(model.id))
+        .sort((a, b) => a.order - b.order);
+    } else {
+      // User has no custom favorites, return non-default favorites
+      return models
+        .filter(model => !model.isFavorite)
+        .sort((a, b) => a.order - b.order);
+    }
+  },
+});
+
+// Get other (non-favorite) models by userId (for server-side calls)
+export const getOtherModelsByUserId = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    // Get user's custom favorites
+    const userFavorites = await ctx.db
+      .query("userModelFavorites")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const favoriteModelIds = userFavorites.map(f => f.modelId);
+    const models = await ctx.db
+      .query("models")
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .collect();
+
+    if (userFavorites.length > 0) {
+      // User has custom favorites, return non-favorites
+      return models
+        .filter(model => !favoriteModelIds.includes(model.id))
+        .sort((a, b) => a.order - b.order);
+    } else {
+      // User has no custom favorites, return non-default favorites
+      return models
+        .filter(model => !model.isFavorite)
+        .sort((a, b) => a.order - b.order);
+    }
   },
 });
 
@@ -117,6 +287,170 @@ export const deleteModel = mutation({
   args: { _id: v.id("models") },
   handler: async (ctx, { _id }) => {
     return await ctx.db.delete(_id);
+  },
+});
+
+// Toggle user model favorite (server-side version that takes userId)
+export const toggleUserModelFavoriteByUserId = mutation({
+  args: { userId: v.id("users"), modelId: v.string() },
+  handler: async (ctx, { userId, modelId }) => {
+    // Check if already favorited
+    const existingFavorite = await ctx.db
+      .query("userModelFavorites")
+      .withIndex("by_user_model", (q) => q.eq("userId", userId).eq("modelId", modelId))
+      .unique();
+
+    if (existingFavorite) {
+      // Remove from favorites
+      await ctx.db.delete(existingFavorite._id);
+      return { favorited: false };
+    } else {
+      // Add to favorites
+      await ctx.db.insert("userModelFavorites", {
+        userId,
+        modelId,
+      });
+      return { favorited: true };
+    }
+  },
+});
+
+// Toggle user model favorite (client-side version for direct auth)
+export const toggleUserModelFavorite = mutation({
+  args: { modelId: v.string() },
+  handler: async (ctx, { modelId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      console.error("No identity found in toggleUserModelFavorite");
+      throw new Error("Not authenticated");
+    }
+    
+    console.log("User identity found:", { subject: identity.subject, name: identity.name });
+
+    // Get or create user
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q) => q.eq("authId", identity.subject))
+      .unique();
+
+    if (!user) {
+      // Create user if they don't exist
+      const userId = await ctx.db.insert("users", {
+        authId: identity.subject,
+        name: identity.name,
+        email: identity.email,
+        image: identity.pictureUrl,
+      });
+      
+      // Seed default favorites for the new user
+      await seedUserDefaultFavorites(ctx, userId);
+      
+      user = await ctx.db.get(userId);
+      if (!user) {
+        throw new Error("Failed to create user");
+      }
+    }
+
+    // Check if already favorited
+    const existingFavorite = await ctx.db
+      .query("userModelFavorites")
+      .withIndex("by_user_model", (q) => q.eq("userId", user._id).eq("modelId", modelId))
+      .unique();
+
+    if (existingFavorite) {
+      // Remove from favorites
+      await ctx.db.delete(existingFavorite._id);
+      return { favorited: false };
+    } else {
+      // Add to favorites
+      await ctx.db.insert("userModelFavorites", {
+        userId: user._id,
+        modelId,
+      });
+      return { favorited: true };
+    }
+  },
+});
+
+// Seed favorites for existing users who don't have any favorites yet
+export const seedFavoritesForExistingUser = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Get or create user
+    let user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q: any) => q.eq("authId", identity.subject))
+      .unique();
+
+    if (!user) {
+      // Create user if they don't exist
+      const userId = await ctx.db.insert("users", {
+        authId: identity.subject,
+        name: identity.name,
+        email: identity.email,
+        image: identity.pictureUrl,
+      });
+      
+      // Seed default favorites for the new user
+      await seedUserDefaultFavorites(ctx, userId);
+      return { message: "User created and favorites seeded" };
+    }
+
+    // Check if user already has favorites
+    const existingFavorites = await ctx.db
+      .query("userModelFavorites")
+      .withIndex("by_user", (q: any) => q.eq("userId", user._id))
+      .collect();
+
+    if (existingFavorites.length === 0) {
+      // User exists but has no favorites, seed them
+      await seedUserDefaultFavorites(ctx, user._id);
+      return { message: "Favorites seeded for existing user" };
+    }
+
+    return { message: "User already has favorites" };
+  },
+});
+
+// Check if user has favorited a model
+export const isUserModelFavorited = query({
+  args: { modelId: v.string() },
+  handler: async (ctx, { modelId }) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return false;
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q) => q.eq("authId", identity.subject))
+      .unique();
+
+    if (!user) {
+      return false;
+    }
+
+    const userFavorites = await ctx.db
+      .query("userModelFavorites")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    if (userFavorites.length === 0) {
+      // User has no custom favorites, check if it's a default favorite
+      const model = await ctx.db
+        .query("models")
+        .filter((q) => q.eq(q.field("id"), modelId))
+        .first();
+      return model?.isFavorite || false;
+    }
+
+    // User has custom favorites, check if this model is in them
+    return userFavorites.some(f => f.modelId === modelId);
   },
 });
 

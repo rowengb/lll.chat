@@ -1,49 +1,123 @@
 # lll.chat
 
-A high-performance AI chat application built with Next.js, TypeScript, Convex, and modern web technologies. Featuring real-time streaming, token tracking, and optimized for speed.
+A modern, high-performance AI chat application that brings together multiple AI providers in a unified interface. Built with Next.js, TypeScript, and Convex for real-time performance.
 
-## 🚀 Quick Start
+## Features
+
+### Multi-Provider AI Support
+
+- **OpenAI**: GPT-4o, o1-mini with vision capabilities
+- **Anthropic**: Claude 3.5 Sonnet with document analysis
+- **Google**: Gemini 2.0 Flash with web search and multimodal support
+- **DeepSeek**: Advanced reasoning models
+- **OpenRouter**: Access to 200+ models through unified API
+
+### User Experience
+
+- **Real-time streaming** responses with typing indicators
+- **Customizable favorites** - pin your preferred models
+- **Thread management** with search, pinning, and organization
+- **File attachments** with support for images and documents
+- **Dark/light mode** with system preference detection
+- **Responsive design** optimized for desktop and mobile
+
+### Technical Features
+
+- **Real-time database** with Convex for instant synchronization
+- **Type-safe APIs** with tRPC and end-to-end TypeScript
+- **Authentication** with Clerk for secure user management
+- **Token tracking** and usage monitoring
+- **Optimized performance** with edge deployment ready
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- pnpm (recommended) or npm
+
+### Installation
 
 ```bash
-# 1. Install dependencies
+# Clone the repository
+git clone https://github.com/yourusername/lll.chat.git
+cd lll.chat
+
+# Install dependencies
 pnpm install
 
-# 2. Setup environment
+# Set up environment variables
 cp .env.example .env.local
 
-# 3. Start Convex development
+# Start Convex development server
 npx convex dev
 
-# 4. Start development server
+# Start the application
 pnpm dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to see lll.chat running!
+Visit `http://localhost:3000` to start chatting.
 
-## ✨ Features
+## Configuration
 
-- 🚀 **Ultra-fast Performance**: Convex real-time backend for 80-118 TPS
-- 🤖 **AI Integration**: OpenAI GPT models with streaming responses
-- 📊 **Token Tracking**: Real-time token counting and TPS monitoring
-- 🔐 **Authentication**: NextAuth.js with GitHub OAuth + mock mode
-- 💾 **Real-time Database**: Convex for instant data synchronization
-- 🎨 **Modern UI**: Tailwind CSS + shadcn/UI components
-- ⚡ **Type-safe APIs**: End-to-end type safety with tRPC + Convex
-- 📱 **Responsive**: Mobile-friendly chat interface
-- 🌍 **Edge Optimized**: Global CDN deployment ready
+### Required Environment Variables
 
-## 🛠️ Tech Stack
+Create a `.env.local` file with the following variables:
 
-- **Framework**: Next.js 14 (Pages Router)
-- **Language**: TypeScript
-- **Backend**: Convex (Real-time database)
-- **Styling**: Tailwind CSS + shadcn/UI
-- **API**: tRPC with React Query
-- **Auth**: NextAuth.js
-- **AI**: OpenAI API
-- **Deployment**: Vercel + Convex
+```env
+# Convex (Required)
+NEXT_PUBLIC_CONVEX_URL=your_convex_deployment_url
+CONVEX_DEPLOYMENT=your_convex_deployment_name
 
-## 📁 Project Structure
+# Clerk Authentication (Required)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+CLERK_SECRET_KEY=your_clerk_secret_key
+
+# AI Provider API Keys (Optional - configure as needed)
+OPENAI_API_KEY=your_openai_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
+GOOGLE_AI_API_KEY=your_google_ai_api_key
+DEEPSEEK_API_KEY=your_deepseek_api_key
+OPENROUTER_API_KEY=your_openrouter_api_key
+```
+
+### Setting Up Services
+
+#### 1. Convex Database
+
+1. Sign up at [Convex](https://convex.dev)
+2. Create a new project
+3. Run `npx convex dev` to initialize
+4. Copy the deployment URL to your `.env.local`
+
+#### 2. Clerk Authentication
+
+1. Sign up at [Clerk](https://clerk.com)
+2. Create a new application
+3. Copy the API keys to your `.env.local`
+4. Configure OAuth providers as needed
+
+#### 3. AI Provider APIs
+
+Configure the AI providers you want to use:
+
+- **OpenAI**: Get API key from [OpenAI Platform](https://platform.openai.com/)
+- **Anthropic**: Get API key from [Anthropic Console](https://console.anthropic.com/)
+- **Google AI**: Get API key from [Google AI Studio](https://makersuite.google.com/)
+- **DeepSeek**: Get API key from [DeepSeek Platform](https://platform.deepseek.com/)
+- **OpenRouter**: Get API key from [OpenRouter](https://openrouter.ai/)
+
+## Tech Stack
+
+- **Frontend**: Next.js 14, React, TypeScript
+- **Backend**: Convex (real-time database)
+- **API Layer**: tRPC with React Query
+- **Authentication**: Clerk
+- **Styling**: Tailwind CSS with custom components
+- **AI Integration**: Multiple provider SDKs
+- **Deployment**: Vercel (recommended)
+
+## Project Structure
 
 ```
 ├── convex/
@@ -98,103 +172,79 @@ Visit [http://localhost:3000](http://localhost:3000) to see lll.chat running!
 └── tsconfig.json          # TypeScript config
 ```
 
-## 🔧 Environment Configuration
+## Development
 
-### Development Mode (Default)
-Perfect for development with Convex:
+### Available Scripts
 
-```env
-AI_MODE=mock
-AUTH_MODE=mock
-NEXT_PUBLIC_CONVEX_URL=https://your-convex-url.convex.cloud
-CONVEX_DEPLOYMENT=dev:your-deployment
+```bash
+# Development
+pnpm dev              # Start development server
+pnpm dev:convex       # Start Convex development server
+
+# Building
+pnpm build            # Build for production
+pnpm start            # Start production server
+
+# Database
+npx convex dev        # Start Convex development
+npx convex deploy     # Deploy to production
 ```
 
-### Production Mode
-Real services with optimized performance:
-
-```env
-AI_MODE=real
-AUTH_MODE=real
-OPENAI_API_KEY=your-openai-key
-GITHUB_ID=your-github-oauth-id
-GITHUB_SECRET=your-github-oauth-secret
-NEXT_PUBLIC_CONVEX_URL=https://your-prod-convex-url.convex.cloud
-CONVEX_DEPLOYMENT=prod:your-deployment
-```
-
-## 📜 Available Scripts
-
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start development server |
-| `pnpm dev:real` | Start with real AI/auth |
-| `pnpm build` | Build for production |
-| `pnpm start` | Start production server |
-| `npx convex dev` | Start Convex development |
-| `npx convex deploy --prod` | Deploy Convex to production |
-
-## 🚀 Performance Features
-
-### Token Tracking & Monitoring
-- Real-time token counting (input/output/total)
-- Live TPS (Tokens Per Second) calculation
-- Performance logging and optimization
-- Streaming response monitoring
-
-### Speed Optimizations
-- Convex real-time backend (80-118 TPS)
-- Edge-optimized global deployment
-- Minimal database latency
-- Optimized AI streaming pipeline
-
-## 🔑 Setting Up Real Services
-
-### OpenAI API
-1. Get API key from [OpenAI Platform](https://platform.openai.com/)
-2. Add to `.env.local`: `OPENAI_API_KEY=sk-...`
-3. Set `AI_MODE=real`
-
-### GitHub OAuth
-1. Create OAuth App in GitHub Settings
-2. Set Authorization callback URL: `http://localhost:3000/api/auth/callback/github`
-3. Add credentials to `.env.local`:
-   ```env
-   GITHUB_ID=your_client_id
-   GITHUB_SECRET=your_client_secret
-   ```
-4. Set `AUTH_MODE=real`
-
-### Convex Setup
-1. Sign up at [Convex](https://convex.dev)
-2. Run `npx convex dev` to setup development
-3. For production: `npx convex deploy --prod`
-
-## 🚀 Deployment
-
-### Vercel + Convex (Recommended)
-1. Deploy Convex: `npx convex deploy --prod`
-2. Connect GitHub repository to Vercel
-3. Set environment variables in Vercel dashboard
-4. Deploy automatically on push
-
-Expected performance: **80-118 TPS** 🚀
-
-## 🤝 Contributing
+### Contributing
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Make your changes
-4. Test with Convex development environment
-5. Submit a pull request
+4. Commit your changes: `git commit -m 'Add amazing feature'`
+5. Push to the branch: `git push origin feature/amazing-feature`
+6. Open a Pull Request
 
-## 📄 License
+## Deployment
 
-MIT License - see LICENSE file for details.
+### Vercel Deployment (Recommended)
 
-## 🙏 Acknowledgments
+1. Deploy your Convex backend:
 
-- [Convex](https://convex.dev/) for the real-time backend
-- [T3 Stack](https://create.t3.gg/) for the foundation
-- [shadcn/ui](https://ui.shadcn.com/) for beautiful components
-- [OpenAI](https://openai.com/) for AI capabilities 
+   ```bash
+   npx convex deploy --prod
+   ```
+
+2. Connect your GitHub repository to Vercel
+
+3. Configure environment variables in Vercel dashboard
+
+4. Deploy automatically on every push to main
+
+### Environment Variables for Production
+
+Ensure all required environment variables are set in your production environment:
+
+- Database: `NEXT_PUBLIC_CONVEX_URL`, `CONVEX_DEPLOYMENT`
+- Authentication: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
+- AI Providers: Configure the APIs you want to enable
+
+## Security
+
+- All API keys are encrypted and stored securely
+- User authentication handled by Clerk
+- Rate limiting implemented for AI API calls
+- Input validation and sanitization throughout
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/yourusername/lll.chat/issues)
+- **Discussions**: Join the conversation in [GitHub Discussions](https://github.com/yourusername/lll.chat/discussions)
+
+## Acknowledgments
+
+Built with these amazing technologies:
+
+- [Next.js](https://nextjs.org/) - React framework
+- [Convex](https://convex.dev/) - Real-time backend
+- [Clerk](https://clerk.com/) - Authentication
+- [Tailwind CSS](https://tailwindcss.com/) - Styling
+- [tRPC](https://trpc.io/) - Type-safe APIs

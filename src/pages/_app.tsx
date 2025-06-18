@@ -9,6 +9,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { dark } from "@clerk/themes";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { useEffect } from "react";
+import Head from "next/head";
 
 // Wrapper component that can access the theme
 function ClerkWrapper({ children }: { children: React.ReactNode }) {
@@ -46,6 +47,14 @@ const MyApp: AppType = ({
   return (
     <ThemeProvider>
       <ClerkWrapper>
+        <Head>
+          <link rel="icon" href="/favicon.ico" />
+          <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+          <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+          <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+          <link rel="manifest" href="/site.webmanifest" />
+        </Head>
         <div className="h-full min-h-screen bg-background text-foreground">
           <ConvexClientProvider>
             <Component {...pageProps} />
