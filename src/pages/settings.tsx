@@ -66,7 +66,6 @@ const SettingsPage: NextPage = () => {
   const setDefaultModelMutation = trpc.userPreferences.setDefaultModel.useMutation();
   const setTitleGenerationModelMutation = trpc.userPreferences.setTitleGenerationModel.useMutation();
   const setOpenRouterModeMutation = trpc.userPreferences.setOpenRouterMode.useMutation();
-  const seedAllUserFavoritesMutation = trpc.models.seedAllUserFavorites.useMutation();
   const utils = trpc.useUtils();
 
   // Set active tab based on URL parameter
@@ -404,19 +403,6 @@ const SettingsPage: NextPage = () => {
     router.push('/settings?tab=api-keys', undefined, { shallow: true });
   };
 
-  const handleSeedFavorites = async () => {
-    try {
-      const result = await seedAllUserFavoritesMutation.mutateAsync();
-      toast.success(result.message);
-      // Refresh the model queries
-      utils.models.getFavoriteModels.invalidate();
-      utils.models.getOtherModels.invalidate();
-    } catch (error) {
-      toast.error('Failed to seed favorites');
-      console.error(error);
-    }
-  };
-
   // Redirect to home if not authenticated
   if (!isLoaded) {
     return (
@@ -585,17 +571,8 @@ const SettingsPage: NextPage = () => {
                     <div className="space-y-6">
                       {/* API Keys Content */}
                       <div>
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="mb-2">
                           <h2 className="text-lg font-medium text-foreground">API Keys</h2>
-                          <Button
-                            onClick={handleSeedFavorites}
-                            disabled={seedAllUserFavoritesMutation.isLoading}
-                            variant="outline"
-                            size="sm"
-                            className="text-xs"
-                          >
-                            {seedAllUserFavoritesMutation.isLoading ? 'Seeding...' : 'Seed Favorites'}
-                          </Button>
                         </div>
                         <p className="text-sm text-muted-foreground mb-6">
                           Configure your API keys for different AI providers

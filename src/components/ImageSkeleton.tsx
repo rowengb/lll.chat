@@ -5,7 +5,6 @@ interface ImageSkeletonProps {
 }
 
 export const ImageSkeleton: React.FC<ImageSkeletonProps> = ({ className = "" }) => {
-  console.log("🎨 [ImageSkeleton] Rendering skeleton loader");
   return (
     <div className={`relative max-w-lg group ${className}`}>
       <div className="relative bg-muted rounded-lg overflow-hidden" style={{ width: '300px', height: '300px', maxWidth: '300px', maxHeight: '300px' }}>

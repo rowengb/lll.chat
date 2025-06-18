@@ -470,7 +470,6 @@ export function Chatbox({
           if (isSupported) {
             filesToUpload.push(file);
           } else {
-            console.log(`📋 [PASTE] Unsupported file type: ${file.type}`);
             toast.error(`Unsupported file type: ${file.type}`);
           }
         }
@@ -489,8 +488,6 @@ export function Chatbox({
     if (filesToUpload.length > 0) {
       // Prevent default paste behavior for files
       event.preventDefault();
-      
-      console.log(`📋 [PASTE] Processing ${filesToUpload.length} pasted file(s)`);
       
       // Track files being added in this paste operation
       let currentUploadedFiles = [...uploadedFiles];
@@ -767,8 +764,6 @@ export function Chatbox({
 
     const files = Array.from(event.dataTransfer.files);
     if (files.length === 0) return;
-
-    console.log(`🎯 [DROP] Processing ${files.length} dropped file(s)`);
 
     // Validate file types
     const supportedTypes = [
