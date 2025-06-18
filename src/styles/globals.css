@@ -89,16 +89,19 @@
     @apply border-border;
   }
 
-  /* Hide browser scrollbars app-wide */
-  html,
-  body {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE/Edge */
-  }
+  /* Hide browser scrollbars app-wide EXCEPT on actual mobile devices */
+  @media (hover: hover) and (pointer: fine) {
+    /* Desktop only - devices with precise pointers and hover capability */
+    html,
+    body {
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
+    }
 
-  html::-webkit-scrollbar,
-  body::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Edge */
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar {
+      display: none; /* Chrome, Safari, Edge */
+    }
   }
 
   /* Ensure ScrollArea scrollbars are visible on all devices */
@@ -117,8 +120,14 @@
     display: block !important;
   }
 
-  /* Mobile-specific ScrollArea scrollbar visibility */
-  @media (max-width: 640px) {
+  /* Mobile-specific overscroll prevention and scrollbar visibility */
+  @media (hover: none) and (pointer: coarse), (max-width: 640px) {
+    /* Prevent overscroll bounce on mobile Safari */
+    html, body {
+      overscroll-behavior: none !important;
+      -webkit-overscroll-behavior: none !important;
+      overflow-x: hidden !important;
+    }
     [data-radix-scroll-area-scrollbar] {
       display: flex !important;
       opacity: 1 !important;
@@ -135,26 +144,29 @@
       width: 12px !important;
     }
 
-    /* EMERGENCY iOS Safari scrollbar fix - nuclear option */
+    /* iOS Safari native scrollbar optimization */
     .ios-native-scroll {
-      scrollbar-width: auto !important;
-      -ms-overflow-style: auto !important;
+      /* Force scrollbars to always be visible */
+      overflow-y: scroll !important;
+      -webkit-overflow-scrolling: touch !important;
+      /* Prevent overscroll bounce - AGGRESSIVE */
+      overscroll-behavior: none !important;
+      -webkit-overscroll-behavior: none !important;
+      overscroll-behavior-y: none !important;
+      -webkit-overscroll-behavior-y: none !important;
+      /* Control touch behavior */
+      touch-action: pan-y !important;
     }
 
+    /* Safari iOS only supports limited webkit scrollbar styling */
     .ios-native-scroll::-webkit-scrollbar {
       -webkit-appearance: none !important;
-      width: 30px !important;
-      background: red !important; /* Bright red to see if it works */
-      display: block !important;
-      opacity: 1 !important;
-      visibility: visible !important;
+      width: 8px !important;
     }
 
     .ios-native-scroll::-webkit-scrollbar-thumb {
-      background: blue !important; /* Bright blue to see if it works */
-      border-radius: 15px !important;
-      opacity: 1 !important;
-      min-height: 50px !important;
+      background: rgba(0, 0, 0, 0.5) !important;
+      border-radius: 4px !important;
     }
   }
 
@@ -168,63 +180,6 @@
     -webkit-overscroll-behavior: contain !important;
     /* Force minimum height to ensure scrollable content */
     min-height: 100% !important;
-  }
-
-  /* Force scrollbars to ALWAYS be visible - not just on scroll */
-  .ios-native-scroll::-webkit-scrollbar {
-    -webkit-appearance: none !important;
-    width: 20px !important;
-    background: rgba(0, 0, 0, 0.2) !important;
-    display: block !important;
-    opacity: 1 !important;
-  }
-
-  .ios-native-scroll::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.1) !important;
-    border-radius: 10px !important;
-    opacity: 1 !important;
-  }
-
-  .ios-native-scroll::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.7) !important;
-    border-radius: 10px !important;
-    border: 2px solid rgba(255, 255, 255, 0.3) !important;
-    background-clip: padding-box !important;
-    opacity: 1 !important;
-    min-height: 30px !important;
-  }
-
-  .ios-native-scroll::-webkit-scrollbar-thumb:active {
-    background: rgba(0, 0, 0, 0.9) !important;
-  }
-
-  /* Extra aggressive iOS-only rules */
-  @supports (-webkit-touch-callout: none) {
-    /* This targets iOS Safari specifically */
-    .ios-native-scroll {
-      scrollbar-width: auto !important;
-      scrollbar-color: rgba(0, 0, 0, 0.7) rgba(0, 0, 0, 0.2) !important;
-    }
-    
-    .ios-native-scroll::-webkit-scrollbar {
-      -webkit-appearance: none !important;
-      width: 24px !important;
-      background: rgba(0, 0, 0, 0.25) !important;
-      display: block !important;
-      opacity: 1 !important;
-      visibility: visible !important;
-      z-index: 999 !important;
-    }
-    
-    .ios-native-scroll::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.8) !important;
-      border-radius: 12px !important;
-      border: 3px solid rgba(255, 255, 255, 0.4) !important;
-      background-clip: padding-box !important;
-      opacity: 1 !important;
-      min-height: 40px !important;
-      box-shadow: 0 0 6px rgba(0, 0, 0, 0.3) !important;
-    }
   }
 
   body {

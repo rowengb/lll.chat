@@ -1023,8 +1023,9 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         <div 
           className="block sm:hidden h-full overflow-y-auto ios-native-scroll"
           ref={setMessagesContainer}
+          style={{ height: '100%', minHeight: '100%' }}
         >
-          <div className={`${sharedGridClasses} pt-8 pb-48`}>
+          <div className={`${sharedGridClasses} pt-8 pb-64 sm:pb-48`} style={{ minHeight: 'calc(100vh + 200px)' }}>
             <div></div>
             <div className="w-full">
               <div className={sharedLayoutClasses} id="messages-container">
@@ -1072,7 +1073,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             className="h-full"
             onRef={setMessagesContainer}
           >
-            <div className={`${sharedGridClasses} pt-8 pb-48`}>
+            <div className={`${sharedGridClasses} pt-8 pb-64 sm:pb-48`}>
               <div></div>
               <div className="w-full">
                 <div className={sharedLayoutClasses} id="messages-container">

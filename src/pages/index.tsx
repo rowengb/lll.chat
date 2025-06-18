@@ -237,10 +237,47 @@ const Home: NextPage = () => {
 
   // Loading state for authenticated users
   if (!selectedModel) {
+  return (
+      <>
+      <Head>
+        <title>lll.chat</title>
+        <meta name="description" content="lll.chat - High-performance AI chat application" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="format-detection" content="telephone=no" />
+          <link rel="icon" href="/favicon.ico" sizes="any" />
+          <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+          <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+          <link rel="manifest" href="/site.webmanifest" />
+      </Head>
+        <main className="h-screen flex">
+        <Sidebar 
+            currentThreadId={null}
+          onThreadSelect={handleThreadSelect}
+              onNewChat={handleNewChat}
+              onNavigateToSettings={navigateToSettings}
+              onNavigateToAccount={navigateToAccount}
+            onNavigateToWelcome={() => {}}
+          collapsed={sidebarCollapsed}
+              onToggleCollapse={toggleSidebar}
+          onWidthChange={setSidebarWidth}
+              onOpenSearch={openSearch}
+        />
+          <div className="flex-1 flex items-center justify-center">
+            <LoadingDots text="Loading" size="lg" />
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  // Welcome view for authenticated users (new chat)
     return (
       <>
         <Head>
-          <title>lll.chat</title>
+        <title>New Chat - lll.chat</title>
           <meta name="description" content="lll.chat - High-performance AI chat application" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
           <meta name="mobile-web-app-capable" content="yes" />
@@ -253,55 +290,18 @@ const Home: NextPage = () => {
           <link rel="manifest" href="/site.webmanifest" />
         </Head>
         <main className="h-screen flex">
-          <Sidebar 
-            currentThreadId={null}
-            onThreadSelect={handleThreadSelect}
-            onNewChat={handleNewChat}
-            onNavigateToSettings={navigateToSettings}
-            onNavigateToAccount={navigateToAccount}
-            onNavigateToWelcome={() => {}}
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={toggleSidebar}
-            onWidthChange={setSidebarWidth}
-            onOpenSearch={openSearch}
-          />
-          <div className="flex-1 flex items-center justify-center">
-            <LoadingDots text="Loading" size="lg" />
-          </div>
-        </main>
-      </>
-    );
-  }
-
-  // Welcome view for authenticated users (new chat)
-  return (
-    <>
-      <Head>
-        <title>New Chat - lll.chat</title>
-        <meta name="description" content="lll.chat - High-performance AI chat application" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="format-detection" content="telephone=no" />
-        <link rel="icon" href="/favicon.ico" sizes="any" />
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <link rel="manifest" href="/site.webmanifest" />
-      </Head>
-      <main className="h-screen flex">
-        <Sidebar 
+            <Sidebar 
           currentThreadId={null}
-          onThreadSelect={handleThreadSelect}
-          onNewChat={handleNewChat}
-          onNavigateToSettings={navigateToSettings}
-          onNavigateToAccount={navigateToAccount}
+              onThreadSelect={handleThreadSelect}
+              onNewChat={handleNewChat}
+              onNavigateToSettings={navigateToSettings}
+              onNavigateToAccount={navigateToAccount}
           onNavigateToWelcome={() => {}}
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={toggleSidebar}
-          onWidthChange={setSidebarWidth}
-          onOpenSearch={openSearch}
-        />
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={toggleSidebar}
+              onWidthChange={setSidebarWidth}
+              onOpenSearch={openSearch}
+            />
         
         <div className="flex-1">
           <ChatWindow 
@@ -316,20 +316,20 @@ const Home: NextPage = () => {
             currentView="welcome"
             onNavigateToSettings={navigateToSettings}
           />
-        </div>
+          </div>
 
-        <SearchCommand
-          isOpen={isSearchOpen}
-          onClose={closeSearch}
-          onThreadSelect={handleThreadSelect}
-          onNewChat={handleNewChat}
-          onNavigateToSettings={navigateToSettings}
-          onNavigateToAccount={navigateToAccount}
-          onModelChange={handleModelChange}
+          <SearchCommand
+            isOpen={isSearchOpen}
+            onClose={closeSearch}
+            onThreadSelect={handleThreadSelect}
+            onNewChat={handleNewChat}
+            onNavigateToSettings={navigateToSettings}
+            onNavigateToAccount={navigateToAccount}
+            onModelChange={handleModelChange}
           currentThreadId={null}
-        />
+          />
       </main>
-    </>
+      </>
   );
 };
 
