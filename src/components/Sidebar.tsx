@@ -123,6 +123,37 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
   const [editTitle, setEditTitle] = useState("");
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
 
+  // Prevent background scrolling when sidebar is open on mobile
+  useEffect(() => {
+    // Only apply on mobile devices
+    const isMobile = window.innerWidth < 640;
+    
+    if (isOpen && isMobile) {
+      // Prevent background scrolling
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+      document.body.style.touchAction = 'none'; // Prevent any touch scrolling on body
+    } else {
+      // Restore scrolling
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+      document.body.style.touchAction = '';
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+      document.body.style.touchAction = '';
+    };
+  }, [isOpen]);
+
   const utils = trpc.useUtils();
   const { data: threads } = trpc.chat.getThreads.useQuery(undefined, {
     refetchOnWindowFocus: true,
@@ -402,8 +433,8 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
                 </div>
               </div>
 
-              {/* Thread List */}
-                              <div className="overflow-y-auto mobile-hidden-scrollbar max-h-[50vh] min-h-0">
+                            {/* Thread List */}
+              <div className="overflow-y-auto mobile-hidden-scrollbar max-h-[50vh] min-h-0 mobile-scroll-isolated" style={{ touchAction: 'pan-y' }}>
                 <div className="px-3 py-2">
                   {/* Pinned Threads Section */}
                   {sortedPinnedThreads.length > 0 && (
