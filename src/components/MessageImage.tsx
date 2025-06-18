@@ -17,12 +17,10 @@ export const MessageImage: React.FC<MessageImageProps> = ({ imageUrl, alt = "Gen
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleImageLoad = () => {
-    console.log("🎨 [MessageImage] Image fully loaded, updating store");
     setImageLoaded(imageUrl);
   };
 
   const handleImageError = () => {
-    console.log("🎨 [MessageImage] Image failed to load, updating store");
     setImageError(imageUrl);
   };
 
@@ -63,7 +61,6 @@ export const MessageImage: React.FC<MessageImageProps> = ({ imageUrl, alt = "Gen
 
   // Show skeleton while generating OR while the actual image is loading
   if (imageUrl === "GENERATING" || !isLoaded) {
-    console.log("🎨 [MessageImage] Showing skeleton - generating:", imageUrl === "GENERATING", "loaded:", isLoaded);
     return (
       <>
         <ImageSkeleton />

@@ -37,7 +37,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
   // Check browser support on mount
   useEffect(() => {
     const supported = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-    console.log('🎤 [VoiceInput] MediaRecorder API available:', supported);
     setIsSupported(supported);
   }, []);
 
@@ -76,7 +75,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       const updateTimer = () => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
         setRecordingTime(elapsed);
-        console.log('🎤 Timer updated:', elapsed, 'seconds');
       };
       
       // Set up interval timer
@@ -110,8 +108,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     audioChunksRef.current = [];
 
     try {
-      console.log('🎤 [VoiceInput] Requesting microphone permission...');
-      
       // Set recording state immediately with synchronous update
       flushSync(() => {
         setIsRecording(true);
@@ -125,8 +121,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
           autoGainControl: true,
         } 
       });
-
-      console.log('🎤 [VoiceInput] Microphone permission granted, starting recording...');
       
       // Create MediaRecorder
       const mediaRecorder = new MediaRecorder(stream, {
@@ -142,7 +136,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       };
 
       mediaRecorder.onstop = async () => {
-        console.log('🎤 [VoiceInput] Recording stopped, processing...');
         stream.getTracks().forEach(track => track.stop());
         
         if (audioChunksRef.current.length > 0) {
@@ -175,7 +168,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      console.log('🎤 [VoiceInput] Stopping recording...');
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       
@@ -203,8 +195,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
         type: audioChunksRef.current[0]?.type || 'audio/webm' 
       });
       
-      console.log('🎤 [VoiceInput] Audio blob created:', audioBlob.size, 'bytes');
-      
       // Convert to file for upload
       const audioFile = new File([audioBlob], 'recording.webm', { 
         type: audioBlob.type 
@@ -215,8 +205,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       formData.append('file', audioFile);
       formData.append('model', 'whisper-1');
       formData.append('language', 'en'); // You can make this configurable
-      
-      console.log('🎤 [VoiceInput] Sending to Whisper API...');
       
       // Call our API endpoint
       const response = await fetch('/api/transcribe', {
@@ -229,7 +217,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
       }
       
       const result = await response.json();
-      console.log('🎤 [VoiceInput] Whisper response:', result);
       
       if (result.text && result.text.trim()) {
         onTranscript(result.text.trim());
@@ -276,8 +263,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  console.log('🎤 [VoiceInput] Rendering. Supported:', isSupported, 'Recording:', isRecording, 'Processing:', isProcessing, 'RecordingTime:', recordingTime, 'Variant:', variant);
-
   // Show not supported state
   if (!isSupported) {
     if (variant === 'compact') {
@@ -320,8 +305,6 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     // Calculate current recording time to force fresh renders
     const currentTime = isRecording ? recordingTime : 0;
     const timeDisplay = formatTime(currentTime);
-    
-    console.log('🎤 [VoiceInput] Compact variant - currentTime:', currentTime, 'timeDisplay:', timeDisplay, 'isRecording:', isRecording);
     
     // Force complete re-render by using different elements for different states
     const buttonContent = isProcessing ? (

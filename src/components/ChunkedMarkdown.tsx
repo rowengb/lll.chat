@@ -43,7 +43,6 @@ const preprocessMarkdownContent = (content: string): string => {
       lines[lines.length - 1]?.trim() === '```') {
     // Extract content between the code block markers
     const extractedContent = lines.slice(1, -1).join('\n');
-    console.log('[MARKDOWN] Extracted content from complete markdown code block');
     return extractedContent;
   }
   
@@ -53,7 +52,6 @@ const preprocessMarkdownContent = (content: string): string => {
       !lines[lines.length - 1]?.trim().startsWith('```')) {
     // Extract content after the opening marker, but keep it as-is since it's still streaming
     const extractedContent = lines.slice(1).join('\n');
-    console.log('[MARKDOWN] Processing streaming markdown code block');
     return extractedContent;
   }
   
@@ -67,7 +65,6 @@ const preprocessMarkdownContent = (content: string): string => {
     const hasMarkdownSyntax = /^#{1,6}\s|^\*\*|^__|\[.*\]\(.*\)|^\s*[-*+]\s|^\s*\d+\.\s|^\|.*\|/m.test(extractedContent);
     
     if (hasMarkdownSyntax) {
-      console.log('[MARKDOWN] Extracted markdown-like content from complete generic code block');
       return extractedContent;
     }
   }
@@ -82,7 +79,6 @@ const preprocessMarkdownContent = (content: string): string => {
     const hasMarkdownSyntax = /^#{1,6}\s|^\*\*|^__|\[.*\]\(.*\)|^\s*[-*+]\s|^\s*\d+\.\s|^\|.*\|/m.test(extractedContent);
     
     if (hasMarkdownSyntax) {
-      console.log('[MARKDOWN] Processing streaming generic code block with markdown content');
       return extractedContent;
     }
   }
@@ -93,7 +89,6 @@ const preprocessMarkdownContent = (content: string): string => {
   // Find complete markdown code blocks and extract their content
   const markdownBlockRegex = /```\s*markdown\s*\n([\s\S]*?)\n```/gi;
   processedContent = processedContent.replace(markdownBlockRegex, (match, markdownContent) => {
-    console.log('[MARKDOWN] Extracted inline markdown code block');
     return markdownContent;
   });
   

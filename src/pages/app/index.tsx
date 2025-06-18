@@ -83,9 +83,9 @@ const App: NextPage = () => {
     setNewChatModelChoice(modelId);
   };
 
-  // Redirect to sign-in if not authenticated
+  // Redirect to home if not authenticated
   if (isLoaded && !user) {
-    router.push('/sign-in');
+    router.push('/home');
     return null;
   }
 

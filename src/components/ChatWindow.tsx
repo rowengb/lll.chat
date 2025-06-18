@@ -14,6 +14,7 @@ import { FileAttachmentWithUrl } from './FileAttachmentWithUrl';
 import { GroundingSources } from './GroundingSources';
 import { MessageImage } from './MessageImage';
 import { ImageSkeleton } from './ImageSkeleton';
+import { LoadingDots } from './LoadingDots';
 import { isImageGenerationModel } from '../utils/modelUtils';
 import { ChunkedMarkdown } from './ChunkedMarkdown';
 import { ApiKeyWarningBanner } from './ApiKeyWarningBanner';
@@ -1049,14 +1050,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           </div>
                         ) : (
                           <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
-                            <div className="flex items-center space-x-3">
-                              <div className="flex items-center space-x-1">
-                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"></div>
-                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
-                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
-                              </div>
-                              <span className="text-sm text-muted-foreground animate-pulse">AI is thinking...</span>
-                            </div>
+                            <LoadingDots text="AI is thinking" size="sm" />
                           </div>
                         )}
                       </div>
@@ -1097,14 +1091,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                           </div>
                         ) : (
                           <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
-                            <div className="flex items-center space-x-3">
-                              <div className="flex items-center space-x-1">
-                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"></div>
-                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
-                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
-                              </div>
-                              <span className="text-sm text-muted-foreground animate-pulse">AI is thinking...</span>
-                            </div>
+                            <LoadingDots text="AI is thinking" size="sm" />
                           </div>
                         )}
                       </div>
