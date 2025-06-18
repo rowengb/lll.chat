@@ -657,7 +657,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   : "pt-1 pb-1"
               } ${
                 message.role === "user"
-                  ? "bg-primary/10 text-foreground border border-primary shadow-sm backdrop-blur-sm dark:bg-primary/30 dark:border-primary/50"
+                  ? "bg-blue-50 text-foreground border border-blue-500 shadow-sm backdrop-blur-sm dark:bg-blue-950/30 dark:border-blue-400"
                   : message.isError
                   ? "bg-destructive/10 text-destructive border border-destructive/30 shadow-sm"
                   : "text-foreground"
