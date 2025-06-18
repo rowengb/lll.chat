@@ -101,10 +101,130 @@
     display: none; /* Chrome, Safari, Edge */
   }
 
-  /* Ensure ScrollArea scrollbars are visible */
+  /* Ensure ScrollArea scrollbars are visible on all devices */
   [data-radix-scroll-area-scrollbar] {
     display: flex !important;
     opacity: 1 !important;
+    width: 16px !important;
+    background: transparent !important;
+  }
+
+  /* ScrollArea scrollbar thumb */
+  [data-radix-scroll-area-thumb] {
+    background: hsl(var(--muted-foreground) / 0.6) !important;
+    border-radius: 8px !important;
+    opacity: 1 !important;
+    display: block !important;
+  }
+
+  /* Mobile-specific ScrollArea scrollbar visibility */
+  @media (max-width: 640px) {
+    [data-radix-scroll-area-scrollbar] {
+      display: flex !important;
+      opacity: 1 !important;
+      width: 16px !important;
+      background: transparent !important;
+      z-index: 10 !important;
+    }
+
+    [data-radix-scroll-area-thumb] {
+      background: hsl(var(--muted-foreground) / 0.8) !important;
+      border-radius: 8px !important;
+      opacity: 1 !important;
+      display: block !important;
+      width: 12px !important;
+    }
+
+    /* EMERGENCY iOS Safari scrollbar fix - nuclear option */
+    .ios-native-scroll {
+      scrollbar-width: auto !important;
+      -ms-overflow-style: auto !important;
+    }
+
+    .ios-native-scroll::-webkit-scrollbar {
+      -webkit-appearance: none !important;
+      width: 30px !important;
+      background: red !important; /* Bright red to see if it works */
+      display: block !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+
+    .ios-native-scroll::-webkit-scrollbar-thumb {
+      background: blue !important; /* Bright blue to see if it works */
+      border-radius: 15px !important;
+      opacity: 1 !important;
+      min-height: 50px !important;
+    }
+  }
+
+  /* iOS Safari native scrollbar styling - Force always visible */
+  .ios-native-scroll {
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: auto !important; /* Firefox */
+    -ms-overflow-style: auto !important; /* IE/Edge */
+    /* Prevent overscroll bounce on iOS */
+    overscroll-behavior: contain !important;
+    -webkit-overscroll-behavior: contain !important;
+    /* Force minimum height to ensure scrollable content */
+    min-height: 100% !important;
+  }
+
+  /* Force scrollbars to ALWAYS be visible - not just on scroll */
+  .ios-native-scroll::-webkit-scrollbar {
+    -webkit-appearance: none !important;
+    width: 20px !important;
+    background: rgba(0, 0, 0, 0.2) !important;
+    display: block !important;
+    opacity: 1 !important;
+  }
+
+  .ios-native-scroll::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1) !important;
+    border-radius: 10px !important;
+    opacity: 1 !important;
+  }
+
+  .ios-native-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.7) !important;
+    border-radius: 10px !important;
+    border: 2px solid rgba(255, 255, 255, 0.3) !important;
+    background-clip: padding-box !important;
+    opacity: 1 !important;
+    min-height: 30px !important;
+  }
+
+  .ios-native-scroll::-webkit-scrollbar-thumb:active {
+    background: rgba(0, 0, 0, 0.9) !important;
+  }
+
+  /* Extra aggressive iOS-only rules */
+  @supports (-webkit-touch-callout: none) {
+    /* This targets iOS Safari specifically */
+    .ios-native-scroll {
+      scrollbar-width: auto !important;
+      scrollbar-color: rgba(0, 0, 0, 0.7) rgba(0, 0, 0, 0.2) !important;
+    }
+    
+    .ios-native-scroll::-webkit-scrollbar {
+      -webkit-appearance: none !important;
+      width: 24px !important;
+      background: rgba(0, 0, 0, 0.25) !important;
+      display: block !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      z-index: 999 !important;
+    }
+    
+    .ios-native-scroll::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.8) !important;
+      border-radius: 12px !important;
+      border: 3px solid rgba(255, 255, 255, 0.4) !important;
+      background-clip: padding-box !important;
+      opacity: 1 !important;
+      min-height: 40px !important;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.3) !important;
+    }
   }
 
   body {
@@ -475,52 +595,7 @@ pre code {
   display: none; /* Chrome, Safari, Edge */
 }
 
-/* Mobile scrolling optimizations */
-.mobile-scroll-container {
-  /* Optimize touch scrolling on mobile */
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-  /* Prevent momentum scrolling from interfering */
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-}
-
-/* Enhanced mobile scroll tracking */
-.mobile-scroll-optimized {
-  /* Optimize touch scrolling on mobile */
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-  /* Prevent momentum scrolling from interfering */
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-}
-
-/* iOS specific scroll fixes */
-.ios-scroll-fix {
-  /* Fix iOS scroll momentum issues */
-  -webkit-overflow-scrolling: touch;
-  /* Prevent rubber band effect */
-  overscroll-behavior-y: contain;
-  /* Improve scroll performance */
-  will-change: scroll-position;
-}
-
-/* Prevent pull-to-refresh on mobile */
-.mobile-no-refresh {
-  overscroll-behavior-y: contain;
-  /* Prevent pull-to-refresh specifically */
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Mobile scroll isolation */
-.mobile-scroll-isolated {
-  /* Isolate scroll context */
-  contain: layout style paint;
-  /* Prevent scroll chaining */
-  overscroll-behavior: contain;
-}
+/* Simplified mobile scrolling - use native browser behavior */
 
 /* Mobile textarea optimizations */
 .mobile-textarea {
@@ -615,25 +690,13 @@ pre code {
   }
 }
 
-/* Simplified mobile scrolling - remove body locking */
+/* Clean mobile behavior */
 @media (max-width: 640px) {
-  /* Allow natural body scrolling, just prevent pull-to-refresh */
-  html,
-  body {
-    overscroll-behavior-y: contain;
-  }
-
   /* Prevent iOS zoom on inputs */
   input,
   textarea,
   select {
     font-size: 16px !important;
-  }
-
-  /* Enable smooth touch scrolling for containers */
-  [class*="overflow-y-auto"] {
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
   }
 
   /* Fix textarea cursor positioning on mobile */
@@ -840,28 +903,4 @@ pre code {
   background: hsl(var(--muted-foreground) / 0.6);
 }
 
-/* Mobile-specific scroll improvements */
-@media (max-width: 640px) {
-  /* Improve mobile scrolling performance */
-  .mobile-scroll-optimized {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    touch-action: pan-y;
-    /* Hardware acceleration */
-    will-change: scroll-position;
-    transform: translateZ(0);
-  }
-
-  /* Prevent scroll chaining on mobile */
-  .mobile-scroll-isolated {
-    overscroll-behavior: contain;
-    touch-action: pan-y;
-  }
-
-  /* Fix for iOS Safari scroll issues */
-  .ios-scroll-fix {
-    -webkit-overflow-scrolling: touch;
-    -webkit-transform: translate3d(0, 0, 0);
-    transform: translate3d(0, 0, 0);
-  }
-}
+/* Clean mobile scrolling - let the browser handle it naturally */

@@ -256,7 +256,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   // Auto-scroll effect
   useEffect(() => {
     if (isInitialLoad || scrollLocked.current) return;
-    if (messagesContainer && messagesContainer.style.overflow === 'hidden') return;
     
     if (localMessages.length > 0) {
       messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
@@ -996,7 +995,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   // Main chat interface when threadId exists
   return (
     <div 
-      className="sm:fixed sm:inset-0 min-h-screen flex flex-col bg-white dark:bg-slate-900 sm:left-auto overflow-hidden"
+      className="sm:fixed sm:inset-0 min-h-screen flex flex-col bg-white dark:bg-slate-900 sm:left-auto"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
         transition: window.innerWidth >= 640 ? 'left 0.3s ease-out' : 'none'
@@ -1018,12 +1017,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         onOpenSearch={onOpenSearch}
       />
 
-      {/* Messages + Chatbox Area */}
-      <div className="flex-1 overflow-hidden relative min-h-0">
-        {/* Mobile: ScrollArea for custom scrollbar and no overscroll */}
-        <ScrollArea
-          onViewportRef={setMessagesContainer}
-          className="block sm:hidden h-full"
+      {/* Messages Area - Single container for both mobile and desktop */}
+      <div className="flex-1 relative min-h-0">
+        {/* Mobile: Native scrolling with iOS scrollbar styling */}
+        <div 
+          className="block sm:hidden h-full overflow-y-auto ios-native-scroll"
+          ref={setMessagesContainer}
         >
           <div className={`${sharedGridClasses} pt-8 pb-48`}>
             <div></div>
@@ -1065,63 +1064,84 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             </div>
             <div></div>
           </div>
-        </ScrollArea>
-        
-        {/* Desktop: Custom scrollbars */}
-        <div className="hidden sm:block absolute inset-0">
-        <CustomScrollbar 
-            className="h-full"
-          onRef={setMessagesContainer}
-        >
-          <div className={`${sharedGridClasses} pt-8 pb-48`}>
-            <div></div>
-            <div className="w-full">
-              <div className={sharedLayoutClasses} id="messages-container">
-                <div className="space-y-0">
-                  {filterOutEmptyOptimisticMessages(localMessages).map(renderMessage)}
-            
-                  {isLoading && (
-                    <div className="flex justify-start">
-                      <div className="w-full flex">
-                        {isImageGenerationModel(selectedModel) ? (
-                          <div className="w-full">
-                            <div className="px-4">
-                              <div className="mt-4">
-                                <ImageSkeleton />
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
-                            <div className="flex items-center space-x-3">
-                              <div className="flex items-center space-x-1">
-                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"></div>
-                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
-                                <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
-                              </div>
-                              <span className="text-sm text-muted-foreground animate-pulse">AI is thinking...</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-            
-                  <div ref={messagesEndRef} />
-                </div>
-              </div>
-            </div>
-            <div></div>
-          </div>
-        </CustomScrollbar>
         </div>
         
+        {/* Desktop: Custom scrollbars */}
+        <div className="hidden sm:block h-full">
+          <CustomScrollbar 
+            className="h-full"
+            onRef={setMessagesContainer}
+          >
+            <div className={`${sharedGridClasses} pt-8 pb-48`}>
+              <div></div>
+              <div className="w-full">
+                <div className={sharedLayoutClasses} id="messages-container">
+                  <div className="space-y-0">
+                    {filterOutEmptyOptimisticMessages(localMessages).map(renderMessage)}
+              
+                    {isLoading && (
+                      <div className="flex justify-start">
+                        <div className="w-full flex">
+                          {isImageGenerationModel(selectedModel) ? (
+                            <div className="w-full">
+                              <div className="px-4">
+                                <div className="mt-4">
+                                  <ImageSkeleton />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
+                              <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-1">
+                                  <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"></div>
+                                  <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-100"></div>
+                                  <div className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground animation-delay-200"></div>
+                                </div>
+                                <span className="text-sm text-muted-foreground animate-pulse">AI is thinking...</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+              
+                    <div ref={messagesEndRef} />
+                  </div>
+                </div>
+              </div>
+              <div></div>
+            </div>
+          </CustomScrollbar>
+        </div>
       </div>
       
       {/* Chatbox - fixed at bottom on mobile, absolute on desktop */}
-        <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
-          <div className="px-3 sm:hidden">
-            <div className="max-w-[95%] w-full mx-auto">
+      <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+        <div className="px-3 sm:hidden">
+          <div className="max-w-[95%] w-full mx-auto">
+            <Chatbox
+              input={input}
+              onInputChange={handleInputChange}
+              onSubmit={handleSubmit}
+              uploadedFiles={uploadedFiles}
+              onFilesChange={setUploadedFiles}
+              selectedModel={selectedModel}
+              onModelChange={onModelChange}
+              isLoading={isLoading}
+              isStreaming={isStreaming}
+              onStop={stopStream}
+              inputRef={inputRef}
+              searchGroundingEnabled={searchGroundingEnabled}
+              onSearchGroundingChange={setSearchGroundingEnabled}
+              onModelSelectorClick={triggerShakeAnimation}
+            />
+          </div>
+        </div>
+        <div className={`hidden sm:block ${chatboxGridClasses}`}>
+          <div></div>
+          <div className="w-full">
+            <div className={chatboxLayoutClasses}>
               <Chatbox
                 input={input}
                 onInputChange={handleInputChange}
@@ -1140,28 +1160,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               />
             </div>
           </div>
-          <div className={`hidden sm:block ${chatboxGridClasses}`}>
-            <div></div>
-            <div className="w-full">
-              <div className={chatboxLayoutClasses}>
-                <Chatbox
-                  input={input}
-                  onInputChange={handleInputChange}
-                  onSubmit={handleSubmit}
-                  uploadedFiles={uploadedFiles}
-                  onFilesChange={setUploadedFiles}
-                  selectedModel={selectedModel}
-                  onModelChange={onModelChange}
-                  isLoading={isLoading}
-                  isStreaming={isStreaming}
-                  onStop={stopStream}
-                  inputRef={inputRef}
-                  searchGroundingEnabled={searchGroundingEnabled}
-                  onSearchGroundingChange={setSearchGroundingEnabled}
-                  onModelSelectorClick={triggerShakeAnimation}
-                />
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -1170,11 +1168,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
 // Memoize the component with custom comparison to prevent unnecessary re-renders
 export const ChatWindow = React.memo(ChatWindowComponent, (prevProps, nextProps) => {
-  const { isTransitioning } = useChatStore.getState();
-  if (isTransitioning) {
-    return true;
-  }
-
   return (
     prevProps.threadId === nextProps.threadId &&
     prevProps.selectedModel === nextProps.selectedModel &&

@@ -434,7 +434,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               </div>
 
                             {/* Thread List */}
-              <div className="overflow-y-auto mobile-hidden-scrollbar max-h-[50vh] min-h-0 mobile-scroll-isolated" style={{ touchAction: 'pan-y' }}>
+              <div className="overflow-y-auto ios-native-scroll max-h-[50vh] min-h-0 mobile-scroll-isolated" style={{ touchAction: 'pan-y' }}>
                 <div className="px-3 py-2">
                   {/* Pinned Threads Section */}
                   {sortedPinnedThreads.length > 0 && (
@@ -1166,8 +1166,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           </div>
 
           {/* Thread List */}
-          {/* Mobile: Native scrollbar with mobile-hidden */}
-          <div className="flex-1 overflow-y-auto mobile-hidden-scrollbar sm:hidden">
+          {/* Mobile: Native scrollbar with iOS styling */}
+          <div className="flex-1 overflow-y-auto ios-native-scroll sm:hidden">
             <div className="px-3 py-2">
               {/* Pinned Threads Section */}
               {sortedPinnedThreads.length > 0 && (
