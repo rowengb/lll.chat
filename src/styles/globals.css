@@ -723,6 +723,35 @@ pre code {
   display: block !important;
 }
 
+/* Chat window specific code block constraints */
+#messages-container pre,
+#messages-container code,
+#messages-container .prose pre,
+#messages-container .prose code {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: auto !important;
+  word-wrap: break-word !important;
+  word-break: break-all !important;
+  white-space: pre-wrap !important;
+}
+
+/* Ensure code blocks never exceed message bubble width */
+#messages-container [class*="rounded-xl"] pre,
+#messages-container [class*="rounded-xl"] code {
+  max-width: calc(100% - 2rem) !important; /* Account for padding */
+}
+
+/* Force CodeBlock component to respect bounds */
+#messages-container .group pre,
+#messages-container .group code {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  white-space: pre-wrap !important;
+  word-break: break-all !important;
+}
+
 /* Mobile-specific overflow prevention */
 @media (max-width: 640px) {
   .prose,

@@ -122,22 +122,17 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   // Thread change effect
   useEffect(() => {
     if (threadId !== previousThreadId.current) {
+      // Set the initial load flag to true when the thread changes.
+      // This prevents auto-scrolling until the new messages are loaded.
       setIsInitialLoad(true);
       previousThreadId.current = threadId;
-      
-      if (messagesContainer && threadId) {
+
+      // Reset scroll to top immediately for a clean transition
+      if (messagesContainer) {
         messagesContainer.scrollTop = 0;
-        requestAnimationFrame(() => {
-          if (messagesContainer) {
-            messagesContainer.scrollTo({
-              top: messagesContainer.scrollHeight,
-              behavior: 'smooth'
-            });
-            setIsInitialLoad(false);
-          }
-        });
       }
-      
+
+      // Focus the input for a better user experience
       smartFocus(inputRef, { delay: 200, reason: 'thread-change' });
     }
   }, [threadId, messagesContainer]);
