@@ -273,11 +273,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     
     const handler = (event: Event) => {
       const target = event.target as HTMLElement;
-      // Don't close if clicking on action buttons or model name areas
+      // Don't close if clicking on the entire action cluster
       if (
-        target.closest('.model-name-container') ||
-        target.closest('[data-action-button]') ||
-        target.closest('.model-name-scroll')
+        target.closest('.message-actions-container') ||
+        target.closest('[data-action-button]')
       ) return;
       
       setMobileActiveMessageId(null);
@@ -761,7 +760,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             </div>
             
             {/* Message actions */}
-            <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${
+            <div className={`message-actions-container flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${
               !showActions 
                 ? "opacity-0 pointer-events-none" 
                 : isMobile 
