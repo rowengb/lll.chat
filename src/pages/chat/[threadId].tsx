@@ -75,6 +75,10 @@ const ChatPage: NextPage = () => {
     router.push('/settings', undefined, { shallow: true });
   };
 
+  const navigateToAccount = () => {
+    router.push('/settings?tab=account', undefined, { shallow: true });
+  };
+
   const handleThreadSelect = (newThreadId: string) => {
     navigateToChat(newThreadId);
   };
@@ -153,7 +157,10 @@ const ChatPage: NextPage = () => {
           onThreadSelect={handleThreadSelect}
           onNewChat={handleNewChat}
           onNavigateToSettings={navigateToSettings}
+          onNavigateToAccount={navigateToAccount}
+          onNavigateToWelcome={navigateToWelcome}
           currentThreadId={threadId}
+          onOpenSearch={openSearch}
         />
 
         {/* Main Content */}
@@ -185,7 +192,7 @@ const ChatPage: NextPage = () => {
           onThreadSelect={handleThreadSelect}
           onNewChat={handleNewChat}
           onNavigateToSettings={navigateToSettings}
-          onNavigateToAccount={navigateToSettings}
+          onNavigateToAccount={navigateToAccount}
         />
       </div>
     </>
