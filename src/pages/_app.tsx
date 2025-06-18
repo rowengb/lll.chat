@@ -33,6 +33,25 @@ const MyApp: AppType = ({
   pageProps,
 }) => {
   const router = useRouter();
+
+  // Ensure body scroll styles are reset on navigation
+  useEffect(() => {
+    const cleanupBodyStyles = () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
+      document.body.style.touchAction = '';
+    };
+
+    router.events.on('routeChangeStart', cleanupBodyStyles);
+    router.events.on('routeChangeComplete', cleanupBodyStyles);
+
+    return () => {
+      router.events.off('routeChangeStart', cleanupBodyStyles);
+      router.events.off('routeChangeComplete', cleanupBodyStyles);
+    };
+  }, [router.events]);
   
 
   
