@@ -6,9 +6,9 @@ A modern, high-performance AI chat application that brings together multiple AI 
 
 ### Multi-Provider AI Support
 
-- **OpenAI**: GPT-4o, o1-mini with vision capabilities
-- **Anthropic**: Claude 3.5 Sonnet with document analysis
-- **Google**: Gemini 2.0 Flash with web search and multimodal support
+- **OpenAI**: GPT-4o, o4-mini with vision capabilities and plenty more!
+- **Anthropic**: Claude 4 Sonnet with document analysis
+- **Google**: Gemini 2.5 Flash with web search and multimodal support
 - **DeepSeek**: Advanced reasoning models
 - **OpenRouter**: Access to 200+ models through unified API
 
@@ -33,7 +33,7 @@ A modern, high-performance AI chat application that brings together multiple AI 
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 19+
 - pnpm (recommended) or npm
 
 ### Installation
@@ -109,7 +109,7 @@ Configure the AI providers you want to use:
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, React, TypeScript
+- **Frontend**: Next.js 15, React, TypeScript
 - **Backend**: Convex (real-time database)
 - **API Layer**: tRPC with React Query
 - **Authentication**: Clerk
