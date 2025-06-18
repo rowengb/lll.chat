@@ -45,6 +45,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   const [searchGroundingEnabled, setSearchGroundingEnabled] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [shouldShakeBanner, setShouldShakeBanner] = useState(false);
+  const [mobileActiveMessageId, setMobileActiveMessageId] = useState<string | null>(null);
   
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const previousThreadId = useRef<string | null>(null);
@@ -266,6 +267,31 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     }
   }, [localMessages, isInitialLoad, messagesContainer]);
 
+  // Close mobile message actions when clicking outside
+  useEffect(() => {
+    if (!mobileActiveMessageId) return;
+    
+    const handler = (event: Event) => {
+      const target = event.target as HTMLElement;
+      // Don't close if clicking on action buttons or model name areas
+      if (
+        target.closest('.model-name-container') ||
+        target.closest('[data-action-button]') ||
+        target.closest('.model-name-scroll')
+      ) return;
+      
+      setMobileActiveMessageId(null);
+    };
+    
+    document.addEventListener('click', handler);
+    document.addEventListener('touchstart', handler);
+    
+    return () => {
+      document.removeEventListener('click', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [mobileActiveMessageId]);
+
   // Event handlers
   const handleCopyMessage = async (content: string) => {
     try {
@@ -421,6 +447,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       setEditingMessageId(messageId);
       setEditingContent(message.content);
     }
+  };
+
+  const handleMobileMessageTap = (messageId: string) => {
+    setMobileActiveMessageId(prev => prev === messageId ? null : messageId);
   };
 
   const handleSaveEdit = async (messageId: string) => {
@@ -610,6 +640,223 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     }
   };
 
+  // Unified Message Render
+  const renderMessage = (message: Message) => {
+    const isMobile = window.innerWidth < 640;
+    const showActions = !message.isOptimistic && !message.isError;
+    const mobileActionsVisible = isMobile && mobileActiveMessageId === message.id;
+       
+    return (
+      <div key={message.id} className="flex justify-start">
+        <div className="w-full max-w-full min-w-0">
+          <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
+            <div
+              tabIndex={-1}
+              className={`rounded-xl px-4 max-w-full overflow-hidden min-w-0 ${isMobile ? 'cursor-pointer' : 'sm:cursor-default'} ${
+                message.role === "user"
+                  ? "py-2" 
+                  : "pt-1 pb-1"
+              } ${
+                message.role === "user"
+                  ? "bg-primary/10 text-foreground border border-primary shadow-sm backdrop-blur-sm dark:bg-primary/30 dark:border-primary/50"
+                  : message.isError
+                  ? "bg-destructive/10 text-destructive border border-destructive/30 shadow-sm"
+                  : "text-foreground"
+              }`}
+              onClick={() => isMobile && handleMobileMessageTap(message.id)}
+              onTouchStart={isMobile ? (e) => { 
+                e.stopPropagation(); 
+                handleMobileMessageTap(message.id); 
+              } : undefined}
+            >
+              {/* Editing */}
+              {editingMessageId === message.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={editingContent}
+                    onChange={(e) => setEditingContent(e.target.value)}
+                    className="w-full p-2 border border-border rounded-lg text-sm resize-none bg-background text-foreground"
+                    rows={Math.max(2, editingContent.split('\n').length)}
+                    autoFocus
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => handleSaveEdit(message.id)}
+                      size="sm"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      onClick={handleCancelEdit}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : message.role === "user" ? (
+                <div>
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                    {message.content}
+                  </p>
+                  {message.attachments && message.attachments.length > 0 && (
+                    <div className="mt-2 w-full">
+                      <div className="flex flex-col gap-2 w-full max-w-2xl">
+                        {message.attachments.map((file) => (
+                          <div key={file.id} className="w-full">
+                            <FileAttachmentWithUrl fileId={file.id} />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  {message.isError ? (
+                    <div className="flex items-center gap-3">
+                      <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+                      <div className="flex-1">
+                        <ChunkedMarkdown 
+                          content={message.content}
+                          chunkSize={75}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <ChunkedMarkdown 
+                      content={message.content}
+                      chunkSize={75}
+                    />
+                  )}
+                  
+                  {message.role === "assistant" && message.groundingMetadata && (
+                    <GroundingSources
+                      sources={message.groundingMetadata.sources}
+                      messageId={message.id}
+                      onToggle={handleGroundingSourcesToggle}
+                    />
+                  )}
+                  
+                  {message.role === "assistant" && message.imageUrl && (
+                    <div className="mt-4">
+                      <MessageImage imageUrl={message.imageUrl} />
+                    </div>
+                  )}
+                  
+                  {message.role === "assistant" && message.stoppedByUser && (
+                    <div className="mt-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <SquareIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="currentColor" />
+                        <span className="text-sm text-amber-700 dark:text-amber-300">
+                          Stopped by user
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Message actions */}
+            <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${
+              !showActions 
+                ? "opacity-0 pointer-events-none" 
+                : isMobile 
+                  ? (mobileActionsVisible ? "opacity-100" : "opacity-0 pointer-events-none")
+                  : "opacity-0 group-hover:opacity-100"
+            } transition-opacity`}>
+              {message.role === "assistant" && (
+                <div className="flex items-center gap-1 mr-1">
+                  {isMobile ? (
+                    <div className="model-name-container px-4">
+                      <div className="model-name-scroll text-sm text-muted-foreground">
+                        <span>{getProviderFromModel(message.model, allModels)}</span>
+                        <span className="mx-1">•</span>
+                        <span>{message.model}</span>
+                      </div>
+                      <div className="model-name-fade"></div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground px-4">
+                      {getProviderFromModel(message.model, allModels)}
+                      <span>•</span>
+                      <span>{message.model}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {message.role === "user" ? (
+                <>
+                  <ActionButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRetryMessage(message.id, true)}
+                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                    data-action-button
+                  >
+                    <RotateCcwIcon className="h-4 w-4" />
+                  </ActionButton>
+                  <ActionButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditMessage(message.id)}
+                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                    data-action-button
+                  >
+                    <EditIcon className="h-4 w-4" />
+                  </ActionButton>
+                  <ActionButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCopyMessage(message.content)}
+                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                    data-action-button
+                  >
+                    <CopyIcon className="h-4 w-4" />
+                  </ActionButton>
+                </>
+              ) : (
+                <>
+                  <ActionButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCopyMessage(message.content)}
+                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                    data-action-button
+                  >
+                    <CopyIcon className="h-4 w-4" />
+                  </ActionButton>
+                  <ActionButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleBranchOff(message.id)}
+                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                    data-action-button
+                  >
+                    <GitBranchIcon className="h-4 w-4" />
+                  </ActionButton>
+                  <ActionButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRetryMessage(message.id, false)}
+                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                    data-action-button
+                  >
+                    <RotateCcwIcon className="h-4 w-4" />
+                  </ActionButton>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && uploadedFiles.length === 0) return;
@@ -789,189 +1036,7 @@ ref={setMessagesContainer}
             <div className="w-full">
               <div className={sharedLayoutClasses} id="messages-container">
                 <div className="space-y-0">
-                  {filterOutEmptyOptimisticMessages(localMessages).map((message: Message) => (
-                    <div key={message.id} className="flex justify-start">
-                      <div className="w-full max-w-full min-w-0">
-                        <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
-                          <div
-                            className={`rounded-xl px-4 max-w-full overflow-hidden min-w-0 ${
-                              message.role === "user"
-                                ? "py-2" 
-                                : "pt-1 pb-1"
-                            } ${
-                              message.role === "user"
-                                ? "bg-primary/10 text-foreground border border-primary shadow-sm backdrop-blur-sm dark:bg-primary/30 dark:border-primary/50"
-                                : message.isError
-                                ? "bg-destructive/10 text-destructive border border-destructive/30 shadow-sm"
-                                : "text-foreground"
-                            }`}
-                          >
-                            {editingMessageId === message.id ? (
-                              <div className="space-y-2">
-                                <textarea
-                                  value={editingContent}
-                                  onChange={(e) => setEditingContent(e.target.value)}
-                                  className="w-full p-2 border border-border rounded-lg text-sm resize-none bg-background text-foreground"
-                                  rows={Math.max(2, editingContent.split('\n').length)}
-                                  autoFocus
-                                />
-                                <div className="flex gap-2">
-                                  <Button
-                                    onClick={() => handleSaveEdit(message.id)}
-                                    size="sm"
-                                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                                  >
-                                    Save
-                                  </Button>
-                                  <Button
-                                    onClick={handleCancelEdit}
-                                    size="sm"
-                                    variant="outline"
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : message.role === "user" ? (
-                              <div>
-                                <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                                  {message.content}
-                                </p>
-                                {message.attachments && message.attachments.length > 0 && (
-                                  <div className="mt-2 w-full">
-                                    <div className="flex flex-col gap-2 w-full max-w-2xl">
-                                      {message.attachments.map((file) => (
-                                        <div key={file.id} className="w-full">
-                                          <FileAttachmentWithUrl fileId={file.id} />
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div>
-                                {message.isError ? (
-                                  <div className="flex items-center gap-3">
-                                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
-                                    <div className="flex-1">
-                                <ChunkedMarkdown 
-                                  content={message.content}
-                                  chunkSize={75}
-                                />
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <ChunkedMarkdown 
-                                    content={message.content}
-                                    chunkSize={75}
-                                  />
-                                )}
-                                
-                                {message.role === "assistant" && message.groundingMetadata && (
-                                  <GroundingSources
-                                    sources={message.groundingMetadata.sources}
-                                    messageId={message.id}
-                                    onToggle={handleGroundingSourcesToggle}
-                                  />
-                                )}
-                                
-                                {message.role === "assistant" && message.imageUrl && (
-                                  <div className="mt-4">
-                                    <MessageImage imageUrl={message.imageUrl} />
-                                  </div>
-                                )}
-                                
-                                {message.role === "assistant" && message.stoppedByUser && (
-                                  <div className="mt-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                                    <div className="flex items-center gap-2">
-                                      <SquareIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="currentColor" />
-                                      <span className="text-sm text-amber-700 dark:text-amber-300">
-                                        Stopped by user
-                                      </span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Message Actions */}
-                          <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity mobile-no-hover`}>
-                            {message.role === "assistant" && (
-                              <div className="flex items-center gap-1 mr-1">
-                                <div className="flex items-center gap-1 text-sm text-muted-foreground px-5">
-                                  {getProviderFromModel(message.model, allModels)}
-                                  <span>•</span>
-                                  <span>{message.model}</span>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {message.role === "user" ? (
-                              <>
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <RotateCcwIcon className="h-4 w-4" />
-                                </ActionButton>
-                        
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditMessage(message.id)}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <EditIcon className="h-4 w-4" />
-                                </ActionButton>
-                        
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleCopyMessage(message.content)}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <CopyIcon className="h-4 w-4" />
-                                </ActionButton>
-                              </>
-                            ) : (
-                              <>
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleCopyMessage(message.content)}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <CopyIcon className="h-4 w-4" />
-                                </ActionButton>
-                        
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleBranchOff(message.id)}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <GitBranchIcon className="h-4 w-4" />
-                                </ActionButton>
-                                
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <RotateCcwIcon className="h-4 w-4" />
-                                </ActionButton>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  {filterOutEmptyOptimisticMessages(localMessages).map(renderMessage)}
             
                   {isLoading && (
                     <div className="flex justify-start">
@@ -1019,189 +1084,7 @@ ref={setMessagesContainer}
             <div className="w-full">
               <div className={sharedLayoutClasses} id="messages-container">
                 <div className="space-y-0">
-                  {filterOutEmptyOptimisticMessages(localMessages).map((message: Message) => (
-                    <div key={message.id} className="flex justify-start">
-                      <div className="w-full max-w-full min-w-0">
-                        <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
-                          <div
-                            className={`rounded-xl px-4 max-w-full overflow-hidden min-w-0 ${
-                              message.role === "user"
-                                ? "py-2" 
-                                : "pt-1 pb-1"
-                            } ${
-                              message.role === "user"
-                                ? "bg-primary/10 text-foreground border border-primary shadow-sm backdrop-blur-sm dark:bg-primary/30 dark:border-primary/50"
-                                : message.isError
-                                ? "bg-destructive/10 text-destructive border border-destructive/30 shadow-sm"
-                                : "text-foreground"
-                            }`}
-                          >
-                            {editingMessageId === message.id ? (
-                              <div className="space-y-2">
-                                <textarea
-                                  value={editingContent}
-                                  onChange={(e) => setEditingContent(e.target.value)}
-                                  className="w-full p-2 border border-border rounded-lg text-sm resize-none bg-background text-foreground"
-                                  rows={Math.max(2, editingContent.split('\n').length)}
-                                  autoFocus
-                                />
-                                <div className="flex gap-2">
-                                  <Button
-                                    onClick={() => handleSaveEdit(message.id)}
-                                    size="sm"
-                                    className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                                  >
-                                    Save
-                                  </Button>
-                                  <Button
-                                    onClick={handleCancelEdit}
-                                    size="sm"
-                                    variant="outline"
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : message.role === "user" ? (
-                              <div>
-                                <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                                  {message.content}
-                                </p>
-                                {message.attachments && message.attachments.length > 0 && (
-                                  <div className="mt-2 w-full">
-                                    <div className="flex flex-col gap-2 w-full max-w-2xl">
-                                      {message.attachments.map((file) => (
-                                        <div key={file.id} className="w-full">
-                                          <FileAttachmentWithUrl fileId={file.id} />
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div>
-                                {message.isError ? (
-                                  <div className="flex items-center gap-3">
-                                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
-                                    <div className="flex-1">
-                                <ChunkedMarkdown 
-                                  content={message.content}
-                                  chunkSize={75}
-                                />
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <ChunkedMarkdown 
-                                    content={message.content}
-                                    chunkSize={75}
-                                  />
-                                )}
-                                
-                                {message.role === "assistant" && message.groundingMetadata && (
-                                  <GroundingSources
-                                    sources={message.groundingMetadata.sources}
-                                    messageId={message.id}
-                                    onToggle={handleGroundingSourcesToggle}
-                                  />
-                                )}
-                                
-                                {message.role === "assistant" && message.imageUrl && (
-                                  <div className="mt-4">
-                                    <MessageImage imageUrl={message.imageUrl} />
-                                  </div>
-                                )}
-                                
-                                {message.role === "assistant" && message.stoppedByUser && (
-                                  <div className="mt-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                                    <div className="flex items-center gap-2">
-                                      <SquareIcon className="h-4 w-4 text-amber-600 dark:text-amber-400" fill="currentColor" />
-                                      <span className="text-sm text-amber-700 dark:text-amber-300">
-                                        Stopped by user
-                                      </span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Message Actions */}
-                          <div className={`flex items-center gap-1 ${message.role === "user" ? "mt-3 mb-2" : "mt-2 mb-2"} ${message.isOptimistic || message.isError ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"} transition-opacity mobile-no-hover`}>
-                            {message.role === "assistant" && (
-                              <div className="flex items-center gap-1 mr-1">
-                                <div className="flex items-center gap-1 text-sm text-muted-foreground px-5">
-                                  {getProviderFromModel(message.model, allModels)}
-                                  <span>•</span>
-                                  <span>{message.model}</span>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {message.role === "user" ? (
-                              <>
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <RotateCcwIcon className="h-4 w-4" />
-                                </ActionButton>
-                        
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditMessage(message.id)}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <EditIcon className="h-4 w-4" />
-                                </ActionButton>
-                        
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleCopyMessage(message.content)}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <CopyIcon className="h-4 w-4" />
-                                </ActionButton>
-                              </>
-                            ) : (
-                              <>
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleCopyMessage(message.content)}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <CopyIcon className="h-4 w-4" />
-                                </ActionButton>
-                        
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleBranchOff(message.id)}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <GitBranchIcon className="h-4 w-4" />
-                                </ActionButton>
-                                
-                                <ActionButton
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleRetryMessage(message.id, message.role === "user")}
-                                  className="h-8 px-2 text-muted-foreground hover:text-foreground"
-                                >
-                                  <RotateCcwIcon className="h-4 w-4" />
-                                </ActionButton>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  {filterOutEmptyOptimisticMessages(localMessages).map(renderMessage)}
             
                   {isLoading && (
                     <div className="flex justify-start">

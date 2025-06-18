@@ -636,6 +636,48 @@ pre code {
   .mobile-hidden-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Edge */
   }
+
+  /* Mobile model name display with horizontal scrolling */
+  .model-name-container {
+    position: relative;
+    overflow: hidden;
+    max-width: 180px; /* Fixed max width for mobile */
+    min-width: 100px;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+
+  .model-name-scroll {
+    white-space: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+    padding-right: 32px; /* Space for gradient */
+    /* Enable smooth scrolling */
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Hide scrollbar for webkit browsers */
+  .model-name-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .model-name-fade {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 32px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, white 100%);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .dark .model-name-fade {
+    background: linear-gradient(90deg, transparent 0%, rgba(15,23,42,0.8) 50%, rgb(15 23 42) 100%);
+  }
 }
 
 /* Custom overlay scrollbar */
