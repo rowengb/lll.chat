@@ -158,15 +158,30 @@
       touch-action: pan-y !important;
     }
 
-    /* Safari iOS only supports limited webkit scrollbar styling */
+    /* Safari iOS scrollbar styling - respects app theme */
     .ios-native-scroll::-webkit-scrollbar {
       -webkit-appearance: none !important;
       width: 8px !important;
     }
 
+    /* Light theme scrollbars */
     .ios-native-scroll::-webkit-scrollbar-thumb {
-      background: rgba(0, 0, 0, 0.5) !important;
+      background: rgba(0, 0, 0, 0.4) !important;
       border-radius: 4px !important;
+    }
+
+    .ios-native-scroll::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* Dark theme scrollbars */
+    .dark .ios-native-scroll::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.6) !important;
+      border-radius: 4px !important;
+    }
+
+    .dark .ios-native-scroll::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1) !important;
     }
   }
 
