@@ -77,9 +77,11 @@ module.exports = {
       height: {
         'screen-mobile': 'calc(var(--vh, 1vh) * 100)',
         'full-mobile': 'calc(var(--vh, 1vh) * 100)',
+        'visual-mobile': 'calc(var(--visual-vh, 1vh) * 100)',
       },
       minHeight: {
         'screen-mobile': 'calc(var(--vh, 1vh) * 100)',
+        'visual-mobile': 'calc(var(--visual-vh, 1vh) * 100)',
       },
     },
   },
