@@ -18,53 +18,39 @@ interface Message {
   createdAt: Date;
   isOptimistic?: boolean;
   isError?: boolean;
-  isGrounded?: boolean; // Indicates if response was grounded with Google Search
-  groundingMetadata?: GroundingMetadata; // Google Search grounding metadata
+  isGrounded?: boolean;
+  groundingMetadata?: GroundingMetadata;
   attachments?: FileAttachment[];
-  imageUrl?: string; // For image generation results
-  imageData?: string; // For base64 image data
-  stoppedByUser?: boolean; // Flag to indicate if stream was stopped by user
+  imageUrl?: string;
+  imageData?: string;
+  stoppedByUser?: boolean;
 }
 
 interface GroundingSource {
-  title: string; // Domain name (e.g., "pbs.org", "democracynow.org")
-  url: string; // Vertexaisearch redirect URL (e.g., "https://vertexaisearch.cloud.google.com/grounding-api-redirect/...")
+  title: string;
+  url: string;
   snippet?: string;
-  confidence?: number; // Confidence percentage (0-100)
-  // Unfurled metadata from the actual destination
+  confidence?: number;
   unfurled?: {
-    title?: string; // Actual article title
-    description?: string; // Article description
-    image?: string; // Article image
-    favicon?: string; // Site favicon
-    siteName?: string; // Site name
-    finalUrl?: string; // Final URL after redirects
+    title?: string;
+    description?: string;
+    image?: string;
+    favicon?: string;
+    siteName?: string;
+    finalUrl?: string;
   };
 }
 
 interface GroundingMetadata {
-  sources?: GroundingSource[]; // The sources used for grounding (optional)
-  rawData?: any; // Include raw data for debugging
+  sources?: GroundingSource[];
 }
 
 interface ChatStore {
-  // Messages by thread ID
   messagesByThread: Record<string, Message[]>;
-  
-  // Current streaming state
   isStreaming: boolean;
   streamingThreadId: string | null;
-  
-  // Loading state
   isLoading: boolean;
   loadingThreadId: string | null;
-  
-  // Transition state for smooth chat switching
-  isTransitioning: boolean;
-  currentDisplayThreadId: string | null;
-  displayMessages: Message[];
-  
-  // Sidebar state
   sidebarCollapsed: boolean;
   sidebarWidth: number;
   lastExpandedWidth: number;
@@ -77,10 +63,6 @@ interface ChatStore {
   setLoading: (threadId: string | null, isLoading: boolean) => void;
   clearThread: (threadId: string) => void;
   
-  // Transition actions
-  startThreadTransition: (newThreadId: string | null) => void;
-  endThreadTransition: (threadId: string) => void;
-  
   // Sidebar actions
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSidebarWidth: (width: number) => void;
@@ -88,7 +70,6 @@ interface ChatStore {
   
   // Get messages for a thread
   getMessages: (threadId: string) => Message[];
-  getDisplayMessages: () => Message[];
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -99,149 +80,102 @@ export const useChatStore = create<ChatStore>()(
       streamingThreadId: null,
       isLoading: false,
       loadingThreadId: null,
-      
-      // Transition state
-      isTransitioning: false,
-      currentDisplayThreadId: null,
-      displayMessages: [],
-      
-      // Default sidebar state
       sidebarCollapsed: false,
       sidebarWidth: 288,
       lastExpandedWidth: 288,
   
-  setMessages: (threadId: string, messages: Message[]) => {
-    set((state) => {
-      const newState = {
-        messagesByThread: {
-          ...state.messagesByThread,
-          [threadId]: messages,
-        },
-      };
-      
-      // Update display messages if this is the current display thread and not transitioning
-      if (!state.isTransitioning && state.currentDisplayThreadId === threadId) {
-        (newState as any).displayMessages = messages;
-      }
-      
-      return newState;
-    });
-  },
-  
-  addMessage: (threadId: string, message: Message) => {
-    set((state) => {
-      const newMessages = [...(state.messagesByThread[threadId] || []), message];
-      const newState = {
-        messagesByThread: {
-          ...state.messagesByThread,
-          [threadId]: newMessages,
-        },
-      };
-      
-      // Update display messages if this is the current display thread and not transitioning
-      if (!state.isTransitioning && state.currentDisplayThreadId === threadId) {
-        (newState as any).displayMessages = newMessages;
-      }
-      
-      return newState;
-    });
-  },
-  
-  updateStreamingMessage: (threadId: string, messageId: string, updates: Partial<Message>) => {
-    set((state) => ({
-      messagesByThread: {
-        ...state.messagesByThread,
-        [threadId]: (state.messagesByThread[threadId] || []).map(msg =>
-          msg.id === messageId ? { ...msg, ...updates } : msg
-        ),
+      // FIXED: Simplified setMessages without transition state interference
+      setMessages: (threadId: string, messages: Message[]) => {
+        set((state) => ({
+          messagesByThread: {
+            ...state.messagesByThread,
+            [threadId]: messages,
+          },
+        }));
       },
-    }));
-  },
-  
-  setStreaming: (threadId: string | null, isStreaming: boolean) => {
-    set({
-      isStreaming,
-      streamingThreadId: threadId,
-    });
-  },
-  
-  setLoading: (threadId: string | null, isLoading: boolean) => {
-    set({
-      isLoading,
-      loadingThreadId: threadId,
-    });
-  },
-  
-  clearThread: (threadId: string) => {
-    set((state) => {
-      const newMessagesByThread = { ...state.messagesByThread };
-      delete newMessagesByThread[threadId];
-      return { messagesByThread: newMessagesByThread };
-    });
-  },
-  
-  getMessages: (threadId: string) => {
-    return get().messagesByThread[threadId] || [];
-  },
-  
-  getDisplayMessages: () => {
-    return get().displayMessages;
-  },
-  
-  startThreadTransition: (newThreadId: string | null) => {
-    set({
-      isTransitioning: true,
-      currentDisplayThreadId: newThreadId,
-      displayMessages: [], // Clear display during transition
-    });
-  },
-  
-  endThreadTransition: (threadId: string) => {
-    const state = get();
-    const messages = state.messagesByThread[threadId] || [];
-    set({
-      isTransitioning: false,
-      currentDisplayThreadId: threadId,
-      displayMessages: messages,
-    });
-  },
-  
-  // Sidebar actions
-  setSidebarCollapsed: (collapsed: boolean) => {
-    set({ sidebarCollapsed: collapsed });
-  },
-  
-  setSidebarWidth: (width: number) => {
-    set((state) => {
-      const newState = { sidebarWidth: width };
       
-      // If sidebar is not collapsed and width > 0, update lastExpandedWidth
-      if (!state.sidebarCollapsed && width > 0) {
-        (newState as any).lastExpandedWidth = width;
-      }
+      addMessage: (threadId: string, message: Message) => {
+        set((state) => ({
+          messagesByThread: {
+            ...state.messagesByThread,
+            [threadId]: [...(state.messagesByThread[threadId] || []), message],
+          },
+        }));
+      },
       
-      return newState;
-    });
-  },
-  
-  toggleSidebar: () => {
-    set((state) => {
-      const newCollapsed = !state.sidebarCollapsed;
-      const newWidth = newCollapsed ? 0 : state.lastExpandedWidth;
+      updateStreamingMessage: (threadId: string, messageId: string, updates: Partial<Message>) => {
+        set((state) => ({
+          messagesByThread: {
+            ...state.messagesByThread,
+            [threadId]: (state.messagesByThread[threadId] || []).map(msg =>
+              msg.id === messageId ? { ...msg, ...updates } : msg
+            ),
+          },
+        }));
+      },
       
-      return {
-        sidebarCollapsed: newCollapsed,
-        sidebarWidth: newWidth,
-      };
-    });
-  },
-}),
-{
-  name: 'chat-store',
-  partialize: (state) => ({
-    sidebarCollapsed: state.sidebarCollapsed,
-    sidebarWidth: state.sidebarWidth,
-    lastExpandedWidth: state.lastExpandedWidth,
-  }),
-}
-)); 
+      setStreaming: (threadId: string | null, isStreaming: boolean) => {
+        set({
+          isStreaming,
+          streamingThreadId: threadId,
+        });
+      },
+      
+      setLoading: (threadId: string | null, isLoading: boolean) => {
+        set({
+          isLoading,
+          loadingThreadId: threadId,
+        });
+      },
+      
+      clearThread: (threadId: string) => {
+        set((state) => {
+          const newMessagesByThread = { ...state.messagesByThread };
+          delete newMessagesByThread[threadId];
+          return { messagesByThread: newMessagesByThread };
+        });
+      },
+      
+      getMessages: (threadId: string) => {
+        return get().messagesByThread[threadId] || [];
+      },
+      
+      // Sidebar actions
+      setSidebarCollapsed: (collapsed: boolean) => {
+        set({ sidebarCollapsed: collapsed });
+      },
+      
+      setSidebarWidth: (width: number) => {
+        set((state) => {
+          const newState = { sidebarWidth: width };
+          
+          if (!state.sidebarCollapsed && width > 0) {
+            (newState as any).lastExpandedWidth = width;
+          }
+          
+          return newState;
+        });
+      },
+      
+      toggleSidebar: () => {
+        set((state) => {
+          const newCollapsed = !state.sidebarCollapsed;
+          const newWidth = newCollapsed ? 0 : state.lastExpandedWidth;
+          
+          return {
+            sidebarCollapsed: newCollapsed,
+            sidebarWidth: newWidth,
+          };
+        });
+      },
+    }),
+    {
+      name: 'chat-store',
+      partialize: (state) => ({
+        sidebarCollapsed: state.sidebarCollapsed,
+        sidebarWidth: state.sidebarWidth,
+        lastExpandedWidth: state.lastExpandedWidth,
+      }),
+    }
+  )
+);

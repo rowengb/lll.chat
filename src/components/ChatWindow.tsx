@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, SquareIcon, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
@@ -51,6 +51,16 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const previousThreadId = useRef<string | null>(null);
   
+  // FIXED: Separate refs for mobile and desktop containers
+  const [mobileMessagesContainer, setMobileMessagesContainer] = useState<HTMLDivElement | null>(null);
+  const [desktopMessagesContainer, setDesktopMessagesContainer] = useState<HTMLDivElement | null>(null);
+  
+  // Get the active container based on screen size
+  const getActiveMessagesContainer = useCallback(() => {
+    if (typeof window === 'undefined') return null;
+    return window.innerWidth < 640 ? mobileMessagesContainer : desktopMessagesContainer;
+  }, [mobileMessagesContainer, desktopMessagesContainer]);
+  
   // Global stores
   const { 
     getMessages, 
@@ -85,14 +95,13 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     utils
   } = useChatData(threadId);
 
+  // FIXED: Use simplified scrolling hook
   const {
     messagesEndRef,
-    messagesContainer,
-    setMessagesContainer,
     scrollLocked,
     scrollToBottomPinned,
     handleGroundingSourcesToggle
-  } = useChatScrolling();
+  } = useChatScrolling(getActiveMessagesContainer);
 
   const { streamResponse, stopStream, isStreamingRef, lastStreamCompletedAt } = useChatStreaming();
 
@@ -120,28 +129,20 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     adjustTextareaHeight(inputRef);
   }, [input]);
 
-  // Thread change effect
+  // FIXED: Simple thread change effect without iOS Safari "fixes"
   useEffect(() => {
     if (threadId !== previousThreadId.current) {
       setIsInitialLoad(true);
       previousThreadId.current = threadId;
       
-      if (messagesContainer && threadId) {
-        messagesContainer.scrollTop = 0;
-        requestAnimationFrame(() => {
-          if (messagesContainer) {
-            messagesContainer.scrollTo({
-              top: messagesContainer.scrollHeight,
-              behavior: 'smooth'
-            });
-            setIsInitialLoad(false);
-          }
-        });
-      }
-      
-      smartFocus(inputRef, { delay: 200, reason: 'thread-change' });
+      // Simple: just scroll to bottom after a brief delay
+      setTimeout(() => {
+        scrollToBottomPinned();
+        setIsInitialLoad(false);
+        smartFocus(inputRef, { delay: 100, reason: 'thread-change' });
+      }, 50); // Very short delay to let DOM update
     }
-  }, [threadId, messagesContainer]);
+  }, [threadId, scrollToBottomPinned]);
 
   // Image loading effect
   useEffect(() => {
@@ -218,27 +219,22 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         setMessages(threadId, mergedMessages);
       }
       
-      if (isInitialLoad && messagesContainer) {
+      if (isInitialLoad) {
         requestAnimationFrame(() => {
-          if (messagesContainer) {
-            messagesContainer.scrollTo({
-              top: messagesContainer.scrollHeight,
-              behavior: 'smooth'
-            });
-            setIsInitialLoad(false);
-          }
+          scrollToBottomPinned();
+          setIsInitialLoad(false);
         });
       }
     }
-  }, [serverMessages, threadId, isLoading, isInitialLoad, messagesContainer, setMessages, getMessages]);
+  }, [serverMessages, threadId, isLoading, isInitialLoad, setMessages, getMessages, scrollToBottomPinned]);
 
   // Scrollbar width detection effect
   useEffect(() => {
     const detectScrollbarWidth = () => {
-      if (messagesContainer) {
-        const element = messagesContainer;
-        const hasScrollbar = element.scrollHeight > element.clientHeight;
-        const currentScrollbarWidth = hasScrollbar ? (element.offsetWidth - element.clientWidth) : 0;
+      const container = getActiveMessagesContainer();
+      if (container) {
+        const hasScrollbar = container.scrollHeight > container.clientHeight;
+        const currentScrollbarWidth = hasScrollbar ? (container.offsetWidth - container.clientWidth) : 0;
         setScrollbarWidth(currentScrollbarWidth);
       }
     };
@@ -246,8 +242,9 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     detectScrollbarWidth();
     
     const observer = new ResizeObserver(detectScrollbarWidth);
-    if (messagesContainer) {
-      observer.observe(messagesContainer);
+    const container = getActiveMessagesContainer();
+    if (container) {
+      observer.observe(container);
     }
 
     window.addEventListener('resize', detectScrollbarWidth);
@@ -256,17 +253,16 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       observer.disconnect();
       window.removeEventListener('resize', detectScrollbarWidth);
     };
-  }, [localMessages, messagesContainer]);
+  }, [localMessages, getActiveMessagesContainer]);
 
   // Auto-scroll effect
   useEffect(() => {
     if (isInitialLoad || scrollLocked.current) return;
-    if (messagesContainer && messagesContainer.style.overflow === 'hidden') return;
     
     if (localMessages.length > 0) {
       messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
     }
-  }, [localMessages, isInitialLoad, messagesContainer]);
+  }, [localMessages, isInitialLoad]);
 
   // Close mobile message actions when clicking outside
   useEffect(() => {
@@ -274,7 +270,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     
     const handler = (event: Event) => {
       const target = event.target as HTMLElement;
-      // Don't close if clicking on the entire action cluster
       if (
         target.closest('.message-actions-container') ||
         target.closest('[data-action-button]')
@@ -292,7 +287,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     };
   }, [mobileActiveMessageId]);
 
-  // Event handlers
+  // Event handlers (keeping all existing handlers the same)
   const handleCopyMessage = async (content: string) => {
     try {
       await navigator.clipboard.writeText(content);
@@ -305,7 +300,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     }
   };
 
-  // Custom streaming function for retries that only saves assistant message
   const streamRetryResponse = async (
     threadId: string,
     content: string,
@@ -320,10 +314,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     generateTitle: any,
     refetchThreads: any
   ) => {
-    // Create a custom save function that only saves assistant message
     const customSaveStreamedMessage = {
       mutateAsync: async (params: any) => {
-        // Only save the assistant message for retries
         const assistantResult = await saveAssistantMessage.mutateAsync({
           threadId: params.threadId,
           content: params.assistantContent,
@@ -334,15 +326,13 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           stoppedByUser: params.stoppedByUser,
         });
 
-        // Return format expected by streamResponse
         return {
-          userMessage: { id: null }, // No user message saved
+          userMessage: { id: null },
           assistantMessage: assistantResult
         };
       }
     };
 
-    // Call streamResponse with our custom save function
     await streamResponse(
       threadId,
       content,
@@ -372,9 +362,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       if (messageIndex === -1) return;
 
       const targetMessage = currentMessages[messageIndex];
-      if (!targetMessage) return; // Type guard
+      if (!targetMessage) return;
       
-      // Delete messages from this point forward in the database (if not optimistic)
       if (!targetMessage.isOptimistic) {
         await deleteMessagesFromPoint.mutateAsync({
           threadId,
@@ -383,20 +372,17 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       }
 
       if (isUserMessage) {
-        // For user message retry: remove this message and all after it, then regenerate
         const messagesToKeep = currentMessages.slice(0, messageIndex);
         setMessages(threadId, messagesToKeep);
         
         const userMessage = currentMessages[messageIndex];
         if (userMessage) {
-          // Add the user message back as an optimistic message
           const optimisticUserMessage = createOptimisticUserMessage(
             userMessage.content, 
             userMessage.attachments
           );
           addMessage(threadId, optimisticUserMessage);
           
-          // For retry, use custom streaming that only saves assistant message
           await streamRetryResponse(
             threadId,
             userMessage.content,
@@ -413,7 +399,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           );
         }
       } else {
-        // For AI message retry: remove this message, keep user message, regenerate AI response
         const messagesToKeep = currentMessages.slice(0, messageIndex);
         setMessages(threadId, messagesToKeep);
           
@@ -527,7 +512,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       
       smartFocus(inputRef, { delay: 50, reason: 'user-action' });
       
-        const currentMessages = getMessages(threadId);
+      const currentMessages = getMessages(threadId);
       const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
       if (messageIndex === -1) return;
 
@@ -548,21 +533,17 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           .filter(msg => !msg.isOptimistic);
         
         if (messagesToCopy.length > 0) {
-          // Step 1: Duplicate all files for the new thread
           const fileIdMap = await duplicateFilesForThread.mutateAsync({
             sourceThreadId: threadId,
             targetThreadId: newThreadId,
           });
 
-          // Step 2: Create messages (without file associations initially)
           const createdMessageIds = await createManyMessages.mutateAsync({
             threadId: newThreadId,
             messages: messagesToCopy.map(msg => ({
               content: msg.content,
               role: msg.role,
               model: msg.model || undefined,
-              // Don't include attachments/imageFileId yet - we'll update them separately
-              // Copy grounding data
               isGrounded: msg.isGrounded || undefined,
               groundingSources: msg.groundingMetadata?.sources?.map(source => ({
                 title: source.title,
@@ -570,33 +551,27 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 snippet: source.snippet || undefined,
                 confidence: source.confidence || undefined,
               })) || undefined,
-              // Copy image generation data (URLs only, file IDs updated separately)
               imageUrl: msg.imageUrl || undefined,
               imageData: msg.imageData || undefined,
-              // Copy stopped by user flag
               stoppedByUser: msg.stoppedByUser || undefined,
             })),
           });
 
-          // Step 3: Update message file associations with duplicated file IDs
           for (let i = 0; i < messagesToCopy.length; i++) {
             const originalMessage = messagesToCopy[i];
             const newMessageId = createdMessageIds[i];
 
             if (!originalMessage || !newMessageId) continue;
 
-            // Update attachments if any
             const newAttachmentIds = originalMessage.attachments?.map(attachment => 
               fileIdMap[attachment.id]
             ).filter((id): id is string => Boolean(id));
 
-            // Update image file ID if any
             let newImageFileId: string | undefined;
             if ((originalMessage as any).imageFileId) {
               newImageFileId = fileIdMap[(originalMessage as any).imageFileId];
             }
 
-            // Update the message with new file associations
             if (newAttachmentIds?.length || newImageFileId) {
               await updateMessageFileAssociations.mutateAsync({
                 messageId: newMessageId.toString(),
@@ -605,7 +580,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               });
             }
 
-            // Update file records with the new message ID
             if (newAttachmentIds?.length) {
               await updateFileAssociations.mutateAsync({
                 fileIds: newAttachmentIds,
@@ -876,7 +850,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
     try {
       if (!threadId) {
-        // Create thread immediately with a proper placeholder title
         const placeholderTitle = messageContent.length > 60 
           ? `${messageContent.slice(0, 57)}...`
           : messageContent || (messageFiles.length > 0 ? `File: ${messageFiles[0]?.name}` : 'New Chat');
@@ -898,24 +871,20 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
         }, 0);
         
-        // Make thread appear in sidebar immediately
         onThreadCreate(newThread.id);
         await refetchThreads();
 
-        // Start title generation immediately in parallel (don't await)
         generateTitle.mutateAsync({
           threadId: newThread.id,
           firstMessage: messageContent,
         }).then((titleResult) => {
           if (titleResult.success) {
-            // Refresh sidebar to show updated title
             refetchThreads();
           }
         }).catch((error) => {
           console.error("Failed to generate title:", error);
         });
 
-        // Start AI response streaming (also in parallel)
         await streamResponse(
           newThread.id,
           messageContent,
@@ -982,19 +951,19 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         shouldShowBanner={shouldShowBanner}
         shouldShakeBanner={shouldShakeBanner}
         onNavigateToSettings={handleNavigateToSettings}
-                  input={input}
-                  onInputChange={handleInputChange}
-                  onSubmit={handleSubmit}
-                  uploadedFiles={uploadedFiles}
-                  onFilesChange={setUploadedFiles}
-                  selectedModel={selectedModel}
-                  onModelChange={onModelChange}
-                  isLoading={isLoading}
-                  inputRef={inputRef}
-                  searchGroundingEnabled={searchGroundingEnabled}
+        input={input}
+        onInputChange={handleInputChange}
+        onSubmit={handleSubmit}
+        uploadedFiles={uploadedFiles}
+        onFilesChange={setUploadedFiles}
+        selectedModel={selectedModel}
+        onModelChange={onModelChange}
+        isLoading={isLoading}
+        inputRef={inputRef}
+        searchGroundingEnabled={searchGroundingEnabled}
         onSearchGroundingChange={setSearchGroundingEnabled}
-                  onModelSelectorClick={triggerShakeAnimation}
-                />
+        onModelSelectorClick={triggerShakeAnimation}
+      />
     );
   }
 
@@ -1025,10 +994,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
       {/* Messages + Chatbox Area */}
       <div className="flex-1 overflow-hidden relative min-h-0">
-        {/* Mobile: Natural body scrolling */}
+        {/* FIXED: Mobile with separate container ref */}
         <div 
-          ref={setMessagesContainer}
-          className="block sm:hidden h-full overflow-y-auto overflow-x-hidden"
+          ref={setMobileMessagesContainer}
+          className="mobile-scroll-container block sm:hidden h-full"
         >
           <div className={`${sharedGridClasses} pt-8 pb-64`}>
             <div></div>
@@ -1065,54 +1034,75 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           </div>
         </div>
         
-        {/* Desktop: Custom scrollbars */}
+        {/* FIXED: Desktop with separate container ref */}
         <div className="hidden sm:block absolute inset-0">
-        <CustomScrollbar 
+          <CustomScrollbar 
             className="h-full"
-          onRef={setMessagesContainer}
-        >
-          <div className={`${sharedGridClasses} pt-8 pb-48`}>
-            <div></div>
-            <div className="w-full">
-              <div className={sharedLayoutClasses} id="messages-container">
-                <div className="space-y-0">
-                  {filterOutEmptyOptimisticMessages(localMessages).map(renderMessage)}
-            
-                  {isLoading && (
-                    <div className="flex justify-start">
-                      <div className="w-full flex">
-                        {isImageGenerationModel(selectedModel) ? (
-                          <div className="w-full">
-                            <div className="px-4">
-                              <div className="mt-4">
-                                <ImageSkeleton />
+            onRef={setDesktopMessagesContainer}
+          >
+            <div className={`${sharedGridClasses} pt-8 pb-48`}>
+              <div></div>
+              <div className="w-full">
+                <div className={sharedLayoutClasses} id="messages-container">
+                  <div className="space-y-0">
+                    {filterOutEmptyOptimisticMessages(localMessages).map(renderMessage)}
+              
+                    {isLoading && (
+                      <div className="flex justify-start">
+                        <div className="w-full flex">
+                          {isImageGenerationModel(selectedModel) ? (
+                            <div className="w-full">
+                              <div className="px-4">
+                                <div className="mt-4">
+                                  <ImageSkeleton />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
-                            <LoadingDots text="AI is thinking" size="sm" />
-                          </div>
-                        )}
+                          ) : (
+                            <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
+                              <LoadingDots text="AI is thinking" size="sm" />
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-            
-                  <div ref={messagesEndRef} />
+                    )}
+              
+                    <div ref={messagesEndRef} />
+                  </div>
                 </div>
               </div>
+              <div></div>
             </div>
-            <div></div>
-          </div>
-        </CustomScrollbar>
+          </CustomScrollbar>
         </div>
-        
       </div>
       
-      {/* Chatbox - fixed at bottom on mobile, absolute on desktop */}
-        <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
-          <div className="px-3 sm:hidden">
-            <div className="max-w-[95%] w-full mx-auto">
+      {/* Chatbox */}
+      <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+        <div className="px-3 sm:hidden">
+          <div className="max-w-[95%] w-full mx-auto">
+            <Chatbox
+              input={input}
+              onInputChange={handleInputChange}
+              onSubmit={handleSubmit}
+              uploadedFiles={uploadedFiles}
+              onFilesChange={setUploadedFiles}
+              selectedModel={selectedModel}
+              onModelChange={onModelChange}
+              isLoading={isLoading}
+              isStreaming={isStreaming}
+              onStop={stopStream}
+              inputRef={inputRef}
+              searchGroundingEnabled={searchGroundingEnabled}
+              onSearchGroundingChange={setSearchGroundingEnabled}
+              onModelSelectorClick={triggerShakeAnimation}
+            />
+          </div>
+        </div>
+        <div className={`hidden sm:block ${chatboxGridClasses}`}>
+          <div></div>
+          <div className="w-full">
+            <div className={chatboxLayoutClasses}>
               <Chatbox
                 input={input}
                 onInputChange={handleInputChange}
@@ -1131,35 +1121,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               />
             </div>
           </div>
-          <div className={`hidden sm:block ${chatboxGridClasses}`}>
-            <div></div>
-            <div className="w-full">
-              <div className={chatboxLayoutClasses}>
-                <Chatbox
-                  input={input}
-                  onInputChange={handleInputChange}
-                  onSubmit={handleSubmit}
-                  uploadedFiles={uploadedFiles}
-                  onFilesChange={setUploadedFiles}
-                  selectedModel={selectedModel}
-                  onModelChange={onModelChange}
-                  isLoading={isLoading}
-                  isStreaming={isStreaming}
-                  onStop={stopStream}
-                  inputRef={inputRef}
-                  searchGroundingEnabled={searchGroundingEnabled}
-                  onSearchGroundingChange={setSearchGroundingEnabled}
-                  onModelSelectorClick={triggerShakeAnimation}
-                />
-            </div>
-          </div>
         </div>
       </div>
     </div>
   );
 };
 
-// Memoize the component with custom comparison to prevent unnecessary re-renders
 export const ChatWindow = React.memo(ChatWindowComponent, (prevProps, nextProps) => {
   const { isTransitioning } = useChatStore.getState();
   if (isTransitioning) {
