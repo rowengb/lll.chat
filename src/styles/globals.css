@@ -716,87 +716,42 @@ pre code {
     max-height: calc(var(--vh, 1vh) * 100 - 120px);
   }
 
-  /* Keyboard-aware layouts using visual viewport */
-  .mobile-keyboard-aware-height {
-    height: calc(var(--visual-vh, 1vh) * 100);
-    max-height: calc(var(--visual-vh, 1vh) * 100);
-    /* Ensure stable layout during keyboard transitions */
-    contain: layout;
-    overflow: hidden;
+  /* Simple mobile layout - no complex viewport calculations */
+  .mobile-simple-container {
+    /* Use stable height that doesn't cause scroll conflicts */
+    height: 100vh;
+    max-height: 100vh;
+    /* Prevent layout shifts and scroll issues */
+    contain: layout style;
+    /* Stable scrolling */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    /* Prevent transform conflicts */
+    transform: none !important;
+    -webkit-transform: none !important;
   }
 
-  .mobile-chatbox-keyboard-aware {
-    /* Position chatbox accounting for keyboard */
-    bottom: 0;
-    transform: translateY(calc(-1 * var(--keyboard-height, 0px)));
-    transition: transform 0.15s ease-out;
-    /* Ensure chatbox stays visible */
-    will-change: transform;
-    /* Force hardware acceleration */
-    -webkit-transform: translateY(calc(-1 * var(--keyboard-height, 0px)));
-    -webkit-transition: -webkit-transform 0.15s ease-out;
-  }
-
-  /* Fallback for when keyboard height detection fails */
-  .mobile-chatbox-keyboard-aware {
-    /* Ensure minimum bottom spacing on mobile */
-    margin-bottom: env(safe-area-inset-bottom, 0px);
-  }
-
-  /* iOS-specific improvements */
-  @supports (-webkit-touch-callout: none) {
-    .mobile-keyboard-aware-height {
-      /* iOS Safari specific height calculation */
-      height: calc(var(--visual-vh, 1vh) * 100);
-      max-height: calc(var(--visual-vh, 1vh) * 100);
-      /* Prevent bounce scrolling issues */
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
-    }
-    
-    .mobile-chatbox-keyboard-aware {
-      /* More aggressive positioning for iOS */
-      bottom: calc(var(--keyboard-height, 0px) * -1);
-      transform: none;
-      -webkit-transform: none;
-      transition: bottom 0.15s ease-out;
-      -webkit-transition: bottom 0.15s ease-out;
-    }
-  }
-
-  /* Ensure chatbox stays above keyboard on modern browsers */
+  /* Modern browsers - use dynamic viewport height */
   @supports (height: 100dvh) {
-    .mobile-keyboard-aware-height {
+    .mobile-simple-container {
       height: 100dvh;
       max-height: 100dvh;
     }
   }
 
-  /* Alternative approach using env() for iOS safe areas */
-  @supports (padding-bottom: env(keyboard-inset-height)) {
-    .mobile-chatbox-keyboard-aware {
-      padding-bottom: env(keyboard-inset-height, 0px);
-      bottom: 0;
-      transform: none;
-      -webkit-transform: none;
-    }
-  }
-
-  /* Fallback approach for when Visual Viewport API fails */
-  .mobile-chatbox-simple-fixed {
-    position: fixed;
-    bottom: 0;
+  /* Simple fixed bottom positioning - no transforms */
+  .mobile-fixed-bottom {
+    position: fixed !important;
+    bottom: 0 !important;
     left: 0;
     right: 0;
     z-index: 20;
-    /* Use viewport units that account for keyboard */
-    margin-bottom: max(env(safe-area-inset-bottom, 0px), env(keyboard-inset-height, 0px));
-  }
-
-  /* Ensure messages container accounts for fixed chatbox */
-  .mobile-messages-with-fixed-chatbox {
-    padding-bottom: 140px; /* Fixed space for chatbox */
-    box-sizing: border-box;
+    /* Only use safe area - no complex calculations */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Prevent any transforms */
+    transform: none !important;
+    -webkit-transform: none !important;
+    will-change: auto !important;
   }
 }
 

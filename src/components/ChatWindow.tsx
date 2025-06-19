@@ -1004,67 +1004,18 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     );
   }
 
-  // Add debug component for mobile keyboard testing
-  const MobileKeyboardDebug = () => {
-    const [debugInfo, setDebugInfo] = useState<{
-      vh: string;
-      visualVh: string;
-      keyboardHeight: string;
-      innerHeight: number;
-      visualHeight: number;
-      screenHeight: number;
-    } | null>(null);
-
-    useEffect(() => {
-      if (typeof window === 'undefined' || window.innerWidth >= 640) return;
-
-      const updateDebugInfo = () => {
-        const vh = getComputedStyle(document.documentElement).getPropertyValue('--vh');
-        const visualVh = getComputedStyle(document.documentElement).getPropertyValue('--visual-vh');
-        const keyboardHeight = getComputedStyle(document.documentElement).getPropertyValue('--keyboard-height');
-        
-        setDebugInfo({
-          vh: vh.trim(),
-          visualVh: visualVh.trim(),
-          keyboardHeight: keyboardHeight.trim(),
-          innerHeight: window.innerHeight,
-          visualHeight: window.visualViewport?.height || window.innerHeight,
-          screenHeight: window.screen.height
-        });
-      };
-
-      updateDebugInfo();
-      
-      const interval = setInterval(updateDebugInfo, 500);
-      
-      return () => clearInterval(interval);
-    }, []);
-
-    if (!debugInfo || window.innerWidth >= 640) return null;
-
-    return (
-      <div className="fixed top-4 left-4 z-50 bg-black/80 text-white text-xs p-2 rounded font-mono">
-        <div>vh: {debugInfo.vh}</div>
-        <div>visual-vh: {debugInfo.visualVh}</div>
-        <div>keyboard-h: {debugInfo.keyboardHeight}</div>
-        <div>inner: {debugInfo.innerHeight}px</div>
-        <div>visual: {debugInfo.visualHeight}px</div>
-        <div>screen: {debugInfo.screenHeight}px</div>
-      </div>
-    );
-  };
+// Removed debug component - using simple CSS-only approach
 
   // Main chat interface when threadId exists
   return (
     <div 
-      className="sm:fixed sm:inset-0 min-h-screen-mobile flex flex-col bg-white dark:bg-slate-900 sm:left-auto overflow-hidden"
+      className="sm:fixed sm:inset-0 mobile-simple-container sm:min-h-screen flex flex-col bg-white dark:bg-slate-900 sm:left-auto overflow-hidden"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
         transition: window.innerWidth >= 640 ? 'left 0.3s ease-out' : 'none'
       }}
     >
-      {/* Debug component for mobile keyboard testing */}
-      <MobileKeyboardDebug />
+      {/* Removed debug component - using simple CSS-only approach */}
 
       {/* API Key Warning Banner */}
       {shouldShowBanner && (
@@ -1087,7 +1038,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         {/* Mobile: Natural body scrolling with keyboard awareness */}
         <div 
           ref={setMessagesContainer}
-          className="block sm:hidden mobile-keyboard-aware-height overflow-y-auto overflow-x-hidden"
+          className="block sm:hidden h-full overflow-y-auto overflow-x-hidden"
         >
           <div className={`${sharedGridClasses} pt-8 pb-64`}>
             <div></div>
@@ -1169,7 +1120,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       </div>
       
       {/* Chatbox - fixed at bottom on mobile with keyboard awareness, absolute on desktop */}
-        <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0 mobile-chatbox-keyboard-aware" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+        <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
           <div className="px-3 sm:hidden">
             <div className="max-w-[95%] w-full mx-auto">
               <Chatbox
