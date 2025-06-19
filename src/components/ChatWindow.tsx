@@ -1004,6 +1004,56 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     );
   }
 
+  // Add debug component for mobile keyboard testing
+  const MobileKeyboardDebug = () => {
+    const [debugInfo, setDebugInfo] = useState<{
+      vh: string;
+      visualVh: string;
+      keyboardHeight: string;
+      innerHeight: number;
+      visualHeight: number;
+      screenHeight: number;
+    } | null>(null);
+
+    useEffect(() => {
+      if (typeof window === 'undefined' || window.innerWidth >= 640) return;
+
+      const updateDebugInfo = () => {
+        const vh = getComputedStyle(document.documentElement).getPropertyValue('--vh');
+        const visualVh = getComputedStyle(document.documentElement).getPropertyValue('--visual-vh');
+        const keyboardHeight = getComputedStyle(document.documentElement).getPropertyValue('--keyboard-height');
+        
+        setDebugInfo({
+          vh: vh.trim(),
+          visualVh: visualVh.trim(),
+          keyboardHeight: keyboardHeight.trim(),
+          innerHeight: window.innerHeight,
+          visualHeight: window.visualViewport?.height || window.innerHeight,
+          screenHeight: window.screen.height
+        });
+      };
+
+      updateDebugInfo();
+      
+      const interval = setInterval(updateDebugInfo, 500);
+      
+      return () => clearInterval(interval);
+    }, []);
+
+    if (!debugInfo || window.innerWidth >= 640) return null;
+
+    return (
+      <div className="fixed top-4 left-4 z-50 bg-black/80 text-white text-xs p-2 rounded font-mono">
+        <div>vh: {debugInfo.vh}</div>
+        <div>visual-vh: {debugInfo.visualVh}</div>
+        <div>keyboard-h: {debugInfo.keyboardHeight}</div>
+        <div>inner: {debugInfo.innerHeight}px</div>
+        <div>visual: {debugInfo.visualHeight}px</div>
+        <div>screen: {debugInfo.screenHeight}px</div>
+      </div>
+    );
+  };
+
   // Main chat interface when threadId exists
   return (
     <div 
@@ -1013,6 +1063,9 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         transition: window.innerWidth >= 640 ? 'left 0.3s ease-out' : 'none'
       }}
     >
+      {/* Debug component for mobile keyboard testing */}
+      <MobileKeyboardDebug />
+
       {/* API Key Warning Banner */}
       {shouldShowBanner && (
         <ApiKeyWarningBanner
