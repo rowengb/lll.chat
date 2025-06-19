@@ -233,6 +233,10 @@ export const useChatStreaming = () => {
                   if (currentStreamDataRef.current) {
                     currentStreamDataRef.current.messageId = messageId;
                   }
+                  
+                  // Clear loading state as soon as we get messageId (streaming has started)
+                  setLoading(null, false);
+                  console.log(`[STREAM] Cleared loading state - streaming started`);
                 }
                 if (metadata.grounding) {
                   isGrounded = true;
@@ -337,11 +341,8 @@ export const useChatStreaming = () => {
                   currentStreamDataRef.current.fullContent = fullContent;
                 }
                 
-                // Hide loading animation on first content chunk (TTFB complete)
-                // But keep loading for image generation models until image is generated
-                if (fullContent.length > 0 && !isImageGenerationModel(selectedModel)) {
-                  setLoading(null, false);
-                }
+                // Loading state is already cleared when messageId is received (streaming started)
+                // No need to clear it again on first content chunk
                 
                 // Update the streaming message immediately
                 updateStreamingMessage(threadId, optimisticAssistantMessage.id, { content: fullContent });

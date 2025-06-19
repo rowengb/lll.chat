@@ -172,37 +172,47 @@ export const useChatStore = create<ChatStore>()(
 
       // Optimized loading state management
       setLoading: (threadId: string | null, isLoading: boolean) => {
-        if (!threadId) return;
-        
         set((state) => {
           const newLoadingStates = new Map(state.loadingStates);
-          if (isLoading) {
-            newLoadingStates.set(threadId, true);
+          
+          if (threadId) {
+            if (isLoading) {
+              newLoadingStates.set(threadId, true);
+            } else {
+              newLoadingStates.delete(threadId);
+            }
           } else {
-            newLoadingStates.delete(threadId);
+            // Clear all loading states when threadId is null
+            newLoadingStates.clear();
           }
+          
           return { 
             loadingStates: newLoadingStates,
-            isLoading,
-            loadingThreadId: threadId 
+            isLoading: isLoading && threadId !== null,
+            loadingThreadId: isLoading ? threadId : null
           };
         });
       },
 
       setStreaming: (threadId: string | null, isStreaming: boolean) => {
-        if (!threadId) return;
-        
         set((state) => {
           const newStreamingStates = new Map(state.streamingStates);
-          if (isStreaming) {
-            newStreamingStates.set(threadId, true);
+          
+          if (threadId) {
+            if (isStreaming) {
+              newStreamingStates.set(threadId, true);
+            } else {
+              newStreamingStates.delete(threadId);
+            }
           } else {
-            newStreamingStates.delete(threadId);
+            // Clear all streaming states when threadId is null
+            newStreamingStates.clear();
           }
+          
           return {
             streamingStates: newStreamingStates,
-            isStreaming,
-            streamingThreadId: threadId
+            isStreaming: isStreaming && threadId !== null,
+            streamingThreadId: isStreaming ? threadId : null
           };
         });
       },
