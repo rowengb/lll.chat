@@ -234,9 +234,8 @@ export const useChatStreaming = () => {
                     currentStreamDataRef.current.messageId = messageId;
                   }
                   
-                  // Clear loading state as soon as we get messageId (streaming has started)
-                  setLoading(null, false);
-                  console.log(`[STREAM] Cleared loading state - streaming started`);
+                  // Don't clear loading state yet - wait for first content chunk
+                  console.log(`[STREAM] Got message ID - waiting for first content chunk to clear loading`);
                 }
                 if (metadata.grounding) {
                   isGrounded = true;
@@ -332,6 +331,7 @@ export const useChatStreaming = () => {
               // Content chunk
               try {
                 const contentChunk = JSON.parse(line.slice(2));
+                const isFirstChunk = fullContent === "";
                 fullContent += contentChunk;
                 
                 console.log(`[STREAM] Content chunk: "${contentChunk}" (total: ${fullContent.length} chars)`);
@@ -341,8 +341,11 @@ export const useChatStreaming = () => {
                   currentStreamDataRef.current.fullContent = fullContent;
                 }
                 
-                // Loading state is already cleared when messageId is received (streaming started)
-                // No need to clear it again on first content chunk
+                // Clear loading state on first content chunk (streaming actually started)
+                if (isFirstChunk) {
+                  setLoading(null, false);
+                  console.log(`[STREAM] First content chunk received - cleared loading state`);
+                }
                 
                 // Update the streaming message immediately
                 updateStreamingMessage(threadId, optimisticAssistantMessage.id, { content: fullContent });

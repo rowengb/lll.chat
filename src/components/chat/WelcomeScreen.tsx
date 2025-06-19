@@ -31,12 +31,16 @@ interface WelcomeScreenProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
   isLoading: boolean;
+  isStreaming?: boolean;
+  onStop?: () => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   
   // Search grounding props
   searchGroundingEnabled: boolean;
   onSearchGroundingChange: (enabled: boolean) => void;
   onModelSelectorClick: () => void;
+  onTextareaFocus?: () => void;
+  onTextareaBlur?: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -55,10 +59,14 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   selectedModel,
   onModelChange,
   isLoading,
+  isStreaming,
+  onStop,
   inputRef,
   searchGroundingEnabled,
   onSearchGroundingChange,
-  onModelSelectorClick
+  onModelSelectorClick,
+  onTextareaFocus,
+  onTextareaBlur
 }) => {
   // T3.chat style: Show welcome elements dynamically based on input content
   const showWelcomeElements = input.trim() === "";
@@ -70,7 +78,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
   return (
     <div 
-      className="sm:fixed sm:top-0 sm:right-0 sm:bottom-0 min-h-screen-mobile flex flex-col bg-white dark:bg-slate-900 sm:left-auto"
+      className="sm:fixed sm:top-0 sm:right-0 sm:bottom-0 mobile-simple-container sm:min-h-screen-mobile flex flex-col bg-white dark:bg-slate-900 sm:left-auto"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
         transition: window.innerWidth >= 640 ? 'left 0.3s ease-out' : 'none'
@@ -95,24 +103,24 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
       {/* Welcome Content Area with natural scrolling */}
       <div className="flex-1 overflow-hidden relative">
         <div className="h-full overflow-y-auto">
-          <div className={`${sharedGridClasses} min-h-full flex items-center justify-center pb-32`}>
+          <div className={`${sharedGridClasses} min-h-full flex items-center justify-center pb-24 sm:pb-32`}>
             <div></div>
             <div className="w-full">
               <div className={sharedLayoutClasses}>
                 {/* Welcome elements that hide/show based on input - T3.chat style */}
                 <div className={`text-center transition-all duration-300 ${showWelcomeElements ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
                   {/* Welcome Header */}
-                  <div className="mb-8">
-                    <h1 className="text-3xl font-normal text-foreground mb-4">
+                  <div className="mb-6 sm:mb-8">
+                    <h1 className="text-2xl sm:text-3xl font-normal text-foreground mb-3 sm:mb-4">
                       Welcome to <span className="font-bold">lll</span><span className="font-normal">.chat</span>
                     </h1>
-                    <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                    <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4 sm:px-0">
                       Start a conversation with AI. Choose from the examples below or type your own message.
                     </p>
                   </div>
 
                   {/* Example Prompts Carousel */}
-                  <div className="mb-8">
+                  <div className="mb-6 sm:mb-8">
                     {/* Desktop: Grid layout */}
                     <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {examplePrompts.map((example, index) => {
@@ -182,29 +190,29 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   </div>
 
                   {/* Features highlight */}
-                  <div className="bg-gradient-to-r from-card/90 to-muted/80 dark:from-slate-800/90 dark:to-slate-700/80 backdrop-blur-sm rounded-2xl border border-border/70 p-6 max-w-2xl mx-auto shadow-lg shadow-muted/20 backdrop-saturate-150">
-                    <div className="grid grid-cols-3 gap-6 text-center">
-                      <div>
-                        <div className="flex justify-center mb-2">
-                          <ZapIcon className="h-6 w-6 text-muted-foreground" />
+                  <div className="bg-gradient-to-r from-card/90 to-muted/80 dark:from-slate-800/90 dark:to-slate-700/80 backdrop-blur-sm rounded-2xl border border-border/70 p-4 sm:p-6 max-w-2xl mx-4 sm:mx-auto shadow-lg shadow-muted/20 backdrop-saturate-150">
+                    <div className="grid grid-cols-3 gap-4 sm:gap-6 text-center">
+                                              <div>
+                          <div className="flex justify-center mb-1 sm:mb-2">
+                            <ZapIcon className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                          </div>
+                          <div className="text-xs sm:text-sm font-medium text-foreground">Lightning Fast</div>
+                          <div className="text-xs text-muted-foreground hidden sm:block">Real-time streaming</div>
                         </div>
-                        <div className="text-sm font-medium text-foreground">Lightning Fast</div>
-                        <div className="text-xs text-muted-foreground">Real-time streaming</div>
-                      </div>
-                      <div>
-                        <div className="flex justify-center mb-2">
-                          <BotIcon className="h-6 w-6 text-muted-foreground" />
+                        <div>
+                          <div className="flex justify-center mb-1 sm:mb-2">
+                            <BotIcon className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                          </div>
+                          <div className="text-xs sm:text-sm font-medium text-foreground">Multiple Models</div>
+                          <div className="text-xs text-muted-foreground hidden sm:block">GPT, Claude, Gemini & more</div>
+                        </div>  
+                        <div>
+                          <div className="flex justify-center mb-1 sm:mb-2">
+                            <ShieldIcon className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
+                          </div>
+                          <div className="text-xs sm:text-sm font-medium text-foreground">BYOK & Privacy</div>
+                          <div className="text-xs text-muted-foreground hidden sm:block">Your keys, your data</div>
                         </div>
-                        <div className="text-sm font-medium text-foreground">Multiple Models</div>
-                        <div className="text-xs text-muted-foreground">GPT, Claude, Gemini & more</div>
-                      </div>  
-                      <div>
-                        <div className="flex justify-center mb-2">
-                          <ShieldIcon className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                        <div className="text-sm font-medium text-foreground">BYOK & Privacy</div>
-                        <div className="text-xs text-muted-foreground">Your keys, your data</div>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -218,7 +226,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0 sm:right-0">
           <div className="px-3 sm:hidden">
             {/* Mobile: Center middle chatbox */}
-            <div className="max-w-[95%] w-full mx-auto">
+            <div className="max-w-[85%] w-full mx-auto">
               <Chatbox
                 input={input}
                 onInputChange={onInputChange}
@@ -228,10 +236,14 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 selectedModel={selectedModel}
                 onModelChange={onModelChange}
                 isLoading={isLoading}
+                isStreaming={isStreaming}
+                onStop={onStop}
                 inputRef={inputRef}
                 searchGroundingEnabled={searchGroundingEnabled}
                 onSearchGroundingChange={onSearchGroundingChange}
                 onModelSelectorClick={onModelSelectorClick}
+                onTextareaFocus={onTextareaFocus}
+                onTextareaBlur={onTextareaBlur}
               />
             </div>
           </div>
@@ -249,10 +261,14 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   selectedModel={selectedModel}
                   onModelChange={onModelChange}
                   isLoading={isLoading}
+                  isStreaming={isStreaming}
+                  onStop={onStop}
                   inputRef={inputRef}
                   searchGroundingEnabled={searchGroundingEnabled}
                   onSearchGroundingChange={onSearchGroundingChange}
                   onModelSelectorClick={onModelSelectorClick}
+                  onTextareaFocus={onTextareaFocus}
+                  onTextareaBlur={onTextareaBlur}
                 />
               </div>
             </div>

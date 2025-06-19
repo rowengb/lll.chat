@@ -3,7 +3,7 @@ import { CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, SquareIcon, AlertCirc
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
 
-import { useChatStore } from "../stores/chatStore";
+import { useChatStore, useChatStreaming as useChatStreamingState } from "../stores/chatStore";
 import { useImageStore } from "../stores/imageStore";
 
 import { CustomScrollbar } from './CustomScrollbar';
@@ -50,6 +50,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [shouldShakeBanner, setShouldShakeBanner] = useState(false);
   const [mobileActiveMessageId, setMobileActiveMessageId] = useState<string | null>(null);
+  const [isKeyboardActive, setIsKeyboardActive] = useState(false);
   
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const previousThreadId = useRef<string | null>(null);
@@ -61,8 +62,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     addMessage, 
     isLoading,
     setLoading,
-    isStreaming,
   } = useChatStore();
+  
+  // Thread-specific streaming state
+  const isStreaming = useChatStreamingState(threadId || '');
   
   const { getImageState } = useImageStore();
   
@@ -113,9 +116,52 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     smartFocus(inputRef, { delay: 100, reason: 'component-mount' });
   }, []);
 
+  // Body scroll lock for mobile keyboard
+  useEffect(() => {
+    const body = document.body;
+    
+    if (isKeyboardActive && window.innerWidth < 640) {
+      // Save current scroll position
+      const scrollY = window.scrollY;
+      body.style.setProperty('--scroll-y', `-${scrollY}px`);
+      
+      // Apply scroll lock
+      body.classList.add('body-scroll-lock-mobile');
+    } else {
+      // Remove scroll lock
+      body.classList.remove('body-scroll-lock-mobile');
+      
+      // Restore scroll position
+      const scrollY = body.style.getPropertyValue('--scroll-y');
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+        body.style.removeProperty('--scroll-y');
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      body.classList.remove('body-scroll-lock-mobile');
+      body.style.removeProperty('--scroll-y');
+    };
+  }, [isKeyboardActive]);
+
   // Handle input changes
   const handleInputChange = (value: string) => {
     setInput(value);
+  };
+
+  // Handle textarea focus/blur for mobile keyboard detection
+  const handleTextareaFocus = () => {
+    if (window.innerWidth < 640) {
+      setIsKeyboardActive(true);
+    }
+  };
+
+  const handleTextareaBlur = () => {
+    if (window.innerWidth < 640) {
+      setIsKeyboardActive(false);
+    }
   };
 
   // Auto-resize textarea effect
@@ -988,19 +1034,23 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         shouldShowBanner={shouldShowBanner}
         shouldShakeBanner={shouldShakeBanner}
         onNavigateToSettings={handleNavigateToSettings}
-                  input={input}
-                  onInputChange={handleInputChange}
-                  onSubmit={handleSubmit}
-                  uploadedFiles={uploadedFiles}
-                  onFilesChange={setUploadedFiles}
-                  selectedModel={selectedModel}
-                  onModelChange={onModelChange}
-                  isLoading={isLoading}
-                  inputRef={inputRef}
-                  searchGroundingEnabled={searchGroundingEnabled}
+        input={input}
+        onInputChange={handleInputChange}
+        onSubmit={handleSubmit}
+        uploadedFiles={uploadedFiles}
+        onFilesChange={setUploadedFiles}
+        selectedModel={selectedModel}
+        onModelChange={onModelChange}
+        isLoading={isLoading}
+        isStreaming={isStreaming}
+        onStop={stopStream}
+        inputRef={inputRef}
+        searchGroundingEnabled={searchGroundingEnabled}
         onSearchGroundingChange={setSearchGroundingEnabled}
-                  onModelSelectorClick={triggerShakeAnimation}
-                />
+        onModelSelectorClick={triggerShakeAnimation}
+        onTextareaFocus={handleTextareaFocus}
+        onTextareaBlur={handleTextareaBlur}
+      />
     );
   }
 
@@ -1121,8 +1171,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       
       {/* Chatbox - fixed at bottom on mobile with keyboard awareness, absolute on desktop */}
         <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
-          <div className="sm:hidden">
-            <div className="max-w-[95%] w-full mx-auto px-3">
+          <div className="px-3 sm:hidden">
+            <div className="max-w-[85%] w-full mx-auto">
               <Chatbox
                 input={input}
                 onInputChange={handleInputChange}
@@ -1138,6 +1188,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 searchGroundingEnabled={searchGroundingEnabled}
                 onSearchGroundingChange={setSearchGroundingEnabled}
                 onModelSelectorClick={triggerShakeAnimation}
+                onTextareaFocus={handleTextareaFocus}
+                onTextareaBlur={handleTextareaBlur}
               />
             </div>
           </div>
@@ -1160,6 +1212,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                   searchGroundingEnabled={searchGroundingEnabled}
                   onSearchGroundingChange={setSearchGroundingEnabled}
                   onModelSelectorClick={triggerShakeAnimation}
+                  onTextareaFocus={handleTextareaFocus}
+                  onTextareaBlur={handleTextareaBlur}
                 />
             </div>
           </div>

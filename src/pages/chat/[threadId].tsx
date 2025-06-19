@@ -52,15 +52,16 @@ const ChatPage: NextPage = () => {
     }
   }, [bestDefaultModel, selectedModel]);
 
-  // Update selected model when switching threads to remember the last model used in that chat
+  // Update model when switching threads, but preserve explicit user selections
   useEffect(() => {
     if (currentThread) {
       const threadModel = (currentThread as any).model || currentThread.lastModel;
-      if (threadModel && threadModel !== selectedModel) {
+      if (threadModel) {
+        // Always update to the thread's last used model when switching threads
         setSelectedModel(threadModel);
       }
     }
-  }, [currentThread, selectedModel]);
+  }, [currentThread?.id]); // Only run when thread ID changes
 
   // Navigation functions
   const navigateToWelcome = () => {
@@ -91,22 +92,11 @@ const ChatPage: NextPage = () => {
     navigateToWelcome();
   };
 
-  // Custom model change handler that persists the selection to the current thread
-  const handleModelChange = async (modelId: string) => {
+  // Custom model change handler that is completely optimistic
+  const handleModelChange = (modelId: string) => {
+    // Only update UI immediately - no database calls
     setSelectedModel(modelId);
-    
-    if (threadId && typeof threadId === 'string') {
-      try {
-        await updateThreadMetadataMutation.mutateAsync({
-          threadId: threadId,
-          lastModel: modelId,
-        });
-        
-        utils.chat.getThreads.invalidate();
-      } catch (error) {
-        console.error('Failed to update thread model:', error);
-      }
-    }
+    // The model will be persisted when the user sends their next message
   };
 
   const getPageTitle = () => {

@@ -123,6 +123,36 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
   const [editTitle, setEditTitle] = useState("");
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
 
+  // Body scroll lock for mobile sidebar
+  useEffect(() => {
+    const body = document.body;
+    
+    if (isOpen) {
+      // Save current scroll position
+      const scrollY = window.scrollY;
+      body.style.setProperty('--scroll-y', `-${scrollY}px`);
+      
+      // Apply scroll lock
+      body.classList.add('body-scroll-lock-mobile');
+    } else {
+      // Remove scroll lock
+      body.classList.remove('body-scroll-lock-mobile');
+      
+      // Restore scroll position
+      const scrollY = body.style.getPropertyValue('--scroll-y');
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+        body.style.removeProperty('--scroll-y');
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      body.classList.remove('body-scroll-lock-mobile');
+      body.style.removeProperty('--scroll-y');
+    };
+  }, [isOpen]);
+
   const utils = trpc.useUtils();
   const { data: threads } = trpc.chat.getThreads.useQuery(undefined, {
     refetchOnWindowFocus: true,
