@@ -505,7 +505,8 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
           showAll 
             ? 'w-[600px] max-w-[90vw]' 
             : 'w-[420px] max-w-[90vw]'
-        } fixed left-1/2 -translate-x-1/2 bottom-32 sm:absolute sm:bottom-full sm:left-0 sm:translate-x-0`}>
+        } fixed left-1/2 bottom-32 sm:absolute sm:bottom-full sm:left-0 sm:translate-x-0`}
+          style={{ transform: 'translateX(-50%)' }}>
           {/* Fixed Search Bar */}
           <div className="flex-shrink-0 p-2 border-b border-border/50 rounded-t-2xl bg-card">
             <div className="relative">

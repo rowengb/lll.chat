@@ -3,10 +3,10 @@ import { useUser } from "@clerk/nextjs";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 import { 
   ArrowRightIcon, 
-  GlobeIcon,
+  GlobeIcon, 
   Zap,
   Eye,
   Sparkles,
@@ -18,8 +18,10 @@ import { Button } from "@/components/ui/button";
 
 const Home: NextPage = () => {
   const { user, isLoaded } = useUser();
+  const { isSignedIn } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -28,7 +30,12 @@ const Home: NextPage = () => {
   // Redirect to app if user is authenticated
   useEffect(() => {
     if (isLoaded && user) {
+      setRedirecting(true);
+      // Use a small delay to ensure auth state is fully settled
+      const timer = setTimeout(() => {
       router.replace('/app');
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isLoaded, user, router]);
 
@@ -36,8 +43,8 @@ const Home: NextPage = () => {
     return null;
   }
 
-  // Show loading while checking auth
-  if (!isLoaded) {
+  // Show loading while checking auth or redirecting
+  if (!isLoaded || redirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex items-center space-x-3">
@@ -87,31 +94,30 @@ const Home: NextPage = () => {
                 className="text-white/60 hover:text-white/80 hover:bg-white/[0.04] border-0 text-sm font-[450] px-4 py-2 h-auto"
                 onClick={() => window.open('https://github.com/rowengb/lll.chat', '_blank')}
               >
-                <svg width="16" height="16" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-1.5">
-                  <path fillRule="evenodd" clipRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-1.5">
+                  <path fillRule="evenodd" clipRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" fill="currentColor"/>
                 </svg>
                 GitHub
               </Button>
-              <SignInButton mode="modal">
-                <Button 
-                  variant="ghost" 
-                  className="text-white/60 hover:text-white/80 hover:bg-white/[0.04] border-0 text-sm font-[450] px-4 py-2 h-auto"
-                >
-                  Sign In
-                </Button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <Button 
-                  className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-lg text-sm font-medium px-5 py-2.5 h-auto transition-all duration-200 hover:scale-[1.02] overflow-hidden"
-                >
-                  {/* Blurry gradient background */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600/80 to-blue-500/80 blur-xl"></div>
-                  <div className="relative z-10 flex items-center">
-                    Get Started
-                    <ArrowRightIcon className="w-4 h-4 ml-1.5" />
-                  </div>
-                </Button>
-              </SignUpButton>
+              <Button 
+                variant="ghost" 
+                className="text-white/60 hover:text-white/80 hover:bg-white/[0.04] border-0 text-sm font-[450] px-4 py-2 h-auto"
+                onClick={() => window.location.href = '/sign-in'}
+              >
+                Sign In
+              </Button>
+              <Button 
+                size="lg" 
+                className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-xl font-medium px-8 py-3.5 h-auto text-base transition-all duration-200 hover:scale-[1.02] overflow-hidden"
+                onClick={() => window.location.href = '/sign-up'}
+              >
+                {/* Blurry gradient background */}
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600/60 to-blue-500/60 blur-2xl"></div>
+                <div className="relative z-10 flex items-center">
+                  Get started
+                  <ArrowRightIcon className="w-5 h-5 ml-2" />
+                </div>
+              </Button>
             </div>
           </nav>
         </header>
@@ -137,19 +143,18 @@ const Home: NextPage = () => {
               </p>
               
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-24">
-                <SignUpButton mode="modal">
-                  <Button 
-                    size="lg" 
-                    className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-xl font-medium px-8 py-3.5 h-auto text-base transition-all duration-200 hover:scale-[1.02] overflow-hidden"
-                  >
-                    {/* Blurry gradient background */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/60 to-blue-500/60 blur-2xl"></div>
-                    <div className="relative z-10 flex items-center">
-                      Get started
-                      <ArrowRightIcon className="w-5 h-5 ml-2" />
-                    </div>
-                  </Button>
-                </SignUpButton>
+                <Button 
+                  size="lg" 
+                  className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-xl font-medium px-8 py-3.5 h-auto text-base transition-all duration-200 hover:scale-[1.02] overflow-hidden"
+                  onClick={() => window.location.href = '/sign-up'}
+                >
+                  {/* Blurry gradient background */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600/60 to-blue-500/60 blur-2xl"></div>
+                  <div className="relative z-10 flex items-center">
+                    Get started
+                  <ArrowRightIcon className="w-5 h-5 ml-2" />
+                  </div>
+                </Button>
                 
                 <Button 
                   size="lg" 
@@ -157,8 +162,8 @@ const Home: NextPage = () => {
                   className="text-white/60 hover:text-white/80 hover:bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.12] px-8 py-3.5 h-auto text-base font-medium transition-all duration-200"
                   onClick={() => window.open('https://github.com/rowengb/lll.chat', '_blank')}
                 >
-                  <svg width="20" height="20" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">
-                    <path fillRule="evenodd" clipRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/>
+                  <svg width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">
+                    <path fillRule="evenodd" clipRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" fill="currentColor"/>
                   </svg>
                   View source
                 </Button>
@@ -185,25 +190,25 @@ const Home: NextPage = () => {
                 {[
                   {
                     icon: <Zap className="w-6 h-6 text-white" />,
-                    title: "Lightning Fast",
+                  title: "Lightning Fast",
                     description: "Sub-50ms response times with optimized streaming and zero perceived latency.",
                     metric: "< 50ms"
-                  },
-                  {
+                },
+                {
                     icon: <Eye className="w-6 h-6 text-white" />,
-                    title: "Vision & Analysis",
+                  title: "Vision & Analysis",
                     description: "Upload and analyze images, documents, and visual content with advanced AI models.",
                     metric: "Multi-modal"
-                  },
-                  {
+                },
+                {
                     icon: <Sparkles className="w-6 h-6 text-white" />,
-                    title: "Image Generation",
+                  title: "Image Generation",
                     description: "Create stunning visuals with DALL-E, Midjourney, and other cutting-edge AI art models.",
                     metric: "AI Art"
-                  },
-                  {
+                },
+                {
                     icon: <Search className="w-6 h-6 text-white" />,
-                    title: "Web Search",
+                  title: "Web Search",
                     description: "Get real-time information from the web integrated directly into your conversations.",
                     metric: "Real-time"
                   },
@@ -215,13 +220,13 @@ const Home: NextPage = () => {
                   },
                   {
                     icon: <Shield className="w-6 h-6 text-white" />,
-                    title: "Privacy First",
+                  title: "Privacy First",
                     description: "Your data stays yours. Use your own API keys for complete control and privacy.",
                     metric: "100% Private"
-                  }
-                ].map((feature, index) => (
-                  <div 
-                    key={index}
+                }
+              ].map((feature, index) => (
+                <div 
+                  key={index}
                     className="group relative p-8 rounded-2xl bg-white/[0.02] backdrop-blur-sm border border-white/[0.06] hover:border-blue-500/[0.15] hover:bg-white/[0.04] transition-all duration-300"
                   >
                     {/* Subtle blue gradient overlay */}
@@ -237,7 +242,7 @@ const Home: NextPage = () => {
                           {/* Subtle blue glow behind icon */}
                           <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.05] to-blue-600/[0.03] opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500" />
                           <div className="relative z-10">
-                            {feature.icon}
+                      {feature.icon}
                           </div>
                         </div>
                         <div className="text-xs font-[500] text-white/40 group-hover:text-white/60 transition-colors duration-300">
@@ -255,7 +260,7 @@ const Home: NextPage = () => {
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
             </div>
 
             {/* Tech Stack */}
@@ -410,19 +415,18 @@ const Home: NextPage = () => {
                 </p>
                 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                  <SignUpButton mode="modal">
-                    <Button 
-                      size="lg" 
-                      className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-xl font-medium px-8 py-3.5 h-auto text-base transition-all duration-200 hover:scale-[1.02] overflow-hidden"
-                    >
-                      {/* Blurry gradient background */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-blue-600/60 to-blue-500/60 blur-2xl"></div>
-                      <div className="relative z-10 flex items-center">
-                        Get started for free
-                        <ArrowRightIcon className="w-5 h-5 ml-2" />
-                      </div>
-                    </Button>
-                  </SignUpButton>
+                  <Button 
+                    size="lg" 
+                    className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-xl font-medium px-8 py-3.5 h-auto text-base transition-all duration-200 hover:scale-[1.02] overflow-hidden"
+                    onClick={() => window.location.href = '/sign-up'}
+                  >
+                    {/* Blurry gradient background */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/60 to-blue-500/60 blur-2xl"></div>
+                    <div className="relative z-10 flex items-center">
+                      Get started for free
+                    <ArrowRightIcon className="w-5 h-5 ml-2" />
+                    </div>
+                  </Button>
                   
                   <Button 
                     size="lg" 
@@ -430,8 +434,8 @@ const Home: NextPage = () => {
                     className="text-white/60 hover:text-white/80 hover:bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.12] px-8 py-3.5 h-auto text-base font-medium transition-all duration-200"
                     onClick={() => window.open('https://github.com/rowengb/lll.chat', '_blank')}
                   >
-                    <svg width="20" height="20" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">
-                      <path fillRule="evenodd" clipRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/>
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">
+                      <path fillRule="evenodd" clipRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" fill="currentColor"/>
                     </svg>
                     View on GitHub
                   </Button>
@@ -459,8 +463,8 @@ const Home: NextPage = () => {
                   onClick={() => window.open('https://github.com/rowengb/lll.chat', '_blank')}
                   className="hover:text-white/60 transition-colors duration-200 flex items-center"
                 >
-                  <svg width="16" height="16" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">
-                    <path fillRule="evenodd" clipRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" transform="scale(64)" fill="currentColor"/>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">
+                    <path fillRule="evenodd" clipRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" fill="currentColor"/>
                   </svg>
                   GitHub
                 </button>

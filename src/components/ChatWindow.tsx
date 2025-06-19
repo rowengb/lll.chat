@@ -723,19 +723,19 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                       <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
                       <div className="flex-1">
                         <Suspense fallback={<div>Loading...</div>}>
-                          <ChunkedMarkdown 
-                            content={message.content}
-                            chunkSize={75}
-                          />
+                        <ChunkedMarkdown 
+                          content={message.content}
+                          chunkSize={75}
+                        />
                         </Suspense>
                       </div>
                     </div>
                   ) : (
                     <Suspense fallback={<div>Loading...</div>}>
-                      <ChunkedMarkdown 
-                        content={message.content}
-                        chunkSize={75}
-                      />
+                    <ChunkedMarkdown 
+                      content={message.content}
+                      chunkSize={75}
+                    />
                     </Suspense>
                   )}
                   
