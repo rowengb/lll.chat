@@ -948,7 +948,7 @@ export function Chatbox({
     >
       {/* Enhanced glassmorphic background with complex styling */}
       <div 
-        className={`absolute inset-0 bg-white/50 dark:bg-secondary/[0.045] backdrop-blur-md border border-b-0 border-white/50 dark:border-[hsl(0,0%,83%)]/[0.04] outline outline-4 outline-blue-500/20 dark:outline-blue-400/25 ${
+        className={`absolute inset-0 sm:bg-white/50 sm:dark:bg-secondary/[0.045] backdrop-blur-md border border-b-0 border-white/50 dark:border-[hsl(0,0%,83%)]/[0.04] outline outline-4 outline-blue-500/20 dark:outline-blue-400/25 ${
           isDragOver ? 'bg-primary/5 border-primary/30' : ''
         }`}
         style={{

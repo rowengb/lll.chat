@@ -558,42 +558,9 @@ pre code {
 }
 
 /* Mobile scrolling optimizations */
-.mobile-scroll-container {
-  /* Optimize touch scrolling on mobile */
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-  /* Prevent momentum scrolling from interfering */
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-}
-
-/* Enhanced mobile scroll tracking */
-.mobile-scroll-optimized {
-  /* Optimize touch scrolling on mobile */
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-  /* Prevent momentum scrolling from interfering */
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-}
-
-/* iOS specific scroll fixes */
-.ios-scroll-fix {
-  /* Fix iOS scroll momentum issues */
-  -webkit-overflow-scrolling: touch;
-  /* Prevent rubber band effect */
-  overscroll-behavior-y: contain;
-  /* Improve scroll performance */
-  will-change: scroll-position;
-}
-
 /* Prevent pull-to-refresh on mobile */
 .mobile-no-refresh {
   overscroll-behavior-y: contain;
-  /* Prevent pull-to-refresh specifically */
-  -webkit-overflow-scrolling: touch;
 }
 
 /* Mobile scroll isolation */
@@ -611,10 +578,8 @@ pre code {
   /* Prevent scrolling issues */
   touch-action: manipulation;
   /* Prevent iOS from adding extra padding */
-  -webkit-appearance: none;
   appearance: none;
   /* Prevent text selection issues */
-  -webkit-user-select: text;
   user-select: text;
 }
 
@@ -623,17 +588,12 @@ pre code {
   /* Prevent accidental touches */
   touch-action: manipulation;
   /* Prevent iOS button styling */
-  -webkit-appearance: none;
   appearance: none;
-  /* Prevent double-tap zoom */
-  -webkit-tap-highlight-color: transparent;
 }
 
 /* Force immediate style updates on mobile for voice input button */
 @media (max-width: 640px) {
   .mobile-button {
-    /* Force immediate style recalculation */
-    transform: translateZ(0);
     /* Disable hover states that can get stuck */
     pointer-events: auto;
   }
@@ -656,7 +616,6 @@ pre code {
   .mobile-no-hover:hover {
     background-color: inherit !important;
     color: inherit !important;
-    transform: none !important;
   }
 
   /* Disable all hover effects on touch devices */
@@ -723,12 +682,7 @@ pre code {
     max-height: 100vh;
     /* Prevent layout shifts and scroll issues */
     contain: layout style;
-    /* Stable scrolling */
-    -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
-    /* Prevent transform conflicts */
-    transform: none !important;
-    -webkit-transform: none !important;
   }
 
   /* Modern browsers - use dynamic viewport height */
@@ -746,12 +700,10 @@ pre code {
     left: 0;
     right: 0;
     z-index: 20;
-    /* Only use safe area - no complex calculations */
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    /* Prevent any transforms */
-    transform: none !important;
-    -webkit-transform: none !important;
-    will-change: auto !important;
+    /* Remove safe area padding to eliminate white chin */
+    padding-bottom: 0px;
+    /* Ensure no background shows through */
+    background: transparent;
   }
 }
 
@@ -792,18 +744,14 @@ pre code {
 
   /* Enable smooth touch scrolling for containers */
   [class*="overflow-y-auto"] {
-    -webkit-overflow-scrolling: touch;
     touch-action: pan-y;
   }
 
   /* Fix textarea cursor positioning on mobile */
   textarea {
     /* Ensure cursor appears in correct position */
-    transform: none !important;
-    -webkit-transform: none !important;
     contain: none !important;
     /* Fix mobile cursor issues */
-    -webkit-appearance: none;
     appearance: none;
   }
 
@@ -835,7 +783,6 @@ pre code {
     -ms-overflow-style: none; /* IE/Edge */
     padding-right: 32px; /* Space for gradient */
     /* Enable smooth scrolling */
-    -webkit-overflow-scrolling: touch;
     scroll-behavior: smooth;
   }
 
@@ -973,27 +920,10 @@ pre code {
 
 /* Mobile-specific scroll improvements */
 @media (max-width: 640px) {
-  /* Improve mobile scrolling performance */
-  .mobile-scroll-optimized {
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    touch-action: pan-y;
-    /* Hardware acceleration */
-    will-change: scroll-position;
-    transform: translateZ(0);
-  }
-
   /* Prevent scroll chaining on mobile */
   .mobile-scroll-isolated {
     overscroll-behavior: contain;
     touch-action: pan-y;
-  }
-
-  /* Fix for iOS Safari scroll issues */
-  .ios-scroll-fix {
-    -webkit-overflow-scrolling: touch;
-    -webkit-transform: translate3d(0, 0, 0);
-    transform: translate3d(0, 0, 0);
   }
 }
 

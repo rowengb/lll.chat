@@ -1121,8 +1121,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       
       {/* Chatbox - fixed at bottom on mobile with keyboard awareness, absolute on desktop */}
         <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
-          <div className="px-3 sm:hidden">
-            <div className="max-w-[95%] w-full mx-auto">
+          <div className="sm:hidden">
+            <div className="max-w-[95%] w-full mx-auto px-3">
               <Chatbox
                 input={input}
                 onInputChange={handleInputChange}
