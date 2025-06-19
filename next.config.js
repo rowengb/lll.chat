@@ -7,9 +7,8 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  serverExternalPackages: [],
   
-  // Advanced bundle optimization
+  // Advanced bundle optimization (Next.js 14 compatible)
   experimental: {
     optimizePackageImports: [
       'lucide-react',
@@ -22,63 +21,21 @@ const nextConfig = {
     ],
   },
   
-  // Turbopack configuration (moved from experimental.turbo)
-  turbopack: {
-    rules: {
-      '*.svg': {
-        loaders: ['@svgr/webpack'],
-        as: '*.js',
-      },
-    },
-  },
-  
-  // Webpack optimizations
+    // Webpack optimizations (simplified to avoid "self is not defined" errors)
   webpack: (config, { dev, isServer }) => {
-    // Production optimizations
-    if (!dev) {
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          chunks: 'all',
-          cacheGroups: {
-            // Vendor chunk for stable dependencies
-            vendor: {
-              test: /[\\/]node_modules[\\/]/,
-              name: 'vendors',
-              chunks: 'all',
-              priority: 10,
-            },
-            // UI components chunk
-            ui: {
-              test: /[\\/]src[\\/]components[\\/]ui[\\/]/,
-              name: 'ui',
-              chunks: 'all',
-              priority: 20,
-            },
-            // Heavy dependencies
-            markdown: {
-              test: /[\\/]node_modules[\\/](react-markdown|rehype-highlight|remark-gfm)[\\/]/,
-              name: 'markdown',
-              chunks: 'all',
-              priority: 30,
-            },
-            pdf: {
-              test: /[\\/]node_modules[\\/](react-pdf|@react-pdf-viewer)[\\/]/,
-              name: 'pdf',
-              chunks: 'all',
-              priority: 30,
-            },
-            icons: {
-              test: /[\\/]node_modules[\\/]lucide-react[\\/]/,
-              name: 'icons',
-              chunks: 'all',
-              priority: 30,
-            },
-          },
-        },
+    // Basic fallbacks for Node.js modules
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        crypto: false,
+        path: false,
+        os: false,
       };
     }
-    
+
     return config;
   },
   
