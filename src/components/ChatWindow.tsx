@@ -1008,7 +1008,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   // Main chat interface when threadId exists
   return (
     <div 
-      className="sm:fixed sm:inset-0 min-h-screen flex flex-col bg-white dark:bg-slate-900 sm:left-auto overflow-hidden"
+      className="sm:fixed sm:inset-0 min-h-screen-mobile flex flex-col bg-white dark:bg-slate-900 sm:left-auto overflow-hidden"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
         transition: window.innerWidth >= 640 ? 'left 0.3s ease-out' : 'none'
@@ -1035,7 +1035,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         {/* Mobile: Natural body scrolling */}
         <div 
           ref={setMessagesContainer}
-          className="block sm:hidden h-full overflow-y-auto overflow-x-hidden"
+          className="block sm:hidden mobile-container-height overflow-y-auto overflow-x-hidden"
         >
           <div className={`${sharedGridClasses} pt-8 pb-64`}>
             <div></div>

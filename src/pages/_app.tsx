@@ -10,6 +10,7 @@ import { dark } from "@clerk/themes";
 import { ThemeProvider, useTheme } from "@/hooks/useTheme";
 import { useEffect } from "react";
 import Head from "next/head";
+import { initViewportHeight } from "@/utils/viewportHeight";
 
 // Wrapper component that can access the theme
 function ClerkWrapper({ children }: { children: React.ReactNode }) {
@@ -35,7 +36,10 @@ const MyApp: AppType = ({
 }) => {
   const router = useRouter();
   
-
+  // Initialize viewport height fix for mobile
+  useEffect(() => {
+    initViewportHeight();
+  }, []);
   
   // Create a key that only changes for different page types, not different chat threads
   const getPageKey = () => {
@@ -55,7 +59,7 @@ const MyApp: AppType = ({
           <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
           <link rel="manifest" href="/site.webmanifest" />
         </Head>
-        <div className="h-full min-h-screen bg-background text-foreground">
+        <div className="h-full min-h-screen-mobile bg-background text-foreground">
           <ConvexClientProvider>
             <Component {...pageProps} />
             <Toaster

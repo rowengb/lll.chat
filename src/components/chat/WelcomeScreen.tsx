@@ -70,7 +70,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
 
   return (
     <div 
-      className="sm:fixed sm:top-0 sm:right-0 sm:bottom-0 min-h-screen flex flex-col bg-white dark:bg-slate-900 sm:left-auto"
+      className="sm:fixed sm:top-0 sm:right-0 sm:bottom-0 min-h-screen-mobile flex flex-col bg-white dark:bg-slate-900 sm:left-auto"
       style={{ 
         left: window.innerWidth >= 640 ? (sidebarCollapsed ? '0px' : `${sidebarWidth}px`) : '0px',
         transition: window.innerWidth >= 640 ? 'left 0.3s ease-out' : 'none'
