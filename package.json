@@ -48,6 +48,8 @@
     "next": "^15.3.3",
     "openai": "^4.104.0",
     "pdfjs-dist": "^3.11.174",
+    "posthog-js": "^1.255.0",
+    "posthog-node": "^5.1.1",
     "react": "^19.1.0",
     "react-audio-visualize": "^1.2.0",
     "react-dom": "^19.1.0",
