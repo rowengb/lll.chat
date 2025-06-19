@@ -873,23 +873,6 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                                                       <CheckIcon className="h-4 w-4 text-primary ml-2" />
                         )}
                         
-                        {/* Pin icon for list view - only show on hover for signed in users */}
-                        {isSignedIn && !disabled && (
-                          <button
-                            onClick={(e) => handleToggleFavorite(e, model.id)}
-                            className="absolute -top-3 -right-3 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                            title={model.isFavorite ? "Remove from favorites" : "Add to favorites"}
-                          >
-                            <div className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200">
-                              {model.isFavorite ? (
-                                <PinOff className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                              ) : (
-                                <PinIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                              )}
-                            </div>
-                          </button>
-                        )}
-                        
                                                 {disabled && (
                           <div className="flex items-center gap-1 ml-2" title={getDisabledTooltip(model)}>
                             <KeyIcon className="h-4 w-4 text-muted-foreground" />
