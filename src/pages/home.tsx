@@ -422,22 +422,22 @@ const Home: NextPage = () => {
                 </p>
                 
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                      <Button 
-                        size="lg" 
+                    <Button 
+                      size="lg" 
                       className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-xl font-medium px-8 py-3.5 h-auto text-base transition-all duration-200 hover:scale-[1.02] overflow-hidden"
                       onClick={() => setShowSignUpModal(true)}
-                      >
+                    >
                       {/* Blurry gradient background */}
                       <div className="absolute inset-0 bg-gradient-to-r from-blue-600/60 to-blue-500/60 blur-2xl"></div>
                       <div className="relative z-10 flex items-center">
                         Get started for free
-                        <ArrowRightIcon className="w-5 h-5 ml-2" />
+                      <ArrowRightIcon className="w-5 h-5 ml-2" />
                       </div>
-                      </Button>
-                    
-                    <Button 
-                      size="lg" 
-                      variant="ghost" 
+                    </Button>
+                  
+                  <Button 
+                    size="lg" 
+                    variant="ghost" 
                       className="text-white/60 hover:text-white/80 hover:bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.12] px-8 py-3.5 h-auto text-base font-medium transition-all duration-200"
                       onClick={() => window.open('https://github.com/rowengb/lll.chat', '_blank')}
                     >

@@ -39,9 +39,10 @@ const MyApp: AppType = ({
   const router = useRouter();
   
   // Initialize viewport height fix for mobile
-  useEffect(() => {
-    initViewportHeight();
-  }, []);
+  // DISABLED: Using simple CSS-only approach to prevent scroll conflicts
+  // useEffect(() => {
+  //   initViewportHeight();
+  // }, []);
   
   // Create a key that only changes for different page types, not different chat threads
   const getPageKey = () => {
