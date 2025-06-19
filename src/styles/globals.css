@@ -86,6 +86,9 @@
     
     /* GPU acceleration */
     will-change: scroll-position;
+
+    /* Mobile viewport height fix */
+    --vh: 1vh;
   }
   
   body {
@@ -685,6 +688,35 @@ pre code {
   }
 }
 
+/* Mobile viewport height fix */
+.h-screen-mobile {
+  height: 100vh; /* Fallback for browsers that don't support CSS custom properties */
+  height: calc(var(--vh, 1vh) * 100);
+}
+
+.min-h-screen-mobile {
+  min-height: 100vh; /* Fallback for browsers that don't support CSS custom properties */
+  min-height: calc(var(--vh, 1vh) * 100);
+}
+
+.h-full-mobile {
+  height: 100%; /* Fallback */
+  height: calc(var(--vh, 1vh) * 100);
+}
+
+/* Mobile-specific container heights */
+@media (max-width: 640px) {
+  .mobile-container-height {
+    height: calc(var(--vh, 1vh) * 100);
+    max-height: calc(var(--vh, 1vh) * 100);
+  }
+  
+  .mobile-messages-container {
+    height: calc(var(--vh, 1vh) * 100 - 120px); /* Account for chatbox */
+    max-height: calc(var(--vh, 1vh) * 100 - 120px);
+  }
+}
+
 /* Prevent iOS zoom on input focus */
 @media screen and (max-width: 640px) {
   input,
@@ -692,6 +724,17 @@ pre code {
   select {
     font-size: 16px !important;
   }
+}
+
+/* Mobile viewport height fix */
+.h-screen-mobile {
+  height: 100vh; /* Fallback for browsers that don't support CSS custom properties */
+  height: calc(var(--vh, 1vh) * 100);
+}
+
+.min-h-screen-mobile {
+  min-height: 100vh; /* Fallback for browsers that don't support CSS custom properties */
+  min-height: calc(var(--vh, 1vh) * 100);
 }
 
 /* Simplified mobile scrolling - remove body locking */

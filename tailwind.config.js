@@ -74,6 +74,13 @@ module.exports = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+      height: {
+        'screen-mobile': 'calc(var(--vh, 1vh) * 100)',
+        'full-mobile': 'calc(var(--vh, 1vh) * 100)',
+      },
+      minHeight: {
+        'screen-mobile': 'calc(var(--vh, 1vh) * 100)',
+      },
     },
   },
   plugins: [require("tailwindcss-animate"), require('tailwind-scrollbar')],

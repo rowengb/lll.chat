@@ -92,7 +92,7 @@ const App: NextPage = () => {
   // Show loading while checking auth
   if (!isLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen-mobile flex items-center justify-center">
         <LoadingDots text="Loading" size="lg" />
       </div>
     );
@@ -106,7 +106,7 @@ const App: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="flex h-screen bg-background">
+      <div className="flex h-screen-mobile bg-background">
         {/* Sidebar */}
         <Sidebar
           collapsed={sidebarCollapsed}
