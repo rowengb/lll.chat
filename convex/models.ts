@@ -85,7 +85,7 @@ export const getFavoriteModels = query({
       .collect();
 
     if (userFavorites.length > 0) {
-      // User has custom favorites, return those
+      // User has custom favorites, return those with isFavorite = true
       const favoriteModelIds = userFavorites.map(f => f.modelId);
       const models = await ctx.db
         .query("models")
@@ -94,6 +94,7 @@ export const getFavoriteModels = query({
       
       return models
         .filter(model => favoriteModelIds.includes(model.id))
+        .map(model => ({ ...model, isFavorite: true }))
         .sort((a, b) => a.order - b.order);
     } else {
       // User has no custom favorites, return default favorites
@@ -118,7 +119,7 @@ export const getFavoriteModelsByUserId = query({
       .collect();
 
     if (userFavorites.length > 0) {
-      // User has custom favorites, return those
+      // User has custom favorites, return those with isFavorite = true
       const favoriteModelIds = userFavorites.map(f => f.modelId);
       const models = await ctx.db
         .query("models")
@@ -127,6 +128,7 @@ export const getFavoriteModelsByUserId = query({
       
       return models
         .filter(model => favoriteModelIds.includes(model.id))
+        .map(model => ({ ...model, isFavorite: true }))
         .sort((a, b) => a.order - b.order);
     } else {
       // User has no custom favorites, return default favorites
@@ -184,9 +186,10 @@ export const getOtherModels = query({
       .collect();
 
     if (userFavorites.length > 0) {
-      // User has custom favorites, return non-favorites
+      // User has custom favorites, return non-favorites with isFavorite = false
       return models
         .filter(model => !favoriteModelIds.includes(model.id))
+        .map(model => ({ ...model, isFavorite: false }))
         .sort((a, b) => a.order - b.order);
     } else {
       // User has no custom favorites, return non-default favorites
@@ -214,9 +217,10 @@ export const getOtherModelsByUserId = query({
       .collect();
 
     if (userFavorites.length > 0) {
-      // User has custom favorites, return non-favorites
+      // User has custom favorites, return non-favorites with isFavorite = false
       return models
         .filter(model => !favoriteModelIds.includes(model.id))
+        .map(model => ({ ...model, isFavorite: false }))
         .sort((a, b) => a.order - b.order);
     } else {
       // User has no custom favorites, return non-default favorites
