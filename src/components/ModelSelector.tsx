@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { ChevronDownIcon, CheckIcon, ZapIcon, SearchIcon, EyeIcon, GlobeIcon, FileTextIcon, BrainIcon, SparklesIcon, ChevronUpIcon, StarIcon, FilterIcon, ChevronLeftIcon, KeyIcon, FlaskConical, Palette, ImagePlus, PinIcon } from "lucide-react";
+import { ChevronDownIcon, CheckIcon, ZapIcon, SearchIcon, EyeIcon, GlobeIcon, FileTextIcon, BrainIcon, SparklesIcon, ChevronUpIcon, StarIcon, FilterIcon, ChevronLeftIcon, KeyIcon, FlaskConical, Palette, ImagePlus, PinIcon, PinOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/utils/trpc";
 import { OpenRouterAvatar } from '@/components/OpenRouterIcon';
@@ -219,20 +219,20 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
         const isFavorite = previousFavorites?.some(m => m.id === modelId);
         
         if (isFavorite) {
-          // Moving from favorites to others
+          // Moving from favorites to others - set isFavorite to false
           utils.models.getFavoriteModels.setData(undefined, (old) => 
             old?.filter(m => m.id !== modelId) || []
           );
           utils.models.getOtherModels.setData(undefined, (old) => 
-            [...(old || []), targetModel].sort((a, b) => a.order - b.order)
+            [...(old || []), { ...targetModel, isFavorite: false }].sort((a, b) => a.order - b.order)
           );
         } else {
-          // Moving from others to favorites
+          // Moving from others to favorites - set isFavorite to true
           utils.models.getOtherModels.setData(undefined, (old) => 
             old?.filter(m => m.id !== modelId) || []
           );
           utils.models.getFavoriteModels.setData(undefined, (old) => 
-            [...(old || []), targetModel].sort((a, b) => a.order - b.order)
+            [...(old || []), { ...targetModel, isFavorite: true }].sort((a, b) => a.order - b.order)
           );
         }
       }
@@ -326,7 +326,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
     });
   };
 
-  // Filter models based on search query and selected filters (always show all models)
+  // Filter models based on search query and selected filters
   const filteredModels = allModels.filter((model: ModelData) => {
     const matchesSearch = model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       model.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -336,8 +336,17 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
     return model.isActive && matchesSearch && matchesFilters(model);
   });
 
+  // For list view, only show favorite models
+  const filteredFavoriteModels = favoriteModels.filter((model: ModelData) => {
+    const matchesSearch = model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      model.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      model.provider.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return model.isActive && matchesSearch && matchesFilters(model);
+  });
+
   // Show top models or all based on showAll state
-  const displayedModels = showAll ? filteredModels : filteredModels.slice(0, 7);
+  const displayedModels = showAll ? filteredModels : filteredFavoriteModels.slice(0, 7);
 
   // Toggle filter selection
   const toggleFilter = (filterId: string) => {
@@ -544,7 +553,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                               closeDropdown();
                             }
                           }}
-                          className={`relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
+                          className={`group relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
                             disabled 
                               ? 'opacity-50 cursor-not-allowed border-border bg-muted' 
                               : selectedModel === model.id 
@@ -590,23 +599,24 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                               ))}
                             </div>
                           </div>
-                          {model.capabilities.includes('experimental') && (
-                            <div className="absolute top-2 left-2" title="Experimental">
-                              <FlaskConical className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-
                           {selectedModel === model.id && (
                             <CheckIcon className="absolute top-2 left-2 h-4 w-4 text-primary" />
                           )}
-                          {/* Pin icon for favorites - only show for signed in users */}
-                          {isSignedIn && selectedModel !== model.id && (
+                          {model.capabilities.includes('experimental') && selectedModel !== model.id && (
+                            <div className="absolute top-2 right-2" title="Experimental">
+                              <FlaskConical className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                          {/* Pin icon for favorites - only show on hover for signed in users */}
+                          {isSignedIn && (
                             <button
                               onClick={(e) => handleToggleFavorite(e, model.id)}
-                              className="absolute top-2 right-2 p-1 rounded-md bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400 hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors"
+                              className="absolute -top-3 -right-3 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                               title="Remove from favorites"
                             >
-                              <PinIcon className="h-3 w-3" />
+                              <div className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200">
+                                <PinOff className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                              </div>
                             </button>
                           )}
                           {(model.provider === 'anthropic' || model.provider === 'openai') && !disabled && selectedModel !== model.id && !isSignedIn && (
@@ -650,7 +660,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                               closeDropdown();
                             }
                           }}
-                          className={`relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
+                          className={`group relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
                             disabled 
                               ? 'opacity-50 cursor-not-allowed border-border bg-muted' 
                               : selectedModel === model.id 
@@ -696,23 +706,24 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                               ))}
                             </div>
                           </div>
-                          {model.capabilities.includes('experimental') && (
-                            <div className="absolute top-2 left-2" title="Experimental">
-                              <FlaskConical className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-
                           {selectedModel === model.id && (
                             <CheckIcon className="absolute top-2 left-2 h-4 w-4 text-primary" />
                           )}
-                          {/* Pin icon for adding to favorites - only show for signed in users */}
-                          {isSignedIn && selectedModel !== model.id && (
+                          {model.capabilities.includes('experimental') && selectedModel !== model.id && (
+                            <div className="absolute top-2 right-2" title="Experimental">
+                              <FlaskConical className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                          {/* Pin icon for adding to favorites - only show on hover for signed in users */}
+                          {isSignedIn && (
                             <button
                               onClick={(e) => handleToggleFavorite(e, model.id)}
-                              className="absolute top-2 right-2 p-1 rounded-md bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                              className="absolute -top-3 -right-3 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                               title="Add to favorites"
                             >
-                              <PinIcon className="h-3 w-3" />
+                              <div className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200">
+                                <PinIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                              </div>
                             </button>
                           )}
                           {disabled && selectedModel !== model.id && (
@@ -765,7 +776,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
           ) : (
             // List View - Default
             <div className="flex flex-col animate-in fade-in duration-300 overflow-hidden" style={{
-              height: window.innerWidth < 640 ? 'min(450px, calc(100vh - 200px))' : '450px', 
+              height: window.innerWidth < 640 ? 'min(450px, calc(100vh - 200px))' : `min(${Math.max(160, Math.min(450, displayedModels.length * 52 + 80))}px, calc(100vh - 100px))`, 
               maxHeight: window.innerWidth < 640 ? 'min(450px, calc(100vh - 200px))' : 'min(450px, calc(100vh - 100px))'
             }}>
               {/* Scrollable Content Area */}
@@ -773,15 +784,27 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                 <div className="p-2">
                   {displayedModels.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
-                      <FilterIcon className="h-8 w-8 text-muted mb-2" />
-                      <p className="text-sm text-muted-foreground mb-1">No models match your filters</p>
-                      <button
-                        type="button"
-                        onClick={clearFilters}
-                        className="text-xs text-primary hover:text-primary/80"
-                      >
-                        Clear filters
-                      </button>
+                      <StarIcon className="h-8 w-8 text-muted mb-2" />
+                      <p className="text-sm text-muted-foreground mb-1">
+                        {selectedFilters.length > 0 ? "No favorite models match your filters" : "No favorite models yet"}
+                      </p>
+                      {selectedFilters.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={clearFilters}
+                          className="text-xs text-primary hover:text-primary/80"
+                        >
+                          Clear filters
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowAll(true)}
+                          className="text-xs text-primary hover:text-primary/80"
+                        >
+                          Browse all models
+                        </button>
+                      )}
                     </div>
                   ) : (
                     displayedModels.map((model: ModelData) => {
@@ -850,6 +873,23 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                                                       <CheckIcon className="h-4 w-4 text-primary ml-2" />
                         )}
                         
+                        {/* Pin icon for list view - only show on hover for signed in users */}
+                        {isSignedIn && !disabled && (
+                          <button
+                            onClick={(e) => handleToggleFavorite(e, model.id)}
+                            className="absolute -top-3 -right-3 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                            title={model.isFavorite ? "Remove from favorites" : "Add to favorites"}
+                          >
+                            <div className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200">
+                              {model.isFavorite ? (
+                                <PinOff className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                              ) : (
+                                <PinIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                              )}
+                            </div>
+                          </button>
+                        )}
+                        
                                                 {disabled && (
                           <div className="flex items-center gap-1 ml-2" title={getDisabledTooltip(model)}>
                             <KeyIcon className="h-4 w-4 text-muted-foreground" />
@@ -865,14 +905,14 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
               {/* Fixed Bottom Bar */}
               <div className="flex-shrink-0 bg-card border-t border-border/50 p-2 rounded-b-2xl">
                 <div className="flex items-center justify-between">
-                  {!showAll && filteredModels.length > 7 ? (
+                  {!showAll ? (
                     <button
                       type="button"
                       onClick={() => setShowAll(true)}
                       className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 px-3 py-1.5 rounded-lg transition-colors"
                     >
                       <ChevronUpIcon className="h-4 w-4" />
-                      Show all
+                      Show all models
                     </button>
                   ) : (
                     <div></div>
