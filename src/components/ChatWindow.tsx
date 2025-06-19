@@ -575,7 +575,6 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               })) || undefined,
               // Copy image generation data (URLs only, file IDs updated separately)
               imageUrl: msg.imageUrl || undefined,
-              imageData: msg.imageData || undefined,
               // Copy stopped by user flag
               stoppedByUser: msg.stoppedByUser || undefined,
             })),
@@ -1032,10 +1031,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
 
       {/* Messages + Chatbox Area */}
       <div className="flex-1 overflow-hidden relative min-h-0">
-        {/* Mobile: Natural body scrolling */}
+        {/* Mobile: Natural body scrolling with keyboard awareness */}
         <div 
           ref={setMessagesContainer}
-          className="block sm:hidden mobile-container-height overflow-y-auto overflow-x-hidden"
+          className="block sm:hidden mobile-keyboard-aware-height overflow-y-auto overflow-x-hidden"
         >
           <div className={`${sharedGridClasses} pt-8 pb-64`}>
             <div></div>
@@ -1116,8 +1115,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         
       </div>
       
-      {/* Chatbox - fixed at bottom on mobile, absolute on desktop */}
-        <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+      {/* Chatbox - fixed at bottom on mobile with keyboard awareness, absolute on desktop */}
+        <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0 mobile-chatbox-keyboard-aware" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
           <div className="px-3 sm:hidden">
             <div className="max-w-[95%] w-full mx-auto">
               <Chatbox

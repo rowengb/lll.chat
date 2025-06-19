@@ -715,6 +715,35 @@ pre code {
     height: calc(var(--vh, 1vh) * 100 - 120px); /* Account for chatbox */
     max-height: calc(var(--vh, 1vh) * 100 - 120px);
   }
+
+  /* Keyboard-aware layouts using visual viewport */
+  .mobile-keyboard-aware-height {
+    height: calc(var(--visual-vh, 1vh) * 100);
+    max-height: calc(var(--visual-vh, 1vh) * 100);
+  }
+
+  .mobile-chatbox-keyboard-aware {
+    /* Position chatbox accounting for keyboard */
+    bottom: 0;
+    transform: translateY(calc(-1 * var(--keyboard-height, 0px)));
+    transition: transform 0.2s ease-out;
+  }
+
+  /* Ensure chatbox stays above keyboard on iOS */
+  @supports (height: 100dvh) {
+    .mobile-keyboard-aware-height {
+      height: 100dvh;
+      max-height: 100dvh;
+    }
+  }
+
+  /* Alternative approach using env() for iOS safe areas */
+  @supports (padding-bottom: env(keyboard-inset-height)) {
+    .mobile-chatbox-keyboard-aware {
+      padding-bottom: env(keyboard-inset-height, 0px);
+      transform: none;
+    }
+  }
 }
 
 /* Prevent iOS zoom on input focus */

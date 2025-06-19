@@ -12,6 +12,25 @@ export function initViewportHeight() {
     // Set the CSS custom property
     document.documentElement.style.setProperty('--vh', `${vh}px`);
     
+    // Handle visual viewport for keyboard-aware layouts
+    if (window.visualViewport) {
+      const visualVh = window.visualViewport.height * 0.01;
+      document.documentElement.style.setProperty('--visual-vh', `${visualVh}px`);
+      
+      // Calculate keyboard height for mobile layouts
+      const keyboardHeight = window.innerHeight - window.visualViewport.height;
+      document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+      
+      // Debug log for mobile testing
+      if (window.innerWidth < 640) {
+        console.log(`[ViewportHeight] innerHeight: ${window.innerHeight}px, visualHeight: ${window.visualViewport.height}px, keyboard: ${keyboardHeight}px`);
+      }
+    } else {
+      // Fallback for browsers without visual viewport support
+      document.documentElement.style.setProperty('--visual-vh', `${vh}px`);
+      document.documentElement.style.setProperty('--keyboard-height', '0px');
+    }
+    
     // Debug log for mobile testing
     if (window.innerWidth < 640) {
       console.log(`[ViewportHeight] Updated --vh to ${vh}px (innerHeight: ${window.innerHeight}px)`);
@@ -33,6 +52,7 @@ export function initViewportHeight() {
   // Listen for visual viewport changes (iOS Safari specific)
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', updateViewportHeight);
+    window.visualViewport.addEventListener('scroll', updateViewportHeight);
   }
 
   isInitialized = true;
@@ -47,6 +67,7 @@ export function cleanupViewportHeight() {
   
   if (window.visualViewport) {
     window.visualViewport.removeEventListener('resize', updateViewportHeight);
+    window.visualViewport.removeEventListener('scroll', updateViewportHeight);
   }
   
   isInitialized = false;
@@ -56,4 +77,18 @@ function updateViewportHeight() {
   if (typeof window === 'undefined') return;
   const vh = window.innerHeight * 0.01;
   document.documentElement.style.setProperty('--vh', `${vh}px`);
+  
+  // Handle visual viewport for keyboard-aware layouts
+  if (window.visualViewport) {
+    const visualVh = window.visualViewport.height * 0.01;
+    document.documentElement.style.setProperty('--visual-vh', `${visualVh}px`);
+    
+    // Calculate keyboard height for mobile layouts
+    const keyboardHeight = window.innerHeight - window.visualViewport.height;
+    document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
+  } else {
+    // Fallback for browsers without visual viewport support
+    document.documentElement.style.setProperty('--visual-vh', `${vh}px`);
+    document.documentElement.style.setProperty('--keyboard-height', '0px');
+  }
 } 
