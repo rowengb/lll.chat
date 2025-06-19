@@ -76,6 +76,11 @@
   }
   
   html {
+    /* Optimize font rendering */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    
     /* Prevent layout shifts */
     scroll-behavior: smooth;
     
