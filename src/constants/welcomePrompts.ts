@@ -1,34 +1,34 @@
-import { PenToolIcon, CodeIcon, BrainIcon, LightbulbIcon, BarChartIcon, ChefHatIcon } from "lucide-react";
+import { RocketIcon, CodeIcon, BrainIcon, SparklesIcon, TrendingUpIcon, GamepadIcon } from "lucide-react";
 
 export const examplePrompts = [
   {
-    title: "Creative Writing",
-    prompt: "Help me write a short story about a time traveler who accidentally changes a small detail in the past",
-    icon: PenToolIcon
+    title: "Startup Ideas",
+    prompt: "Generate 3 innovative startup ideas that solve real problems using AI and explain their potential market impact",
+    icon: RocketIcon
   },
   {
-    title: "Code Review",
-    prompt: "Review this Python function and suggest improvements for performance and readability",
+    title: "System Architecture",
+    prompt: "Design a scalable microservices architecture for a real-time chat application with 1M+ users",
     icon: CodeIcon
   },
   {
-    title: "Learn Something New",
-    prompt: "Explain quantum computing in simple terms with practical examples",
+    title: "Future Skills",
+    prompt: "What will the job market look like in 2030? Which skills should I start learning now to stay relevant?",
     icon: BrainIcon
   },
   {
-    title: "Problem Solving",
-    prompt: "Help me brainstorm solutions for reducing plastic waste in my daily life",
-    icon: LightbulbIcon
+    title: "Sci-Fi Story",
+    prompt: "Write a thrilling sci-fi story where humans discover they're living in a simulation, but the twist is...",
+    icon: SparklesIcon
   },
   {
-    title: "Data Analysis",
-    prompt: "How can I analyze customer feedback data to identify key improvement areas?",
-    icon: BarChartIcon
+    title: "Investment Portfolio",
+    prompt: "Analyze the current market trends and create a diversified investment portfolio for a 25-year-old tech worker",
+    icon: TrendingUpIcon
   },
   {
-    title: "Recipe Ideas",
-    prompt: "Suggest a healthy dinner recipe using chicken, vegetables, and ingredients I likely have at home",
-    icon: ChefHatIcon
+    title: "Game Design",
+    prompt: "Design a unique multiplayer game concept that combines elements of strategy, creativity, and social interaction",
+    icon: GamepadIcon
   }
 ]; 

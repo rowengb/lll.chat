@@ -103,7 +103,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                 <div className={`text-center transition-all duration-300 ${showWelcomeElements ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
                   {/* Welcome Header */}
                   <div className="mb-8">
-                    <h1 className="text-3xl font-light text-foreground mb-4">
+                    <h1 className="text-3xl font-normal text-foreground mb-4">
                       Welcome to <span className="font-bold">lll</span><span className="font-normal">.chat</span>
                     </h1>
                     <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
