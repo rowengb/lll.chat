@@ -84,8 +84,14 @@ const App: NextPage = () => {
   };
 
   // Redirect to home if not authenticated
+  useEffect(() => {
+    if (isLoaded && !user) {
+      router.replace('/home');
+    }
+  }, [isLoaded, user, router]);
+
+  // Don't render anything if redirecting
   if (isLoaded && !user) {
-    router.push('/home');
     return null;
   }
 
