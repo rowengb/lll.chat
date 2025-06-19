@@ -28,17 +28,7 @@ const nextConfig = {
     ],
   },
   
-  // Turbopack configuration (stable in Next.js 15)
-  turbopack: {
-    rules: {
-      '*.svg': {
-        loaders: ['@svgr/webpack'],
-        as: '*.js',
-      },
-    },
-  },
-  
-      // Webpack optimizations (simplified for React 19 compatibility)
+  // Webpack optimizations (simplified for React 19 + Next.js 15 compatibility)
   webpack: (config, { dev, isServer }) => {
     // Basic fallbacks for Node.js modules
     if (!isServer) {
@@ -52,8 +42,6 @@ const nextConfig = {
         os: false,
       };
     }
-
-
 
     return config;
   },
