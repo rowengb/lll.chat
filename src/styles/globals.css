@@ -989,3 +989,82 @@ pre code {
     text-shadow: none !important;
   }
 }
+
+/* Global Body Scroll Lock Utilities */
+.body-scroll-lock {
+  overflow: hidden !important;
+  /* Prevent iOS bounce */
+  position: fixed !important;
+  width: 100% !important;
+  /* Preserve scroll position */
+  top: var(--scroll-y, 0) !important;
+}
+
+/* Alternative scroll lock that preserves layout */
+.body-scroll-lock-preserve {
+  overflow: hidden !important;
+  /* Prevent scroll but keep layout */
+  padding-right: var(--scrollbar-width, 0px) !important;
+}
+
+/* Mobile-specific scroll lock */
+@media (max-width: 640px) {
+  .body-scroll-lock-mobile {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    top: var(--scroll-y, 0) !important;
+    /* Prevent iOS overscroll bounce */
+    overscroll-behavior: none !important;
+    /* Disable touch actions */
+    touch-action: none !important;
+  }
+}
+
+/* Desktop-specific scroll lock */
+@media (min-width: 641px) {
+  .body-scroll-lock-desktop {
+    overflow: hidden !important;
+    padding-right: var(--scrollbar-width, 0px) !important;
+  }
+}
+
+/* Utility to calculate and store scrollbar width */
+.scrollbar-width-detector {
+  position: absolute !important;
+  top: -9999px !important;
+  width: 50px !important;
+  height: 50px !important;
+  overflow: scroll !important;
+  visibility: hidden !important;
+}
+
+/* Prevent text selection during scroll lock */
+.body-scroll-lock *,
+.body-scroll-lock-mobile *,
+.body-scroll-lock-preserve * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+    -ms-user-select: none !important;
+}
+
+/* Hide scrollbars for model selector */
+.model-selector-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.model-selector-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Hide scrollbars for model selector */
+.model-selector-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.model-selector-scroll {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
