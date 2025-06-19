@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef } from "react";
-import { ChevronDownIcon, CheckIcon, ZapIcon, SearchIcon, EyeIcon, GlobeIcon, FileTextIcon, BrainIcon, SparklesIcon, ChevronUpIcon, StarIcon, FilterIcon, ChevronLeftIcon, KeyIcon, FlaskConical, Palette, ImagePlus, PinIcon, PinOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { trpc } from "@/utils/trpc";
-import { OpenRouterAvatar } from '@/components/OpenRouterIcon';
-import { useOpenRouterStore } from '@/stores/openRouterStore';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { ChevronDownIcon, StarIcon, FilterIcon, XIcon, FlaskConicalIcon, BookmarkIcon, PinIcon, PinOffIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { trpc } from '@/utils/trpc';
 import { useUser } from '@clerk/nextjs';
 
 interface ModelSelectorProps {
@@ -174,6 +172,87 @@ const getCapabilityColor = (capability: string) => {
       return 'bg-muted text-muted-foreground';
   }
 };
+
+// Memoize the model item component for better performance
+const ModelItem = React.memo(({ 
+  model, 
+  isSelected, 
+  isDisabled, 
+  isUsingOpenRouter, 
+  onSelect, 
+  onToggleFavorite, 
+  isSignedIn,
+  size 
+}: {
+  model: any;
+  isSelected: boolean;
+  isDisabled: boolean;
+  isUsingOpenRouter: boolean;
+  onSelect: () => void;
+  onToggleFavorite: (e: React.MouseEvent) => void;
+  isSignedIn: boolean;
+  size: string;
+}) => {
+  return (
+    <div
+      className={`relative group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${
+        isSelected 
+          ? 'bg-primary text-primary-foreground' 
+          : isDisabled
+            ? 'bg-muted/50 text-muted-foreground cursor-not-allowed opacity-60'
+            : 'hover:bg-muted/50'
+      }`}
+      onClick={!isDisabled ? onSelect : undefined}
+    >
+      {/* Model info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <div className={`text-sm font-medium ${isSelected ? 'text-primary-foreground' : 'text-foreground'} truncate`}>
+            {model.name}
+          </div>
+          
+          {/* Capability badges */}
+          <div className="flex items-center gap-1">
+            {model.capabilities?.includes('experimental') && (
+              <div className="absolute top-2 right-2 w-4 h-4 bg-orange-100 dark:bg-orange-900/30 rounded-sm flex items-center justify-center">
+                <FlaskConicalIcon className="h-2.5 w-2.5 text-orange-600 dark:text-orange-400" />
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className={`text-xs ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'} truncate`}>
+          {model.description}
+          {isUsingOpenRouter && (
+            <span className="ml-1 text-blue-600 dark:text-blue-400 font-medium">
+              (via OpenRouter)
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Favorite toggle - only show for signed in users */}
+      {isSignedIn && (
+        <div 
+          className={`absolute -top-3 -right-3 w-6 h-6 bg-white rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 dark:bg-gray-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:shadow-md ${
+            isSelected ? 'opacity-100' : ''
+          }`}
+          onClick={onToggleFavorite}
+        >
+          <div className="w-5 h-5 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+            {model.isFavorite ? (
+              <PinOffIcon className="h-3 w-3 text-gray-600 dark:text-gray-300" />
+            ) : (
+              <PinIcon className="h-3 w-3 text-gray-600 dark:text-gray-300" />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+ModelItem.displayName = 'ModelItem';
 
 export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onClick }: ModelSelectorProps) {
   const { useOpenRouter } = useOpenRouterStore();
@@ -544,94 +623,22 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                       filteredModels.filter(model => model.isFavorite).map((model: ModelData) => {
                         const disabled = isModelDisabled(model);
                         return (
-                        <button
-                          type="button"
-                          key={model.id}
-                          onClick={() => {
-                            if (!disabled) {
-                              onModelChange(model.id);
-                              closeDropdown();
-                            }
-                          }}
-                          className={`group relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
-                            disabled 
-                              ? 'opacity-50 cursor-not-allowed border-border bg-muted' 
-                              : selectedModel === model.id 
-                                ? 'border-primary bg-primary/10 hover:border-primary/80 hover:bg-primary/10' 
-                                : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
-                          }`}
-                        >
-                          <div className="flex flex-col items-center gap-2 justify-between h-full">
-                            <div className="flex flex-col items-center gap-2">
-                              <div className="flex items-center justify-center w-12 h-12 bg-muted rounded-xl text-xl font-medium relative">
-                                {getProviderIcon(model.provider, model.name, 'lg')}
-                                {isUsingOpenRouter(model) && (
-                                  <div className="absolute -bottom-1 -right-1" title="Via OpenRouter">
-                                    <OpenRouterAvatar size={20} />
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-center">
-                                {model.displayNameTop && model.displayNameBottom ? (
-                                  <>
-                                    <div className="font-medium text-sm text-foreground">{model.displayNameTop}</div>
-                                    <div className="font-medium text-sm text-foreground">{model.displayNameBottom}</div>
-                                  </>
-                                ) : (
-                                  <div className="font-medium text-sm text-foreground">{model.name}</div>
-                                )}
-                                {model.subtitle && (
-                                  <div className="text-xs text-muted-foreground mt-0.5">
-                                    {model.subtitle}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap justify-center gap-1 min-h-[32px] items-center">
-                              {model.capabilities.filter(cap => cap !== 'experimental').slice(0, 4).map((capability: string, index: number) => (
-                                <div
-                                  key={index}
-                                  className={`p-1 rounded-md ${getCapabilityColor(capability)}`}
-                                  title={capability}
-                                >
-                                  {getCapabilityIcon(capability)}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          {selectedModel === model.id && (
-                            <CheckIcon className="absolute top-2 left-2 h-4 w-4 text-primary" />
-                          )}
-                          {model.capabilities.includes('experimental') && selectedModel !== model.id && (
-                            <div className="absolute top-2 right-2" title="Experimental">
-                              <FlaskConical className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-                          {/* Pin icon for favorites - only show on hover for signed in users */}
-                          {isSignedIn && (
-                            <button
-                              onClick={(e) => handleToggleFavorite(e, model.id)}
-                              className="absolute -top-3 -right-3 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                              title="Remove from favorites"
-                            >
-                              <div className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200">
-                                <PinOff className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                              </div>
-                            </button>
-                          )}
-                          {(model.provider === 'anthropic' || model.provider === 'openai') && !disabled && selectedModel !== model.id && !isSignedIn && (
-                            <div className="absolute top-2 left-2">
-                              <span className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-1 py-0.5 rounded flex items-center">
-                                <ZapIcon className="h-3 w-3" />
-                              </span>
-                            </div>
-                          )}
-                          {disabled && selectedModel !== model.id && (
-                            <div className="absolute top-2 left-2" title={getDisabledTooltip(model)}>
-                              <KeyIcon className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-                        </button>
+                          <ModelItem
+                            key={model.id}
+                            model={model}
+                            isSelected={selectedModel === model.id}
+                            isDisabled={disabled}
+                            isUsingOpenRouter={isUsingOpenRouter(model)}
+                            onSelect={() => {
+                              if (!disabled) {
+                                onModelChange(model.id);
+                                closeDropdown();
+                              }
+                            }}
+                            onToggleFavorite={(e) => handleToggleFavorite(e, model.id)}
+                            isSignedIn={isSignedIn}
+                            size={size}
+                          />
                         );
                       })
                     )}
@@ -651,87 +658,22 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                       filteredModels.filter(model => !model.isFavorite).map((model: ModelData) => {
                         const disabled = isModelDisabled(model);
                         return (
-                        <button
-                          type="button"
-                          key={model.id}
-                          onClick={() => {
-                            if (!disabled) {
-                              onModelChange(model.id);
-                              closeDropdown();
-                            }
-                          }}
-                          className={`group relative p-3 rounded-xl border-2 transition-all min-h-[160px] ${
-                            disabled 
-                              ? 'opacity-50 cursor-not-allowed border-border bg-muted' 
-                              : selectedModel === model.id 
-                                ? 'border-primary bg-primary/10 hover:border-primary/80 hover:bg-primary/10' 
-                                : 'border-border bg-card hover:border-primary/50 hover:bg-primary/5'
-                          }`}
-                        >
-                          <div className="flex flex-col items-center gap-2 justify-between h-full">
-                            <div className="flex flex-col items-center gap-2">
-                              <div className="flex items-center justify-center w-12 h-12 bg-muted rounded-xl text-xl font-medium relative">
-                                {getProviderIcon(model.provider, model.name, 'lg')}
-                                {isUsingOpenRouter(model) && (
-                                  <div className="absolute -bottom-1 -right-1" title="Via OpenRouter">
-                                    <OpenRouterAvatar size={20} />
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-center">
-                                {model.displayNameTop && model.displayNameBottom ? (
-                                  <>
-                                    <div className="font-medium text-sm text-foreground">{model.displayNameTop}</div>
-                                    <div className="font-medium text-sm text-foreground">{model.displayNameBottom}</div>
-                                  </>
-                                ) : (
-                                  <div className="font-medium text-sm text-foreground">{model.name}</div>
-                                )}
-                                {model.subtitle && (
-                                  <div className="text-xs text-muted-foreground mt-0.5">
-                                    {model.subtitle}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap justify-center gap-1 min-h-[32px] items-center">
-                              {model.capabilities.filter(cap => cap !== 'experimental').slice(0, 4).map((capability: string, index: number) => (
-                                <div
-                                  key={index}
-                                  className={`p-1 rounded-md ${getCapabilityColor(capability)}`}
-                                  title={capability}
-                                >
-                                  {getCapabilityIcon(capability)}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          {selectedModel === model.id && (
-                            <CheckIcon className="absolute top-2 left-2 h-4 w-4 text-primary" />
-                          )}
-                          {model.capabilities.includes('experimental') && selectedModel !== model.id && (
-                            <div className="absolute top-2 right-2" title="Experimental">
-                              <FlaskConical className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-                          {/* Pin icon for adding to favorites - only show on hover for signed in users */}
-                          {isSignedIn && (
-                            <button
-                              onClick={(e) => handleToggleFavorite(e, model.id)}
-                              className="absolute -top-3 -right-3 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                              title="Add to favorites"
-                            >
-                              <div className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200">
-                                <PinIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                              </div>
-                            </button>
-                          )}
-                          {disabled && selectedModel !== model.id && (
-                            <div className="absolute top-2 left-2" title={getDisabledTooltip(model)}>
-                              <KeyIcon className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          )}
-                        </button>
+                          <ModelItem
+                            key={model.id}
+                            model={model}
+                            isSelected={selectedModel === model.id}
+                            isDisabled={disabled}
+                            isUsingOpenRouter={isUsingOpenRouter(model)}
+                            onSelect={() => {
+                              if (!disabled) {
+                                onModelChange(model.id);
+                                closeDropdown();
+                              }
+                            }}
+                            onToggleFavorite={(e) => handleToggleFavorite(e, model.id)}
+                            isSignedIn={isSignedIn}
+                            size={size}
+                          />
                         );
                       })
                     )}
@@ -810,92 +752,22 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                     displayedModels.map((model: ModelData) => {
                       const disabled = isModelDisabled(model);
                       return (
-                      <button
-                        type="button"
-                        key={model.id}
-                        onClick={() => {
-                          if (!disabled) {
-                            onModelChange(model.id);
-                            closeDropdown();
-                          }
-                        }}
-                        className={`flex w-full items-center justify-between px-3 py-3 text-left rounded-lg transition-colors group ${
-                          disabled 
-                            ? 'opacity-50 cursor-not-allowed bg-muted' 
-                            : 'hover:bg-muted'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className="relative flex items-center justify-center w-8 h-8 bg-muted rounded-lg text-sm font-medium text-muted-foreground">
-                            {getProviderIcon(model.provider, model.name)}
-                            {model.capabilities.includes('experimental') && (
-                              <div className="absolute -top-1 -left-1" title="Experimental">
-                                <FlaskConical className="h-3 w-3 text-muted-foreground" />
-                              </div>
-                            )}
-                            {isUsingOpenRouter(model) && (
-                              <div className="absolute -bottom-1 -right-1" title="Via OpenRouter">
-                                <OpenRouterAvatar size={20} />
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="flex flex-col flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-foreground text-sm">{model.name}</span>
-                              {model.subtitle && (
-                                <span className="text-xs text-muted-foreground">
-                                  {model.subtitle}
-                                </span>
-                              )}  
-                              {model.provider === 'openai' && model.name.includes('GPT') && (
-                                <span className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-1.5 py-0.5 rounded-md flex items-center">
-                                  <ZapIcon className="h-3 w-3" />
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            {model.capabilities.filter(cap => cap !== 'experimental').map((capability: string, index: number) => (
-                              <div
-                                key={index}
-                                className={`p-1 rounded-md ${getCapabilityColor(capability)}`}
-                                title={capability}
-                              >
-                                {getCapabilityIcon(capability)}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {selectedModel === model.id && (
-                                                      <CheckIcon className="h-4 w-4 text-primary ml-2" />
-                        )}
-                        
-                        {/* Pin icon for list view - only show on hover for signed in users */}
-                        {isSignedIn && !disabled && (
-                          <button
-                            onClick={(e) => handleToggleFavorite(e, model.id)}
-                            className="absolute -top-3 -right-3 p-1 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                            title={model.isFavorite ? "Remove from favorites" : "Add to favorites"}
-                          >
-                            <div className="p-1.5 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200">
-                              {model.isFavorite ? (
-                                <PinOff className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                              ) : (
-                                <PinIcon className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                              )}
-                            </div>
-                          </button>
-                        )}
-                        
-                                                {disabled && (
-                          <div className="flex items-center gap-1 ml-2" title={getDisabledTooltip(model)}>
-                            <KeyIcon className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        )}
-                      </button>
+                        <ModelItem
+                          key={model.id}
+                          model={model}
+                          isSelected={selectedModel === model.id}
+                          isDisabled={disabled}
+                          isUsingOpenRouter={isUsingOpenRouter(model)}
+                          onSelect={() => {
+                            if (!disabled) {
+                              onModelChange(model.id);
+                              closeDropdown();
+                            }
+                          }}
+                          onToggleFavorite={(e) => handleToggleFavorite(e, model.id)}
+                          isSignedIn={isSignedIn}
+                          size={size}
+                        />
                       );
                     })
                   )}

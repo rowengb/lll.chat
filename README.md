@@ -72,13 +72,6 @@ CONVEX_DEPLOYMENT=your_convex_deployment_name
 # Clerk Authentication (Required)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
 CLERK_SECRET_KEY=your_clerk_secret_key
-
-# AI Provider API Keys (Optional - configure as needed)
-OPENAI_API_KEY=your_openai_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
-GOOGLE_AI_API_KEY=your_google_ai_api_key
-DEEPSEEK_API_KEY=your_deepseek_api_key
-OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
 ### Setting Up Services

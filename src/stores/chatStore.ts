@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { subscribeWithSelector } from 'zustand/middleware';
+import { Message } from '../types/chat';
 
 interface FileAttachment {
   id: string;
@@ -8,22 +10,6 @@ interface FileAttachment {
   size: number;
   url?: string;
   storageId?: string;
-}
-
-interface Message {
-  id: string;
-  content: string;
-  role: string;
-  model?: string | null;
-  createdAt: Date;
-  isOptimistic?: boolean;
-  isError?: boolean;
-  isGrounded?: boolean; // Indicates if response was grounded with Google Search
-  groundingMetadata?: GroundingMetadata; // Google Search grounding metadata
-  attachments?: FileAttachment[];
-  imageUrl?: string; // For image generation results
-  imageData?: string; // For base64 image data
-  stoppedByUser?: boolean; // Flag to indicate if stream was stopped by user
 }
 
 interface GroundingSource {
@@ -46,6 +32,185 @@ interface GroundingMetadata {
   sources?: GroundingSource[]; // The sources used for grounding (optional)
   rawData?: any; // Include raw data for debugging
 }
+
+interface ChatState {
+  // Thread-specific messages
+  messagesByThread: Record<string, Message[]>;
+  
+  // UI state
+  sidebarCollapsed: boolean;
+  sidebarWidth: number;
+  
+  // Loading states - use Map for better performance
+  loadingStates: Map<string, boolean>;
+  streamingStates: Map<string, boolean>;
+  
+  // Actions
+  getMessages: (threadId: string) => Message[];
+  setMessages: (threadId: string, messages: Message[]) => void;
+  addMessage: (threadId: string, message: Message) => void;
+  updateStreamingMessage: (threadId: string, messageId: string, updates: Partial<Message>) => void;
+  
+  // Optimized selectors
+  getMessagesCount: (threadId: string) => number;
+  getLastMessage: (threadId: string) => Message | undefined;
+  
+  // UI actions
+  setSidebarCollapsed: (collapsed: boolean) => void;
+  setSidebarWidth: (width: number) => void;
+  toggleSidebar: () => void;
+  
+  // Loading actions with better performance
+  setLoading: (threadId: string | null, loading: boolean) => void;
+  isLoading: (threadId: string) => boolean;
+  setStreaming: (threadId: string, streaming: boolean) => void;
+  isStreaming: (threadId: string) => boolean;
+}
+
+export const useChatStore = create<ChatState>()(
+  persist(
+    subscribeWithSelector((set, get) => ({
+      messagesByThread: {},
+      sidebarCollapsed: false,
+      sidebarWidth: 288,
+      loadingStates: new Map(),
+      streamingStates: new Map(),
+
+      // Optimized message getters
+      getMessages: (threadId: string) => {
+        return get().messagesByThread[threadId] || [];
+      },
+
+      getMessagesCount: (threadId: string) => {
+        return get().messagesByThread[threadId]?.length || 0;
+      },
+
+      getLastMessage: (threadId: string) => {
+        const messages = get().messagesByThread[threadId];
+        return messages?.[messages.length - 1];
+      },
+
+      setMessages: (threadId: string, messages: Message[]) => {
+        set((state) => ({
+          messagesByThread: {
+            ...state.messagesByThread,
+            [threadId]: messages,
+          },
+        }));
+      },
+
+      addMessage: (threadId: string, message: Message) => {
+        set((state) => {
+          const existingMessages = state.messagesByThread[threadId] || [];
+          return {
+            messagesByThread: {
+              ...state.messagesByThread,
+              [threadId]: [...existingMessages, message],
+            },
+          };
+        });
+      },
+
+      updateStreamingMessage: (threadId: string, messageId: string, updates: Partial<Message>) => {
+        set((state) => {
+          const messages = state.messagesByThread[threadId] || [];
+          const updatedMessages = messages.map((msg) =>
+            msg.id === messageId ? { ...msg, ...updates } : msg
+          );
+          return {
+            messagesByThread: {
+              ...state.messagesByThread,
+              [threadId]: updatedMessages,
+            },
+          };
+        });
+      },
+
+      // UI state management
+      setSidebarCollapsed: (collapsed: boolean) => {
+        set({ sidebarCollapsed: collapsed });
+      },
+
+      setSidebarWidth: (width: number) => {
+        set({ sidebarWidth: width });
+      },
+
+      toggleSidebar: () => {
+        set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed }));
+      },
+
+      // Optimized loading state management
+      setLoading: (threadId: string | null, loading: boolean) => {
+        if (!threadId) return;
+        
+        set((state) => {
+          const newLoadingStates = new Map(state.loadingStates);
+          if (loading) {
+            newLoadingStates.set(threadId, true);
+          } else {
+            newLoadingStates.delete(threadId);
+          }
+          return { loadingStates: newLoadingStates };
+        });
+      },
+
+      isLoading: (threadId: string) => {
+        return get().loadingStates.get(threadId) || false;
+      },
+
+      setStreaming: (threadId: string, streaming: boolean) => {
+        set((state) => {
+          const newStreamingStates = new Map(state.streamingStates);
+          if (streaming) {
+            newStreamingStates.set(threadId, true);
+          } else {
+            newStreamingStates.delete(threadId);
+          }
+          return { streamingStates: newStreamingStates };
+        });
+      },
+
+      isStreaming: (threadId: string) => {
+        return get().streamingStates.get(threadId) || false;
+      },
+    })),
+    {
+      name: 'chat-store',
+      partialize: (state) => ({
+        sidebarCollapsed: state.sidebarCollapsed,
+        sidebarWidth: state.sidebarWidth,
+      }),
+    }
+  )
+);
+
+// Optimized selectors for components
+export const useChatMessages = (threadId: string) => 
+  useChatStore((state) => state.messagesByThread[threadId] || []);
+
+export const useChatMessagesCount = (threadId: string) => 
+  useChatStore((state) => state.messagesByThread[threadId]?.length || 0);
+
+export const useChatLastMessage = (threadId: string) => 
+  useChatStore((state) => {
+    const messages = state.messagesByThread[threadId];
+    return messages?.[messages.length - 1];
+  });
+
+export const useChatLoading = (threadId: string) => 
+  useChatStore((state) => state.loadingStates.get(threadId) || false);
+
+export const useChatStreaming = (threadId: string) => 
+  useChatStore((state) => state.streamingStates.get(threadId) || false);
+
+export const useSidebarState = () => 
+  useChatStore((state) => ({
+    collapsed: state.sidebarCollapsed,
+    width: state.sidebarWidth,
+    setSidebarCollapsed: state.setSidebarCollapsed,
+    setSidebarWidth: state.setSidebarWidth,
+    toggleSidebar: state.toggleSidebar,
+  }));
 
 interface ChatStore {
   // Messages by thread ID

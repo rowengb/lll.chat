@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { CopyIcon, GitBranchIcon, RotateCcwIcon, EditIcon, SquareIcon, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import toast from "react-hot-toast";
@@ -16,10 +16,13 @@ import { MessageImage } from './MessageImage';
 import { ImageSkeleton } from './ImageSkeleton';
 import { LoadingDots } from './LoadingDots';
 import { isImageGenerationModel } from '../utils/modelUtils';
-import { ChunkedMarkdown } from './ChunkedMarkdown';
 import { ApiKeyWarningBanner } from './ApiKeyWarningBanner';
 import { WelcomeScreen } from './chat/WelcomeScreen';
 import { MobileMenuButton } from './chat/MobileMenuButton';
+
+// Lazy load heavy components
+const ChunkedMarkdown = lazy(() => import('./ChunkedMarkdown').then(module => ({ default: module.ChunkedMarkdown })));
+const FileViewerModal = lazy(() => import('./FileViewerModal').then(module => ({ default: module.FileViewerModal })));
 
 // Hooks
 import { useChatData } from '../hooks/useChatData';
@@ -719,17 +722,21 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                     <div className="flex items-center gap-3">
                       <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
                       <div className="flex-1">
-                        <ChunkedMarkdown 
-                          content={message.content}
-                          chunkSize={75}
-                        />
+                        <Suspense fallback={<div>Loading...</div>}>
+                          <ChunkedMarkdown 
+                            content={message.content}
+                            chunkSize={75}
+                          />
+                        </Suspense>
                       </div>
                     </div>
                   ) : (
-                    <ChunkedMarkdown 
-                      content={message.content}
-                      chunkSize={75}
-                    />
+                    <Suspense fallback={<div>Loading...</div>}>
+                      <ChunkedMarkdown 
+                        content={message.content}
+                        chunkSize={75}
+                      />
+                    </Suspense>
                   )}
                   
                   {message.role === "assistant" && message.groundingMetadata && (
