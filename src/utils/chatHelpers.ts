@@ -1,19 +1,14 @@
 export const getDefaultModel = (bestDefaultModel: any): string => {
-  // If we have the bestDefaultModel data, use it (even if null - means no API keys)
   if (bestDefaultModel) {
-    // If there's a valid model ID, use it
     if (bestDefaultModel.modelId) {
       return bestDefaultModel.modelId;
     }
-    // If modelId is null but we have the bestDefaultModel result, it means no API keys
-    // Don't fallback to favorite models without API keys
     if (bestDefaultModel.reason === "no_api_keys") {
-      return 'gpt-4o'; // Safe fallback - but user will get error about missing API key
+      return 'gpt-4o';
     }
   }
   
-  // If bestDefaultModel is still loading, use gpt-4o as fallback
-  return 'gpt-4o'; // final fallback
+  return 'gpt-4o';
 };
 
 export const getProviderFromModel = (modelId?: string | null, allModels?: any[]): string => {
@@ -27,13 +22,12 @@ export const createShakeAnimation = () => {
   return {
     trigger: (setShouldShake: (value: boolean) => void) => {
       setShouldShake(true);
-      setTimeout(() => setShouldShake(false), 500); // Reset after animation duration
+      setTimeout(() => setShouldShake(false), 500);
     }
   };
 };
 
 export const navigateToSettings = (onNavigateToSettings?: () => void) => {
-  // Use the parent's navigation function if available, otherwise fallback to window.location
   if (onNavigateToSettings) {
     onNavigateToSettings();
   } else {
@@ -41,110 +35,147 @@ export const navigateToSettings = (onNavigateToSettings?: () => void) => {
   }
 };
 
-// Auto-resize textarea helper
 export const adjustTextareaHeight = (inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>) => {
   const textarea = inputRef.current;
   if (textarea) {
     textarea.style.height = 'auto';
     const scrollHeight = textarea.scrollHeight;
-    const maxHeight = 128; // max-h-32 = 128px
-    const minHeight = 20; // Even slimmer default height
+    const maxHeight = 128;
+    const minHeight = 20;
     
     textarea.style.height = `${Math.min(Math.max(scrollHeight, minHeight), maxHeight)}px`;
   }
 };
 
-// Mobile detection utility
-export const isMobileDevice = () => {
-  if (typeof window === 'undefined') return false;
+export const isMobileDevice = (() => {
+  let cachedResult: boolean | null = null;
   
-  // Check for touch capability and screen size
-  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const isSmallScreen = window.innerWidth <= 768;
-  const isMobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  
-  return isTouchDevice && (isSmallScreen || isMobileUserAgent);
-};
+  return () => {
+    if (cachedResult !== null) return cachedResult;
+    if (typeof window === 'undefined') return false;
+    
+    const checks = {
+      hasTouch: 'ontouchstart' in window || navigator.maxTouchPoints > 0,
+      isSmallScreen: window.innerWidth <= 768 || window.innerHeight <= 1024,
+      isMobileUA: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|CriOS/i.test(navigator.userAgent),
+      matchesMediaQuery: window.matchMedia?.('(pointer: coarse)')?.matches,
+    };
+    
+    const isMobile = checks.hasTouch && (
+      checks.isSmallScreen || 
+      checks.isMobileUA || 
+      checks.matchesMediaQuery
+    );
+    
+    cachedResult = isMobile;
+    return isMobile;
+  };
+})();
 
-// Track user interaction state
-let lastUserInteraction = 0;
-let isUserScrolling = false;
-let scrollTimeout: NodeJS.Timeout | null = null;
-
-// Update last interaction time
-export const updateLastUserInteraction = () => {
-  lastUserInteraction = Date.now();
-};
-
-// Track scrolling state
-export const setUserScrolling = (scrolling: boolean) => {
-  isUserScrolling = scrolling;
-  if (scrollTimeout) {
-    clearTimeout(scrollTimeout);
-  }
-  if (scrolling) {
-    scrollTimeout = setTimeout(() => {
-      isUserScrolling = false;
-    }, 1000); // Consider scrolling stopped after 1 second
-  }
-};
-
-// Smart focus function that respects mobile UX
+// FIXED: Simplified smart focus without problematic mobile restrictions
 export const smartFocus = (inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>, options: {
   force?: boolean;
   delay?: number;
   reason?: string;
+  respectMobile?: boolean;
 } = {}) => {
-  const { force = false, delay = 0, reason = 'unknown' } = options;
+  const { force = false, delay = 0, reason = 'unknown', respectMobile = true } = options;
   
-  // Always allow focus on desktop
-  if (!isMobileDevice() || force) {
+  const doFocus = () => {
+    try {
+      inputRef.current?.focus({ preventScroll: true });
+    } catch (error) {
+      console.warn('[FOCUS] Focus failed:', error);
+    }
+  };
+  
+  if (force) {
     if (delay > 0) {
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, delay);
+      setTimeout(doFocus, delay);
     } else {
-      inputRef.current?.focus();
+      doFocus();
     }
     return;
   }
   
-  // On mobile, COMPLETELY disable automatic focus to prevent scrolling issues
-  // Only allow focus for very specific user-initiated actions
-  console.log(`[FOCUS] Mobile focus disabled for reason: ${reason}`);
-  
-  // Only allow focus for explicit user actions that expect input focus
-  if (reason === 'example-click') {
-    // User clicked on an example prompt - they expect to be able to edit/send immediately
-    if (delay > 0) {
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, delay);
-    } else {
-      inputRef.current?.focus();
+  // FIXED: Only skip focus for very specific problematic scenarios
+  if (respectMobile && isMobileDevice()) {
+    const allowedReasons = ['user-click', 'example-click', 'explicit-focus'];
+    if (!allowedReasons.includes(reason)) {
+      console.log(`[FOCUS] Skipping auto-focus on mobile (reason: ${reason})`);
+      return;
     }
-    return;
   }
   
-  // All other reasons are disabled on mobile to prevent scrolling issues:
-  // - 'component-mount': No auto-focus when page loads
-  // - 'thread-change': No auto-focus when switching conversations
-  // - 'form-submit': No auto-focus after sending a message
-  // - 'user-action': No auto-focus for general user actions
-  // - 'stream-content': No auto-focus during streaming
-  // - any other automatic focus triggers
-  
-  console.log(`[FOCUS] Skipping all auto-focus on mobile (reason: ${reason})`);
+  if (delay > 0) {
+    setTimeout(doFocus, delay);
+  } else {
+    doFocus();
+  }
 };
 
-// Initialize interaction tracking
-if (typeof window !== 'undefined') {
-  // Track user interactions
-  ['touchstart', 'touchmove', 'touchend', 'click', 'keydown', 'input'].forEach(event => {
-    window.addEventListener(event, updateLastUserInteraction, { passive: true });
-  });
-  
-  // Track scrolling
-  window.addEventListener('scroll', () => setUserScrolling(true), { passive: true });
-  window.addEventListener('touchmove', () => setUserScrolling(true), { passive: true });
-} 
+// FIXED: Remove problematic global touch listeners
+class InteractionTracker {
+  private lastUserInteraction = 0;
+  private cleanupFunctions: (() => void)[] = [];
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      this.setupEventListeners();
+    }
+  }
+
+  private setupEventListeners() {
+    const updateInteraction = () => {
+      this.lastUserInteraction = Date.now();
+    };
+
+    // FIXED: Only track essential events, no touchmove/scroll
+    const events: Array<[string, EventListener]> = [
+      ['click', updateInteraction],
+      ['keydown', updateInteraction],
+      ['input', updateInteraction],
+    ];
+
+    events.forEach(([event, handler]) => {
+      window.addEventListener(event, handler, { passive: true });
+      this.cleanupFunctions.push(() => {
+        window.removeEventListener(event, handler);
+      });
+    });
+  }
+
+  cleanup() {
+    this.cleanupFunctions.forEach(cleanup => cleanup());
+    this.cleanupFunctions = [];
+  }
+
+  getLastInteraction() {
+    return this.lastUserInteraction;
+  }
+}
+
+let interactionTracker: InteractionTracker | null = null;
+
+export const getInteractionTracker = () => {
+  if (!interactionTracker && typeof window !== 'undefined') {
+    interactionTracker = new InteractionTracker();
+    
+    window.addEventListener('beforeunload', () => {
+      if (interactionTracker) {
+        interactionTracker.cleanup();
+        interactionTracker = null;
+      }
+    });
+  }
+  return interactionTracker;
+};
+
+export const updateLastUserInteraction = () => {
+  getInteractionTracker()?.getLastInteraction();
+};
+
+// FIXED: Remove problematic scroll tracking
+export const setUserScrolling = (scrolling: boolean) => {
+  console.warn('setUserScrolling is deprecated');
+};

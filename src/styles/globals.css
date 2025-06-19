@@ -815,3 +815,24 @@ pre code {
     transform: translate3d(0, 0, 0);
   }
 }
+
+/* FIXED: Ensure mobile scroll containers never lose overflow */
+@media (max-width: 640px) {
+  .mobile-scroll-container {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    /* Prevent any JavaScript from breaking scroll */
+    touch-action: pan-y !important;
+    /* Ensure no interference from other styles */
+    overscroll-behavior: contain !important;
+  }
+  
+  /* Prevent scroll issues during transitions */
+  .mobile-scroll-container * {
+    touch-action: inherit !important;
+  }
+}
+
+/* FIXED: Remove problematic scroll tracking styles */
+/* Remove or comment out any existing .mobile-scroll-optimized styles */
