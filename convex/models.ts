@@ -55,12 +55,12 @@ export const getFavoriteModels = query({
     
     if (!identity) {
       // User not authenticated, return default favorites
-      return await ctx.db
-        .query("models")
-        .withIndex("by_favorite", (q) => q.eq("isFavorite", true))
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .order("asc")
-        .collect();
+    return await ctx.db
+      .query("models")
+      .withIndex("by_favorite", (q) => q.eq("isFavorite", true))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .order("asc")
+      .collect();
     }
 
     const user = await ctx.db
@@ -150,12 +150,12 @@ export const getOtherModels = query({
     
     if (!identity) {
       // User not authenticated, return non-default favorites
-      return await ctx.db
-        .query("models")
-        .withIndex("by_favorite", (q) => q.eq("isFavorite", false))
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .order("asc")
-        .collect();
+    return await ctx.db
+      .query("models")
+      .withIndex("by_favorite", (q) => q.eq("isFavorite", false))
+      .filter((q) => q.eq(q.field("isActive"), true))
+      .order("asc")
+      .collect();
     }
 
     const user = await ctx.db

@@ -237,7 +237,7 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
           // Style paragraphs
           p: ({ node, ...props }) => (
             <p 
-              className="text-sm text-foreground mb-3 last:mb-0 leading-relaxed"
+              className="text-sm text-foreground mb-3 last:mb-0 leading-8"
               {...props}
             />
           ),
@@ -310,7 +310,7 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
           ),
           li: ({ node, ...props }) => (
             <li 
-              className="text-sm text-foreground leading-relaxed"
+              className="text-sm text-foreground leading-8"
               {...props}
             />
           ),
@@ -346,13 +346,13 @@ const MemoizedChunk = React.memo(({ chunk, isStreaming }: { chunk: MarkdownChunk
           ),
           th: ({ node, ...props }) => (
             <th 
-              className="border border-border px-3 py-2 text-left font-semibold text-foreground text-sm leading-relaxed"
+              className="border border-border px-3 py-2 text-left font-semibold text-foreground text-sm leading-8"
               {...props}
             />
           ),
           td: ({ node, ...props }) => (
             <td 
-              className="border border-border px-3 py-2 text-sm text-foreground leading-relaxed"
+              className="border border-border px-3 py-2 text-sm text-foreground leading-8"
               {...props}
             />
           ),

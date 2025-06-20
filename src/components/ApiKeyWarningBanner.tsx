@@ -17,7 +17,7 @@ export function ApiKeyWarningBanner({
 }: ApiKeyWarningBannerProps) {
   return (
     <div className={`absolute top-8 left-1/2 transform -translate-x-1/2 z-50 ${shouldShake ? 'animate-shake' : ''}`}>
-      <div className="bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800/50 rounded-2xl shadow-lg shadow-black/10 dark:shadow-black/30 backdrop-blur-sm max-w-lg mx-auto">
+      <div className="bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800/50 rounded-lg shadow-lg shadow-black/10 dark:shadow-black/30 backdrop-blur-sm max-w-lg mx-auto">
         <div className="px-6 py-5 flex items-center gap-4">
           <div className="flex-shrink-0">
             <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
@@ -38,7 +38,7 @@ export function ApiKeyWarningBanner({
             <Button
               onClick={onNavigateToSettings}
               size="sm"
-              className="bg-amber-500 hover:bg-amber-600 text-white dark:bg-amber-600 dark:hover:bg-amber-700 text-sm px-4 py-2.5 h-auto rounded-lg font-medium shadow-sm"
+              className="bg-amber-500 hover:bg-amber-600 text-white dark:bg-amber-600 dark:hover:bg-amber-700 text-sm px-4 py-2.5 h-auto rounded font-medium shadow-sm"
             >
               <Key className="h-4 w-4 mr-2" />
               Add Keys
@@ -49,7 +49,7 @@ export function ApiKeyWarningBanner({
                 onClick={onDismiss}
                 variant="ghost"
                 size="sm"
-                className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 p-2 h-auto rounded-lg"
+                className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 p-2 h-auto rounded"
               >
                 <X className="h-4 w-4" />
               </Button>
