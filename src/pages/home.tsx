@@ -12,7 +12,9 @@ import {
   Sparkles,
   Brain,
   Shield,
-  Search
+  Search,
+  Key,
+  Cpu
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SignUpModal from "@/components/SignUpModal";
@@ -218,55 +220,37 @@ const Home: NextPage = () => {
                   title: "Web Search",
                       description: "Get real-time information from the web integrated directly into your conversations.",
                       metric: "Real-time"
-                    },
-                    {
-                      icon: <Brain className="w-6 h-6 text-white" />,
-                      title: "50+ AI Models",
-                      description: "Access GPT-4, Claude, Gemini, and dozens of other AI models in one interface.",
+                },
+                {
+                      icon: <Key className="w-6 h-6 text-white" />,
+                  title: "BYOK & Privacy",
+                      description: "Use your own API keys. Your data stays private and secure.",
+                      metric: "Private"
+                },
+                {
+                      icon: <Cpu className="w-6 h-6 text-white" />,
+                  title: "50+ Models",
+                      description: "Access GPT-4, Claude, Gemini, and dozens of other cutting-edge AI models.",
                       metric: "50+ Models"
-                    },
-                    {
-                      icon: <Shield className="w-6 h-6 text-white" />,
-                  title: "Privacy First",
-                      description: "Your data stays yours. Use your own API keys for complete control and privacy.",
-                      metric: "100% Private"
                 }
               ].map((feature, index) => (
-                <div 
-                  key={index}
-                      className="group relative p-8 rounded-2xl bg-white/[0.02] backdrop-blur-sm border border-white/[0.06] hover:border-blue-500/[0.15] hover:bg-white/[0.04] transition-all duration-300"
-                    >
-                    {/* Subtle blue gradient overlay */}
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/[0.02] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                    
-                    {/* Blurry blue glow on hover */}
-                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500/[0.08] to-blue-600/[0.04] opacity-0 group-hover:opacity-100 blur-xl transition-opacity duration-500" />
-                    
-                    {/* Content */}
-                    <div className="relative z-10">
-                      <div className="flex items-center justify-between mb-6">
-                        <div className="relative p-3 rounded-xl bg-white/[0.06] border border-white/[0.08] group-hover:bg-blue-500/[0.08] group-hover:border-blue-500/[0.15] transition-all duration-300 overflow-hidden">
-                          {/* Subtle blue glow behind icon */}
-                          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/[0.05] to-blue-600/[0.03] opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-500" />
-                          <div className="relative z-10">
+                    <div key={index} className="group relative bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-sm border border-white/[0.08] rounded-2xl p-6 hover:from-white/[0.05] hover:to-white/[0.02] hover:border-white/[0.12] transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-white/[0.05]">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="p-2 bg-white/[0.06] rounded-lg border border-white/[0.08] group-hover:bg-white/[0.08] group-hover:border-white/[0.12] transition-all duration-300">
                       {feature.icon}
-                          </div>
                         </div>
-                        <div className="text-xs font-[500] text-white/40 group-hover:text-white/60 transition-colors duration-300">
+                        <div className="text-xs font-mono text-white/40 bg-white/[0.04] px-2 py-1 rounded-md border border-white/[0.08]">
                           {feature.metric}
                         </div>
                       </div>
-                      
-                      <h3 className="text-xl font-[600] text-white mb-3 group-hover:text-white/95 transition-colors duration-300">
+                      <h3 className="text-lg font-[600] text-white mb-2 group-hover:text-white/90 transition-colors">
                         {feature.title}
                       </h3>
-                      
-                      <p className="text-white/60 text-sm font-[450] leading-relaxed group-hover:text-white/70 transition-colors duration-300">
+                      <p className="text-sm text-white/50 leading-relaxed group-hover:text-white/60 transition-colors">
                         {feature.description}
                       </p>
                     </div>
-                  </div>
-                ))}
+                  ))}
                 </div>
               </div>
 
@@ -440,7 +424,7 @@ const Home: NextPage = () => {
                     variant="ghost" 
                       className="text-white/60 hover:text-white/80 hover:bg-white/[0.04] border border-white/[0.08] hover:border-white/[0.12] px-8 py-3.5 h-auto text-base font-medium transition-all duration-200"
                       onClick={() => window.open('https://github.com/rowengb/lll.chat', '_blank')}
-                    >
+                  >
                       <svg width="20" height="20" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">
                         <path fillRule="evenodd" clipRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8C0 11.54 2.29 14.53 5.47 15.59C5.87 15.66 6.02 15.42 6.02 15.21C6.02 15.02 6.01 14.39 6.01 13.72C4 14.09 3.48 13.23 3.32 12.78C3.23 12.55 2.84 11.84 2.5 11.65C2.22 11.5 1.82 11.13 2.49 11.12C3.12 11.11 3.57 11.7 3.72 11.94C4.44 13.15 5.59 12.81 6.05 12.6C6.12 12.08 6.33 11.73 6.56 11.53C4.78 11.33 2.92 10.64 2.92 7.58C2.92 6.71 3.23 5.99 3.74 5.43C3.66 5.23 3.38 4.41 3.82 3.31C3.82 3.31 4.49 3.1 6.02 4.13C6.66 3.95 7.34 3.86 8.02 3.86C8.7 3.86 9.38 3.95 10.02 4.13C11.55 3.09 12.22 3.31 12.22 3.31C12.66 4.41 12.38 5.23 12.3 5.43C12.81 5.99 13.12 6.7 13.12 7.58C13.12 10.65 11.25 11.33 9.47 11.53C9.76 11.78 10.01 12.26 10.01 13.01C10.01 14.08 10 14.94 10 15.21C10 15.42 10.15 15.67 10.55 15.59C13.71 14.53 16 11.53 16 8C16 3.58 12.42 0 8 0Z" fill="currentColor"/>
                       </svg>

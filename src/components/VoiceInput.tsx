@@ -273,7 +273,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
             variant="ghost"
             disabled={true}
             className="h-10 w-10 shadow-sm transition-all mobile-button bg-muted/50 text-muted-foreground opacity-50"
-            style={{ borderRadius: '10px' }}
+            style={{ borderRadius: '6px' }}
             size="sm"
             title="Audio recording not supported in this browser"
           >
@@ -325,23 +325,18 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
     return (
       <div className={`relative ${className}`}>
         {isRecording || isProcessing ? (
-          // Recording/Processing button - red background
+          // Recording/Processing button - white background with red text
           <button
             ref={buttonRef}
             type="button"
             onClick={toggleRecording}
             disabled={disabled || isProcessing}
-            className="group h-10 w-10 shadow-sm transition-colors mobile-button bg-red-500 text-white animate-pulse"
+            className="group h-10 w-10 transition-colors mobile-button bg-white border border-red-200 dark:border-red-800"
             style={{ 
-              borderRadius: '10px',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-              backgroundColor: '#ef4444',
-              color: 'white',
-              border: 'none',
+              borderRadius: '6px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              position: 'relative'
+              justifyContent: 'center'
             }}
 
             title={
@@ -349,7 +344,18 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
               `Recording... ${formatTime(recordingTime)}`
             }
           >
-            {buttonContent}
+            {isProcessing ? (
+              <div className="flex items-center justify-center">
+                <div className="w-5 h-5 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <>
+                {/* Timer - clean and visible */}
+                <div className="flex flex-col items-center justify-center text-xs font-mono text-red-500">
+                  <div className="text-xs leading-none text-red-500 font-medium">{timeDisplay}</div>
+                </div>
+              </>
+            )}
           </button>
         ) : (
           // Normal button - default styling
@@ -360,10 +366,9 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
             onClick={toggleRecording}
             onTouchStart={handleTouchStart}
             disabled={disabled}
-            className="group h-10 w-10 shadow-sm transition-colors mobile-button bg-foreground/5 text-foreground border border-foreground/15 dark:border-gray-800"
+            className="h-10 w-10 transition-all mobile-button bg-white text-gray-600 hover:text-gray-800 hover:bg-gray-50 border border-gray-200 hover:border-gray-300 dark:bg-white/10 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/20 dark:border-white/10 dark:hover:border-white/20"
             style={{ 
-              borderRadius: '10px',
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+              borderRadius: '6px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
