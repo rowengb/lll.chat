@@ -273,7 +273,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
             variant="ghost"
             disabled={true}
             className="h-10 w-10 shadow-sm transition-all mobile-button bg-muted/50 text-muted-foreground opacity-50"
-            style={{ borderRadius: '6px' }}
+            style={{ borderRadius: '10px' }}
             size="sm"
             title="Audio recording not supported in this browser"
           >
@@ -333,7 +333,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
             disabled={disabled || isProcessing}
             className="group h-10 w-10 transition-colors mobile-button bg-white border border-red-200 dark:border-red-800"
             style={{ 
-              borderRadius: '6px',
+              borderRadius: '10px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -368,7 +368,7 @@ export const VoiceInput: React.FC<VoiceInputProps> = ({
             disabled={disabled}
             className="h-10 w-10 transition-all mobile-button bg-white text-gray-600 hover:text-gray-800 hover:bg-gray-50 border border-gray-200 hover:border-gray-300 dark:bg-white/10 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/20 dark:border-white/10 dark:hover:border-white/20"
             style={{ 
-              borderRadius: '6px',
+              borderRadius: '10px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
