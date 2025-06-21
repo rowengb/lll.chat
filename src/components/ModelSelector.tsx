@@ -12,6 +12,10 @@ interface ModelSelectorProps {
   onModelChange: (model: string) => void;
   size?: 'sm' | 'lg';
   onClick?: () => void;
+  // Optional props to pass model data from parent to avoid redundant API calls
+  favoriteModels?: ModelData[];
+  otherModels?: ModelData[];
+  apiKeys?: any;
 }
 
 // Type definition for model data from Convex
@@ -176,7 +180,7 @@ const getCapabilityColor = (capability: string) => {
   }
 };
 
-export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onClick }: ModelSelectorProps) {
+export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onClick, favoriteModels: propFavoriteModels, otherModels: propOtherModels, apiKeys: propApiKeys }: ModelSelectorProps) {
   const { useOpenRouter } = useOpenRouterStore();
   const { selectedModelData, setSelectedModel } = useModelStore();
   const { isSignedIn } = useUser();
@@ -189,10 +193,17 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
   const dropdownRef = useRef<HTMLDivElement>(null);
   const filterModalRef = useRef<HTMLDivElement>(null);
   
-  // Fetch models from database
-  const { data: favoriteModels = [] } = trpc.models.getFavoriteModels.useQuery();
-  const { data: otherModels = [] } = trpc.models.getOtherModels.useQuery();
+  // Fetch models from database only if not provided as props
+  const { data: fetchedFavoriteModels = [] } = trpc.models.getFavoriteModels.useQuery(undefined, {
+    enabled: !propFavoriteModels
+  });
+  const { data: fetchedOtherModels = [] } = trpc.models.getOtherModels.useQuery(undefined, {
+    enabled: !propOtherModels
+  });
   
+  // Use props if available, otherwise use fetched data
+  const favoriteModels = propFavoriteModels || fetchedFavoriteModels;
+  const otherModels = propOtherModels || fetchedOtherModels;
   const allModels = [...favoriteModels, ...otherModels];
   
   // Initialize store with first available model if no model is selected
@@ -207,12 +218,15 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
   }, [allModels.length, selectedModelData, selectedModel, setSelectedModel]);
   
   // Fallback to tRPC data if store doesn't have the current model
-  const displayModelData = selectedModelData?.id === selectedModel 
-    ? selectedModelData 
-    : allModels.find(m => m.id === selectedModel) || allModels[0];
+  const currentModel = selectedModelData || allModels.find(model => model.id === selectedModel);
   
-  // Fetch API keys from database
-  const { data: apiKeys } = trpc.apiKeys.getApiKeys.useQuery();
+  // Fetch API keys only if not provided as props
+  const { data: fetchedApiKeys } = trpc.apiKeys.getApiKeys.useQuery(undefined, {
+    enabled: !propApiKeys
+  });
+  
+  // Use props if available, otherwise use fetched data
+  const apiKeys = propApiKeys || fetchedApiKeys;
   
   // Get tRPC utils for query invalidation
   const utils = trpc.useUtils();
@@ -275,44 +289,50 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
   const hasApiKey = (provider: string) => {
     if (!apiKeys) return false;
     const key = apiKeys[provider as keyof typeof apiKeys];
-    return !!key && key.trim().length > 0;
+    return key && typeof key === 'string' && key.trim().length > 0;
   };
   
   // Function to check if a model is disabled (no API key)
   const isModelDisabled = (model: ModelData) => {
-    const hasDirectProviderKey = hasApiKey(model.provider);
-    const hasOpenRouterKey = hasApiKey('openrouter');
+    if (!apiKeys) return true;
     
     if (useOpenRouter) {
-      // In OpenRouter mode, disable models that don't have OpenRouter support OR no OpenRouter key
-      return !model.openrouterModelId || !hasOpenRouterKey;
+      // In OpenRouter mode, model needs OpenRouter support
+      return !model.openrouterModelId;
     } else {
-      // In individual provider mode, disable models that don't have direct provider keys
-      return !hasDirectProviderKey;
+      // In individual mode, model needs direct provider key
+      return !hasApiKey(model.provider);
     }
   };
 
   // Function to check if a model is using OpenRouter
   const isUsingOpenRouter = (model: ModelData) => {
-    if (!useOpenRouter) return false;
-    return hasApiKey('openrouter') && model.openrouterModelId;
+    return useOpenRouter && model.openrouterModelId;
   };
 
   // Function to get tooltip text for disabled models
   const getDisabledTooltip = (model: ModelData) => {
+    if (!apiKeys) return "API keys not loaded";
+    
     if (useOpenRouter) {
       if (!model.openrouterModelId) {
-        return `${model.name} is not available via OpenRouter`;
+        return "This model is not available via OpenRouter";
       }
-      if (!hasApiKey('openrouter')) {
-        return 'Add an OpenRouter API key to use this model';
-      }
+      return "";
     } else {
       if (!hasApiKey(model.provider)) {
-        return `Add a ${model.provider} API key to use this model`;
+        const providerNames: { [key: string]: string } = {
+          'openai': 'OpenAI',
+          'anthropic': 'Anthropic',
+          'gemini': 'Google',
+          'deepseek': 'DeepSeek',
+          'meta': 'Meta',
+          'xai': 'xAI'
+        };
+        return `${providerNames[model.provider] || model.provider} API key required`;
       }
+      return "";
     }
-    return 'Model not available';
   };
 
   // Define filter categories based on the image
@@ -330,26 +350,34 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
   const matchesFilters = (model: ModelData) => {
     if (selectedFilters.length === 0) return true;
     
-    // Special handling for "fast" filter - check if model is in favorites (typically faster models)
-    if (selectedFilters.includes('fast')) {
-      if (model.isFavorite) return true;
-    }
-    
-    // Check if model has any of the selected capabilities
-    return selectedFilters.some(filter => {
-      if (filter === 'fast') return model.isFavorite; // Fast = favorites
-      return model.capabilities.includes(filter);
+    return selectedFilters.some(filterId => {
+      if (filterId === 'vision') return model.capabilities.includes('vision');
+      if (filterId === 'web') return model.capabilities.includes('web');
+      if (filterId === 'documents') return model.capabilities.includes('documents');
+      if (filterId === 'reasoning') return model.capabilities.includes('reasoning');
+      if (filterId === 'experimental') return model.capabilities.includes('experimental');
+      if (filterId === 'image-generation') return model.capabilities.includes('image-generation');
+      
+      // Provider filters
+      if (filterId === 'openai') return model.provider === 'openai';
+      if (filterId === 'anthropic') return model.provider === 'anthropic';
+      if (filterId === 'gemini') return model.provider === 'gemini';
+      if (filterId === 'deepseek') return model.provider === 'deepseek';
+      if (filterId === 'meta') return model.provider === 'meta' || model.provider === 'together';
+      if (filterId === 'xai') return model.provider === 'xai';
+      
+      return false;
     });
   };
 
   // Filter models based on search query and selected filters
-  const filteredModels = allModels.filter((model: ModelData) => {
-    const matchesSearch = model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      model.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      model.provider.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredModels = allModels.filter(model => {
+    const matchesSearch = searchQuery === "" || 
+      model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      model.provider.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      model.description.toLowerCase().includes(searchQuery.toLowerCase());
     
-    // Always show all active models so users can discover what's available
-    return model.isActive && matchesSearch && matchesFilters(model);
+    return matchesSearch && matchesFilters(model);
   });
 
   // For list view, only show favorite models
@@ -452,14 +480,16 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
     utils.apiKeys.getApiKeys.invalidate();
   }, [useOpenRouter, utils]);
 
+  // Check if user has any API keys
+  const hasAnyApiKey = apiKeys && Object.values(apiKeys).some(key => key && typeof key === 'string' && key.trim().length > 0);
+
   return (
     <div className="relative" ref={dropdownRef}>
       <Button
         type="button"
         variant="ghost"
-        onClick={() => {
-          // Check if user has any API keys
-          const hasAnyApiKey = apiKeys && Object.values(apiKeys).some(key => key && key.trim().length > 0);
+                  onClick={() => {
+            // Check if user has any API keys - already computed above
           
           if (!hasAnyApiKey && onClick) {
             onClick(); // Trigger shake animation
@@ -479,7 +509,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
         <div className={`flex items-center ${size === 'lg' ? 'gap-3' : 'gap-1.5'} ${size === 'sm' ? 'overflow-hidden' : ''}`}>
           <div className="flex-shrink-0">
             <div className={size === 'lg' ? 'text-xl scale-125' : ''}>
-              {getProviderIcon(displayModelData?.provider || '', displayModelData?.name)}
+              {getProviderIcon(currentModel?.provider || '', currentModel?.name)}
             </div>
           </div>
           
@@ -491,15 +521,15 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 model-selector-scroll" 
                      style={{ WebkitOverflowScrolling: 'touch' }}>
                   <span className="font-medium text-sm whitespace-nowrap">
-            {displayModelData?.name}
+            {currentModel?.name}
           </span>
-          {displayModelData && isUsingOpenRouter(displayModelData) && (
+          {currentModel && isUsingOpenRouter(currentModel) && (
             <div className="flex-shrink-0" title="Via OpenRouter">
                       <OpenRouterAvatar size={20} />
             </div>
           )}
                   <span className="text-muted-foreground bg-muted px-2 py-0.5 rounded-md text-xs whitespace-nowrap">
-            {displayModelData?.provider}
+            {currentModel?.provider}
           </span>
                                   </div>
               </div>
@@ -507,15 +537,15 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
               {/* Desktop: Full layout when size is sm */}
               <div className="hidden sm:flex sm:items-center sm:gap-1.5">
                 <span className="font-medium text-sm">
-                  {displayModelData?.name}
+                  {currentModel?.name}
                 </span>
-                {displayModelData && isUsingOpenRouter(displayModelData) && (
+                {currentModel && isUsingOpenRouter(currentModel) && (
                   <div className="flex-shrink-0" title="Via OpenRouter">
                     <OpenRouterAvatar size={20} />
                   </div>
                 )}
                 <span className="text-muted-foreground bg-muted px-2 py-0.5 rounded-md text-xs">
-                  {displayModelData?.provider}
+                  {currentModel?.provider}
                 </span>
               </div>
             </>
@@ -523,15 +553,15 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
             // Large size: Original layout
             <>
               <span className="font-medium text-base">
-                {displayModelData?.name}
+                {currentModel?.name}
               </span>
-              {displayModelData && isUsingOpenRouter(displayModelData) && (
+              {currentModel && isUsingOpenRouter(currentModel) && (
                 <div className="flex-shrink-0" title="Via OpenRouter">
                   <OpenRouterAvatar size={24} />
                 </div>
               )}
               <span className="text-muted-foreground bg-muted px-2 py-0.5 rounded-md text-sm">
-                {displayModelData?.provider}
+                {currentModel?.provider}
               </span>
             </>
           )}
@@ -539,9 +569,9 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
 
         <div className="flex items-center gap-2">
           {/* Category icons - only show on large size (settings page) */}
-          {size === 'lg' && displayModelData?.capabilities && (
+          {size === 'lg' && currentModel?.capabilities && (
             <div className="flex items-center gap-1">
-              {displayModelData.capabilities.slice(0, 4).map((capability: string, index: number) => (
+              {currentModel.capabilities.slice(0, 4).map((capability: string, index: number) => (
                 <div
                   key={index}
                   className={`p-1 rounded-md ${getCapabilityColor(capability)}`}
@@ -565,13 +595,13 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
           {/* Fixed Search Bar */}
           <div className="flex-shrink-0 p-2 border-b border-border/50 rounded-t-2xl bg-card">
             <div className="relative">
-              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <SearchIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-foreground/60 hover:text-foreground/80 transition-colors z-10 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Search models..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-1.5 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-foreground placeholder:text-muted-foreground"
+                className="w-full pl-10 pr-4 py-1.5 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-foreground placeholder:text-muted-foreground relative z-0"
               />
             </div>
           </div>

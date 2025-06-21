@@ -409,8 +409,18 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
               <div className="px-4 py-3 pb-2">
                 <Button
                   onClick={onNewChat}
-                  className="w-full bg-gradient-to-b from-blue-600 via-blue-600 to-blue-600 hover:from-blue-700 hover:via-blue-700 hover:to-blue-700 text-white dark:text-black h-10 text-sm font-medium transition-all duration-200 shadow-sm"
-                  style={{ borderRadius: '12px' }}
+                  className="w-full text-white dark:text-black h-10 text-sm font-medium transition-all duration-200 shadow-sm"
+                  style={{ 
+                    borderRadius: '12px',
+                    backgroundColor: '#3D80F6',
+                    border: 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#2563eb';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#3D80F6';
+                  }}
                 >
                   New Chat
                 </Button>
@@ -1130,8 +1140,18 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           <div className="px-4 py-3 pb-2">
             <Button
               onClick={handleNewChat}
-              className="w-full bg-gradient-to-b from-blue-600 via-blue-600 to-blue-600 hover:from-blue-700 hover:via-blue-700 hover:to-blue-700 text-white dark:text-black h-10 text-sm font-medium transition-all duration-200 shadow-sm"
-              style={{ borderRadius: '12px' }}
+              className="w-full text-white dark:text-black h-10 text-sm font-medium transition-all duration-200 shadow-sm"
+              style={{ 
+                borderRadius: '12px',
+                backgroundColor: '#3D80F6',
+                border: 'none'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#2563eb';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#3D80F6';
+              }}
             >
               New Chat
             </Button>
