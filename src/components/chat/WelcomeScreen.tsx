@@ -122,7 +122,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                   {/* Example Prompts Carousel */}
                   <div className="mb-6 sm:mb-8">
                     {/* Desktop: Grid layout */}
-                    <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="hidden md:grid md:grid-cols-1 lg:grid-cols-2 gap-4">
                       {examplePrompts.map((example, index) => {
                         const IconComponent = example.icon;
                         return (
@@ -160,7 +160,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                                 key={index}
                                 onClick={() => handleExampleClick(example.prompt)}
                                 className="group text-left p-4 bg-gradient-to-br from-card/80 to-muted/60 dark:from-slate-800/80 dark:to-slate-700/60 backdrop-blur-sm hover:from-muted/90 hover:to-muted/70 dark:hover:from-slate-700/90 dark:hover:to-slate-600/70 rounded-2xl border border-border/60 hover:border-border/80 shadow-lg shadow-muted/20 hover:shadow-xl hover:shadow-muted/30 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
-                                style={{ width: '240px', flexShrink: 0 }}
+                                style={{ width: '280px', flexShrink: 0 }}
                               >
                                 <div className="flex items-start gap-3">
                                   <div className="text-muted-foreground mt-1 group-hover:text-foreground transition-colors">
