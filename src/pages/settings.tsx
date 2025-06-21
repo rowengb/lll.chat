@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import { ModelSelector, getProviderIcon } from "@/components/ModelSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LoadingDots } from "@/components/LoadingDots";
+import { CustomScrollbar } from "@/components/CustomScrollbar";
 
 import { trpc } from "@/utils/trpc";
 import { useOpenRouterStore } from '@/stores/openRouterStore';
@@ -63,6 +64,8 @@ const SettingsPage: NextPage = () => {
   const deleteApiKeyMutation = trpc.apiKeys.deleteApiKey.useMutation();
   const { data: userPreferences } = trpc.userPreferences.getPreferences.useQuery();
   const { data: allModels } = trpc.models.getModels.useQuery();
+  const { data: favoriteModels = [] } = trpc.models.getFavoriteModels.useQuery();
+  const { data: otherModels = [] } = trpc.models.getOtherModels.useQuery();
   const setDefaultModelMutation = trpc.userPreferences.setDefaultModel.useMutation();
   const setTitleGenerationModelMutation = trpc.userPreferences.setTitleGenerationModel.useMutation();
   const setOpenRouterModeMutation = trpc.userPreferences.setOpenRouterMode.useMutation();
@@ -443,346 +446,401 @@ const SettingsPage: NextPage = () => {
         <link rel="manifest" href="/site.webmanifest" />
       </Head>
       
-      <div className="flex-1 overflow-y-auto">
-        <main className="min-h-screen bg-background">
-          <div className="max-w-4xl mx-auto px-6 py-8 pb-16">
-            <div className="space-y-8">
-              {/* Header */}
-              <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={navigateToWelcome}
-                  className="rounded-full hover:bg-muted p-2"
-                >
-                  <ArrowLeftIcon className="h-4 w-4" />
-                </Button>
-                <div>
-                  <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Manage your API keys, account, and preferences
-                  </p>
-                </div>
+      <div className="flex h-screen bg-background">
+        {/* Mobile Header - visible only on mobile */}
+        <div className="sm:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b border-border">
+          <div className="flex items-center justify-between p-4">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={navigateToWelcome}
+                className="rounded-xl hover:bg-white dark:hover:bg-muted p-2"
+              >
+                <ArrowLeftIcon className="h-4 w-4" />
+              </Button>
+              <h1 className="text-lg font-semibold text-foreground">Settings</h1>
+            </div>
+          </div>
+          
+          {/* Mobile Tab Navigation */}
+          <div className="px-4 pb-3">
+            <nav className="flex gap-2">
+              <button
+                onClick={switchToAccountTab}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium transition-all ${
+                  activeSettingsTab === 'account'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white dark:hover:bg-muted'
+                }`}
+                style={{ borderRadius: '12px' }}
+              >
+                <UserIcon className="h-4 w-4" />
+                Account
+              </button>
+              <button
+                onClick={switchToApiKeysTab}
+                className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium transition-all ${
+                  activeSettingsTab === 'api-keys'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white dark:hover:bg-muted'
+                }`}
+                style={{ borderRadius: '12px' }}
+              >
+                <KeyIcon className="h-4 w-4" />
+                API Keys
+              </button>
+            </nav>
+          </div>
+        </div>
+
+        {/* Desktop Sidebar - hidden on mobile */}
+        <div className="hidden sm:flex flex-shrink-0 bg-gray-100 dark:bg-card border-r border-border w-72">
+          <div className="flex flex-col h-full w-full">
+            {/* Sidebar Header */}
+            <div className="flex items-center gap-3 p-6 border-b border-border">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={navigateToWelcome}
+                className="rounded-xl hover:bg-white dark:hover:bg-muted p-2"
+              >
+                <ArrowLeftIcon className="h-4 w-4" />
+              </Button>
+              <div>
+                <h1 className="text-lg font-semibold text-foreground">Settings</h1>
+                <p className="text-xs text-muted-foreground">
+                  Manage your preferences
+                </p>
               </div>
+            </div>
 
-              {/* Tab Navigation */}
-              <div className="bg-card rounded-2xl border border-border shadow-sm">
-                <div className="p-6 pb-0">
-                  <nav className="flex space-x-2 bg-muted rounded-xl p-1" aria-label="Tabs">
-                    <button
-                      onClick={switchToAccountTab}
-                      className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-all ${
-                        activeSettingsTab === 'account'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <UserIcon className="h-4 w-4" />
-                        Account
-                      </div>
-                    </button>
-                    <button
-                      onClick={switchToApiKeysTab}
-                      className={`flex-1 py-2 px-4 rounded-lg font-medium text-sm transition-all ${
-                        activeSettingsTab === 'api-keys'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <KeyIcon className="h-4 w-4" />
-                        API Keys
-                      </div>
-                    </button>
-                  </nav>
-                </div>
+            {/* Navigation Tabs */}
+            <div className="flex-1 p-4">
+              <nav className="space-y-2">
+                <button
+                  onClick={switchToAccountTab}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all ${
+                    activeSettingsTab === 'account'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-white dark:hover:bg-muted'
+                  }`}
+                  style={{ borderRadius: '12px' }}
+                >
+                  <UserIcon className="h-4 w-4" />
+                  Account
+                </button>
+                <button
+                  onClick={switchToApiKeysTab}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all ${
+                    activeSettingsTab === 'api-keys'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-white dark:hover:bg-muted'
+                  }`}
+                  style={{ borderRadius: '12px' }}
+                >
+                  <KeyIcon className="h-4 w-4" />
+                  API Keys
+                </button>
+              </nav>
+            </div>
+          </div>
+        </div>
 
-                {/* Tab Content */}
-                <div className="p-6">
-                  {activeSettingsTab === 'account' ? (
-                    <div className="space-y-6">
-                      {/* Account Content */}
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h2 className="text-lg font-medium text-foreground">Account Settings</h2>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Manage your account settings and preferences
-                          </p>
-                        </div>
-                        <SignOutButton>
-                          <Button variant="outline" size="sm" className="flex items-center gap-2">
-                            <LogOutIcon className="h-4 w-4" />
-                            Sign Out
-                          </Button>
-                        </SignOutButton>
-                      </div>
-
-                      {/* Theme Toggle */}
-                      <div className="pt-6 border-t border-border">
-                        <ThemeToggle />
-                      </div>
-
-                      {/* Profile Management */}
-                      <div className="pt-6 border-t border-border">
-                        <div className="mb-4">
-                          <h3 className="text-lg font-medium text-foreground mb-2">Profile Management</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Manage your profile, security settings, and connected accounts
-                          </p>
-                        </div>
-                        
-                        <div className="w-full">
-                          <UserProfile 
-                            routing="hash"
-                            appearance={{
-                              elements: {
-                                rootBox: {
-                                  boxShadow: "none !important",
-                                  width: "100%",
-                                  maxWidth: "none",
-                                  border: "1px solid hsl(var(--border))",
-                                  borderRadius: "0.75rem"
-                                },
-                                card: {
-                                  boxShadow: "none !important",
-                                  width: "100%",
-                                  maxWidth: "none",
-                                  border: "none"
-                                },
-                                cardBox: {
-                                  boxShadow: "none !important",
-                                  width: "100%",
-                                  maxWidth: "none",
-                                  border: "none"
-                                },
-                                main: {
-                                  boxShadow: "none !important",
-                                  width: "100%",
-                                  border: "none"
-                                }
-                              }
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6">
-                      {/* API Keys Content */}
-                      <div>
-                        <div className="mb-2">
-                          <h2 className="text-lg font-medium text-foreground">API Keys</h2>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-6">
-                          Configure your API keys for different AI providers
-                        </p>
-                      </div>
-
-                      {/* Mode Toggle */}
-                      <div className="p-4 bg-muted/50 border border-border rounded-xl">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 flex items-center gap-3">
-                            {useOpenRouter && (
-                              <OpenRouterAvatar size={32} />
-                            )}
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Scrollable Content */}
+          <div className="flex-1 min-h-0 pt-32 sm:pt-0">
+            <CustomScrollbar className="h-full">
+              <main className="bg-background">
+                <div className="px-4 sm:px-8 py-4 sm:py-8 pb-16">
+                  <div className="max-w-4xl">
+                    <div className="p-3 sm:p-6">
+                      {activeSettingsTab === 'account' ? (
+                        <div className="space-y-4 sm:space-y-4">
+                          {/* Header with Sign Out Button */}
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                             <div>
-                              <h3 className="text-sm font-medium text-foreground mb-1">
-                                {useOpenRouter ? 'OpenRouter Mode' : 'Individual Provider Mode'}
-                              </h3>
-                              <p className="text-xs text-muted-foreground">
-                                {useOpenRouter 
-                                  ? 'Use one OpenRouter key to access all supported models' 
-                                  : 'Use individual API keys for each provider'
-                                }
+                              <h2 className="text-lg font-medium text-foreground">Account Settings</h2>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Manage your account settings and preferences
+                              </p>
+                            </div>
+                            <SignOutButton>
+                              <Button variant="outline" size="sm" className="flex items-center gap-2 w-full sm:w-auto justify-center">
+                                <LogOutIcon className="h-4 w-4" />
+                                Sign Out
+                              </Button>
+                            </SignOutButton>
+                          </div>
+
+                          {/* Divider */}
+                          <div className="border-t border-border"></div>
+
+                          {/* Theme Toggle */}
+                          <div className="pt-2 sm:pt-6">
+                            <ThemeToggle />
+                          </div>
+
+                          {/* Profile Management */}
+                          <div className="pt-2 sm:pt-6 border-t border-border">
+                            <div className="mb-4">
+                              <h4 className="text-lg font-medium text-foreground mb-2">Profile Management</h4>
+                              <p className="text-sm text-muted-foreground">
+                                Manage your profile, security settings, and connected accounts
+                              </p>
+                            </div>
+                            
+                            <div className="w-full">
+                              <UserProfile 
+                                routing="hash"
+                                appearance={{
+                                  elements: {
+                                    rootBox: {
+                                      boxShadow: "none !important",
+                                      width: "100%",
+                                      maxWidth: "none",
+                                      border: "1px solid hsl(var(--border))",
+                                      borderRadius: "0.75rem"
+                                    },
+                                    card: {
+                                      boxShadow: "none !important",
+                                      width: "100%",
+                                      maxWidth: "none",
+                                      border: "none"
+                                    },
+                                    cardBox: {
+                                      boxShadow: "none !important",
+                                      width: "100%",
+                                      maxWidth: "none",
+                                      border: "none"
+                                    },
+                                    main: {
+                                      boxShadow: "none !important",
+                                      width: "100%",
+                                      border: "none"
+                                    }
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 sm:space-y-6">
+                          {/* API Keys Content */}
+                          <div>
+                            <h2 className="text-lg font-medium text-foreground">API Keys</h2>
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Configure your API keys for different AI providers
+                            </p>
+                          </div>
+
+                          {/* Divider */}
+                          <div className="border-t border-border"></div>
+
+                          {/* Mode Toggle */}
+                          <div className="p-3 sm:p-4 bg-muted/50 border border-border rounded-xl">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                              <div className="flex-1">
+                                <h3 className="text-sm font-medium text-foreground mb-1">API Key Mode</h3>
+                                <p className="text-xs text-muted-foreground">
+                                  Choose between individual API keys or OpenRouter for unified access
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3 justify-center sm:justify-end">
+                                <span className={`text-xs font-medium ${!useOpenRouter ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                  Individual
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleMode(!useOpenRouter)}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                                    useOpenRouter ? 'bg-primary' : 'bg-muted-foreground/20'
+                                  }`}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                      useOpenRouter ? 'translate-x-6' : 'translate-x-1'
+                                    }`}
+                                  />
+                                </button>
+                                <span className={`text-xs font-medium ${useOpenRouter ? 'text-foreground' : 'text-muted-foreground'}`}>
+                                  OpenRouter
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-4 sm:space-y-6">
+                            {(Object.keys(apiKeys) as Array<keyof ApiKeys>)
+                              .filter(provider => useOpenRouter ? provider === 'openrouter' : provider !== 'openrouter')
+                              .map((provider) => (
+                              <div key={provider} className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <label className="text-sm font-medium text-foreground">
+                                    {getProviderInfo(provider).name}
+                                  </label>
+                                  {apiKeys[provider] && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleClear(provider)}
+                                      className="text-destructive hover:text-destructive hover:bg-destructive/10 p-2 h-8 w-8"
+                                    >
+                                      <TrashIcon className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                                
+                                <div className="relative">
+                                  <Input
+                                    type={showKeys[provider] ? "text" : "password"}
+                                    placeholder={getProviderInfo(provider).placeholder}
+                                    value={showKeys[provider] ? apiKeys[provider] : maskKey(apiKeys[provider])}
+                                    onChange={(e) => handleKeyChange(provider, e.target.value)}
+                                    onFocus={() => setShowKeys(prev => ({ ...prev, [provider]: true }))}
+                                    onBlur={() => setShowKeys(prev => ({ ...prev, [provider]: false }))}
+                                    className="pr-12 bg-muted border-border focus:bg-background focus:border-ring transition-colors h-12 text-base sm:text-sm sm:h-10"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleKeyVisibility(provider)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                                  >
+                                    {showKeys[provider] ? (
+                                      <EyeOffIcon className="h-4 w-4" />
+                                    ) : (
+                                      <EyeIcon className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            
+                            <div className="pt-4 border-t border-border">
+                              <Button 
+                                onClick={handleSave}
+                                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-3 px-4 transition-colors h-12 text-base font-medium"
+                              >
+                                {saved ? (
+                                  <span className="flex items-center gap-2">
+                                    <CheckIcon className="h-4 w-4" />
+                                    Saved!
+                                  </span>
+                                ) : (
+                                  "Save API Keys"
+                                )}
+                              </Button>
+                              
+                              <p className="text-xs text-muted-foreground mt-3 text-center px-2">
+                                API keys are encrypted and stored securely in the database.
                               </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`text-xs font-medium ${!useOpenRouter ? 'text-foreground' : 'text-muted-foreground'}`}>
-                              Individual
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleMode(!useOpenRouter)}
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                                useOpenRouter ? 'bg-primary' : 'bg-muted-foreground/20'
-                              }`}
-                            >
-                              <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                  useOpenRouter ? 'translate-x-6' : 'translate-x-1'
-                                }`}
-                              />
-                            </button>
-                            <span className={`text-xs font-medium ${useOpenRouter ? 'text-foreground' : 'text-muted-foreground'}`}>
-                              OpenRouter
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-6">
-                        {(Object.keys(apiKeys) as Array<keyof ApiKeys>)
-                          .filter(provider => useOpenRouter ? provider === 'openrouter' : provider !== 'openrouter')
-                          .map((provider) => (
-                          <div key={provider} className="space-y-3">
-                            <div className="flex items-center justify-between">
-                              <label className="text-sm font-medium text-foreground">
-                                {getProviderInfo(provider).name}
-                              </label>
-                              {apiKeys[provider] && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleClear(provider)}
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10 p-1"
-                                >
-                                  <TrashIcon className="h-4 w-4" />
-                                </Button>
-                              )}
+
+                          {/* Default Chat Model Section */}
+                          <div className="pt-6 border-t border-border">
+                            <div className="mb-4">
+                              <h3 className="text-lg font-medium text-foreground mb-2 flex items-center gap-2">
+                                <MessageSquare className="h-5 w-5 text-black dark:text-primary" />
+                                Default Chat Model
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                Choose your preferred AI model for new conversations
+                              </p>
                             </div>
                             
-                            <div className="relative">
-                              <Input
-                                type={showKeys[provider] ? "text" : "password"}
-                                placeholder={getProviderInfo(provider).placeholder}
-                                value={showKeys[provider] ? apiKeys[provider] : maskKey(apiKeys[provider])}
-                                onChange={(e) => handleKeyChange(provider, e.target.value)}
-                                onFocus={() => setShowKeys(prev => ({ ...prev, [provider]: true }))}
-                                onBlur={() => setShowKeys(prev => ({ ...prev, [provider]: false }))}
-                                className="pr-12 bg-muted border-border focus:bg-background focus:border-ring transition-colors"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => toggleKeyVisibility(provider)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                              >
-                                {showKeys[provider] ? (
-                                  <EyeOffIcon className="h-4 w-4" />
-                                ) : (
-                                  <EyeIcon className="h-4 w-4" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        
-                        <div className="pt-4 border-t border-border">
-                          <Button 
-                            onClick={handleSave}
-                            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-2 px-4 transition-colors"
-                          >
-                            {saved ? (
-                              <span className="flex items-center gap-2">
-                                <CheckIcon className="h-4 w-4" />
-                                Saved!
-                              </span>
-                            ) : (
-                              "Save API Keys"
-                            )}
-                          </Button>
-                          
-                          <p className="text-xs text-muted-foreground mt-3 text-center">
-                            API keys are encrypted and stored securely in the database.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Default Chat Model Section */}
-                      <div className="pt-6 border-t border-border">
-                        <div className="mb-4">
-                          <h3 className="text-lg font-medium text-foreground mb-2 flex items-center gap-2">
-                            <MessageSquare className="h-5 w-5 text-black dark:text-primary" />
-                            Default Chat Model
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            Choose your preferred AI model for new conversations
-                          </p>
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <div className="px-4 py-2 border border-border rounded-xl bg-muted">
-                            <ModelSelector
-                              selectedModel={selectedDefaultModel || ""}
-                              onModelChange={handleSetDefaultModel}
-                              size="lg"
-                            />
-                          </div>
-                          
-                          {selectedDefaultModel && (
-                            <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl">
-                              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                                <CheckIcon className="h-4 w-4" />
-                                <span className="text-sm font-medium">
-                                  {defaultModelSaved ? "Default model updated!" : "Default model set"}
-                                </span>
+                            <div className="space-y-4">
+                              <div className="px-3 sm:px-4 py-3 sm:py-2 border border-border rounded-xl bg-muted">
+                                <ModelSelector
+                                  selectedModel={selectedDefaultModel || ""}
+                                  onModelChange={handleSetDefaultModel}
+                                  size="lg"
+                                  favoriteModels={favoriteModels}
+                                  otherModels={otherModels}
+                                  apiKeys={dbApiKeys}
+                                />
                               </div>
-                              <button
-                                onClick={handleClearDefaultModel}
-                                className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-sm underline"
-                              >
-                                Clear
-                              </button>
+                              
+                              {selectedDefaultModel && (
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl">
+                                  <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                                    <CheckIcon className="h-4 w-4" />
+                                    <span className="text-sm font-medium">
+                                      {defaultModelSaved ? "Default model updated!" : "Default model set"}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={handleClearDefaultModel}
+                                    className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-sm underline self-start sm:self-auto"
+                                  >
+                                    Clear
+                                  </button>
+                                </div>
+                              )}
+                              
+                              <p className="text-xs text-muted-foreground px-1">
+                                Only models with API keys are available for selection. When no default is set, the cheapest available model will be used automatically.
+                              </p>
                             </div>
-                          )}
-                          
-                          <p className="text-xs text-muted-foreground">
-                            Only models with API keys are available for selection. When no default is set, the cheapest available model will be used automatically.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Title Generation Model Section */}
-                      <div className="pt-6 border-t border-border">
-                        <div className="mb-4">
-                          <h3 className="text-lg font-medium text-foreground mb-2 flex items-center gap-2">
-                            <TypeIcon className="h-5 w-5 text-black dark:text-primary" />
-                            Default Title Generation Model
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
-                            Choose the AI model used to automatically generate chat titles
-                          </p>
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <div className="px-4 py-2 border border-border rounded-xl bg-muted">
-                            <ModelSelector
-                              selectedModel={selectedTitleGenerationModel || "gpt-4o-mini"}
-                              onModelChange={handleSetTitleGenerationModel}
-                              size="lg"
-                            />
                           </div>
-                          
-                          {selectedTitleGenerationModel && (
-                            <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl">
-                              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                                <CheckIcon className="h-4 w-4" />
-                                <span className="text-sm font-medium">
-                                  {titleGenerationModelSaved ? "Title generation model updated!" : "Title generation model set"}
-                                </span>
-                              </div>
-                              <button
-                                onClick={handleClearTitleGenerationModel}
-                                className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-sm underline"
-                              >
-                                Reset to Default
-                              </button>
+
+                          {/* Title Generation Model Section */}
+                          <div className="pt-6 border-t border-border">
+                            <div className="mb-4">
+                              <h3 className="text-lg font-medium text-foreground mb-2 flex items-center gap-2">
+                                <TypeIcon className="h-5 w-5 text-black dark:text-primary" />
+                                Default Title Generation Model
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                Choose the AI model used to automatically generate chat titles
+                              </p>
                             </div>
-                          )}
-                          
-                          <p className="text-xs text-muted-foreground">
-                            This model will be used to automatically generate descriptive titles for your conversations. Defaults to GPT-4o Mini for cost efficiency.
-                          </p>
+                            
+                            <div className="space-y-4">
+                              <div className="px-3 sm:px-4 py-3 sm:py-2 border border-border rounded-xl bg-muted">
+                                <ModelSelector
+                                  selectedModel={selectedTitleGenerationModel || "gpt-4o-mini"}
+                                  onModelChange={handleSetTitleGenerationModel}
+                                  size="lg"
+                                  favoriteModels={favoriteModels}
+                                  otherModels={otherModels}
+                                  apiKeys={dbApiKeys}
+                                />
+                              </div>
+                              
+                              {selectedTitleGenerationModel && (
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl">
+                                  <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                                    <CheckIcon className="h-4 w-4" />
+                                    <span className="text-sm font-medium">
+                                      {titleGenerationModelSaved ? "Title generation model updated!" : "Title generation model set"}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={handleClearTitleGenerationModel}
+                                    className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-sm underline self-start sm:self-auto"
+                                  >
+                                    Reset to Default
+                                  </button>
+                                </div>
+                              )}
+                              
+                              <p className="text-xs text-muted-foreground px-1">
+                                This model will be used to automatically generate descriptive titles for your conversations. Defaults to GPT-4o Mini for cost efficiency.
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
-              </div>
-            </div>
+              </main>
+            </CustomScrollbar>
           </div>
-        </main>
+        </div>
       </div>
     </>
   );
