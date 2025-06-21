@@ -422,6 +422,7 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
                     e.currentTarget.style.backgroundColor = '#3D80F6';
                   }}
                 >
+                  <PlusIcon className="h-4 w-4 mr-2" />
                   New Chat
                 </Button>
               </div>
@@ -1153,6 +1154,7 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
                 e.currentTarget.style.backgroundColor = '#3D80F6';
               }}
             >
+              <PlusIcon className="h-4 w-4 mr-2" />
               New Chat
             </Button>
           </div>
