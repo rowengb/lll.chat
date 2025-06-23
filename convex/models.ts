@@ -667,13 +667,14 @@ export const getModelById = query({
 export const addOpenRouterModelIds = mutation({
   args: {},
   handler: async (ctx) => {
-    // Define OpenRouter model ID mappings
+    // Define comprehensive OpenRouter model ID mappings
     const openRouterMappings: Record<string, string> = {
       // Gemini models
       "gemini-2.5-pro-preview-06-05": "google/gemini-2.5-pro-preview",
       "gemini-2.5-flash-preview-05-20": "google/gemini-2.5-flash-preview",
-      "gemini-2.0-flash": "google/gemini-2.0-flash",
-      "gemini-2.0-flash-lite": "google/gemini-2.0-flash-lite",
+      "gemini-2.5-flash-preview-05-20-thinking": "google/gemini-2.5-flash-preview-05-20:thinking",
+      "gemini-2.0-flash": "google/gemini-2.0-flash-001",
+      "gemini-2.0-flash-lite": "google/gemini-2.0-flash-lite-001",
       "gemini-1.5-pro": "google/gemini-1.5-pro",
       "gemini-1.5-flash": "google/gemini-1.5-flash",
       
@@ -685,26 +686,48 @@ export const addOpenRouterModelIds = mutation({
       "o4-mini": "openai/o4-mini",
       "gpt-4.1": "openai/gpt-4.1",
       "gpt-4.1-mini": "openai/gpt-4.1-mini",
+      "gpt-4.1-nano": "openai/gpt-4.1-nano",
+      "o3-mini": "openai/o3-mini",
+      "o3": "openai/o3",
+      "gpt-4.5-preview": "openai/gpt-4.5-preview",
       
       // Anthropic models
-      "claude-sonnet-4-20250514": "anthropic/claude-3.5-sonnet",
-      "claude-sonnet-4-20250514-reasoning": "anthropic/claude-3.5-sonnet",
-      "claude-3.5-sonnet": "anthropic/claude-3.5-sonnet",
+      "claude-sonnet-4-20250514": "anthropic/claude-4-sonnet",
+      "claude-sonnet-4-20250514-reasoning": "anthropic/claude-4-sonnet:thinking",
+      "claude-3-5-sonnet-20240620": "anthropic/claude-3.5-sonnet-20240620",
+      "claude-3-7-sonnet-20250219": "anthropic/claude-3.7-sonnet",
+      "claude-3-7-sonnet-20250219-reasoning": "anthropic/claude-3.7-sonnet:thinking",
+      "claude-opus-4-20250514": "anthropic/claude-4-opus",
+      "claude-3.5-sonnet": "anthropic/claude-3.5-sonnet-20240620",
       "claude-3-opus": "anthropic/claude-3-opus",
       "claude-3-haiku": "anthropic/claude-3-haiku",
       
       // DeepSeek models
-      "deepseek-r1-llama-70b": "deepseek/deepseek-r1-llama-70b",
+      "deepseek-r1-llama-70b": "deepseek/deepseek-r1-distill-llama-70b",
+      "deepseek-r1-0528": "deepseek/deepseek-r1:free",
+      "deepseek-r1-distilled-qwen-32b": "deepseek/deepseek-r1-distill-qwen-32b",
+      "deepseek-v3-0324": "deepseek/deepseek-chat-v3-0324",
       "deepseek-chat": "deepseek/deepseek-chat",
       "deepseek-coder": "deepseek/deepseek-coder",
+      "accounts/fireworks/models/deepseek-v3": "deepseek/deepseek-chat-v3-0324",
       
       // Meta models
+      "meta-llama/Llama-3.3-70B-Instruct-Turbo": "meta-llama/llama-3.3-70b-instruct",
+      "meta-llama/Llama-4-Scout-17B-16E-Instruct": "meta-llama/llama-4-scout",
+      "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8": "meta-llama/llama-4-maverick",
       "llama-3.3-70b": "meta-llama/llama-3.3-70b-instruct",
       "llama-3.1-405b": "meta-llama/llama-3.1-405b-instruct",
       
-      // Other models that might be available on OpenRouter
+      // X.AI models
       "grok-3-beta": "x-ai/grok-3-beta",
       "grok-3-mini-beta": "x-ai/grok-3-mini-beta",
+      
+      // Qwen models (these should already be set but included for completeness)
+      "Qwen/QwQ-32B": "qwen/qwq-32b-preview",
+      "qwen2.5-32b-instruct": "qwen/qwen-2.5-72b-instruct",
+      
+      // DeepSeek OpenRouter specific models
+      "deepseek/deepseek-r1": "deepseek/deepseek-r1:free",
     };
 
     // Update models with OpenRouter IDs
@@ -713,11 +736,12 @@ export const addOpenRouterModelIds = mutation({
 
     for (const model of allModels) {
       const openRouterModelId = openRouterMappings[model.id];
-      if (openRouterModelId) {
+      if (openRouterModelId && !model.openrouterModelId) {
         await ctx.db.patch(model._id, {
           openrouterModelId: openRouterModelId
         });
         updatedCount++;
+        console.log(`Updated ${model.id} with OpenRouter ID: ${openRouterModelId}`);
       }
     }
 
@@ -953,7 +977,7 @@ export const updateModelsWithCorrectData = mutation({
         description: "Advanced reasoning model",
         provider: "openai",
         apiUrl: "https://api.openai.com/v1/",
-        capabilities: ["reasoning"],
+        capabilities: ["vision", "reasoning"],
         isFavorite: false,
         isActive: true,
         order: 19,

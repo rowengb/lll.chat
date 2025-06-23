@@ -74,6 +74,25 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
 CLERK_SECRET_KEY=your_clerk_secret_key
 ```
 
+### Optional Environment Variables
+
+```env
+# Global Logging Control
+DISABLE_DEBUG_LOGS=true           # Disable all debug logs (recommended for production)
+DISABLE_ERROR_LOGS=false          # Disable error logs (not recommended)
+DISABLE_WARN_LOGS=false           # Disable warning logs
+NODE_ENV=production               # Automatically disables debug logs
+
+# AI Development
+AI_MODE=mock                      # Use mock AI responses for testing
+```
+
+**Production Logging:**
+
+- Set `DISABLE_DEBUG_LOGS=true` or `NODE_ENV=production` to hide debug logs from users
+- Errors and warnings are still logged unless explicitly disabled
+- All AI streaming debug information will be hidden from production console
+
 ### Setting Up Services
 
 #### 1. Convex Database

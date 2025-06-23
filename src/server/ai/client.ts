@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../convex/_generated/api";
+import { debugLog, errorLog, warnLog } from '@/utils/logger';
 
 // Initialize Convex client for server-side operations
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -97,7 +98,7 @@ class OpenAIClient implements AIClient {
     
     const client = new OpenAI(clientConfig);
 
-    console.log(`🔍 [${this.provider?.toUpperCase() || 'OPENAI'}-DEBUG] Creating completion with model: ${params.model || "gpt-3.5-turbo"}, stream: ${params.stream}`);
+    debugLog(`🔍 [${this.provider?.toUpperCase() || 'OPENAI'}-DEBUG] Creating completion with model: ${params.model || "gpt-3.5-turbo"}, stream: ${params.stream}`);
     
     const completion = await client.chat.completions.create({
       model: params.model || "gpt-3.5-turbo",
@@ -106,7 +107,7 @@ class OpenAIClient implements AIClient {
       stream_options: params.stream ? { include_usage: true } : undefined,
     });
     
-    console.log(`🔍 [${this.provider?.toUpperCase() || 'OPENAI'}-DEBUG] Completion request sent successfully`);
+    debugLog(`🔍 [${this.provider?.toUpperCase() || 'OPENAI'}-DEBUG] Completion request sent successfully`);
 
     if (params.stream) {
       return this.createOpenAIStream(completion as any, this.provider);
@@ -121,7 +122,7 @@ class OpenAIClient implements AIClient {
     let outputTokens = 0;
     let contentChunks = 0;
 
-    console.log(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Starting stream processing...`);
+    debugLog(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Starting stream processing...`);
 
     for await (const chunk of stream) {
       const content = chunk.choices[0]?.delta?.content;
@@ -130,7 +131,7 @@ class OpenAIClient implements AIClient {
       
       // Debug what we're actually getting (only log chunks with content or usage)
       if (contentChunks < 3 && (content || usage)) {
-        console.log(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Chunk ${contentChunks + 1} - Content: "${content}", Usage: ${JSON.stringify(usage)}, FinishReason: ${finishReason}`);
+        debugLog(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Chunk ${contentChunks + 1} - Content: "${content}", Usage: ${JSON.stringify(usage)}, FinishReason: ${finishReason}`);
       }
 
       // Track token usage when it comes in (usually at the end)
@@ -139,7 +140,7 @@ class OpenAIClient implements AIClient {
         outputTokens = usage.completion_tokens || 0;
         totalTokens = usage.total_tokens || 0;
         
-        console.log(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Usage chunk received - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${totalTokens}`);
+        debugLog(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Usage chunk received - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${totalTokens}`);
         
         // Send a token update chunk
         yield {
@@ -323,7 +324,7 @@ class GeminiClient implements AIClient {
     const timeSinceLastRequest = now - GeminiClient.lastRequestTime;
     if (timeSinceLastRequest < GeminiClient.MIN_REQUEST_INTERVAL) {
       const waitTime = GeminiClient.MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-      console.log(`⏱️ [GEMINI] Rate limiting: waiting ${waitTime}ms before request`);
+      debugLog(`⏱️ [GEMINI] Rate limiting: waiting ${waitTime}ms before request`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
     GeminiClient.lastRequestTime = Date.now();
@@ -345,7 +346,7 @@ class GeminiClient implements AIClient {
         if (response.status === 429) {
           // Rate limited - wait and retry
           const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff: 1s, 2s, 4s
-          console.log(`🔄 [GEMINI] Rate limited, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`);
+          warnLog(`🔄 [GEMINI] Rate limited, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
           continue;
         }
@@ -360,10 +361,10 @@ class GeminiClient implements AIClient {
         // Log grounding metadata if available
         if (data.candidates[0]?.groundingMetadata) {
           const groundingMetadata = data.candidates[0].groundingMetadata;
-          console.log(`🔍 [GEMINI] Response grounded with ${groundingMetadata.groundingChunks?.length || 0} sources`);
+          debugLog(`🔍 [GEMINI] Response grounded with ${groundingMetadata.groundingChunks?.length || 0} sources`);
           
           if (groundingMetadata.searchEntryPoint?.renderedContent) {
-            console.log(`🔗 [GEMINI] Search suggestions available`);
+            debugLog(`🔗 [GEMINI] Search suggestions available`);
           }
         }
 
@@ -381,7 +382,7 @@ class GeminiClient implements AIClient {
         
         // Wait before retrying
         const waitTime = Math.pow(2, attempt) * 1000;
-        console.log(`⚠️ [GEMINI] Request failed, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries}): ${error}`);
+        warnLog(`⚠️ [GEMINI] Request failed, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries}): ${error}`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }
