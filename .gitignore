@@ -41,4 +41,5 @@ next-env.d.ts
 
 # docker
 docker-compose.override.yml 
-.env.local.env.dev
+.env.local
+.env.dev
