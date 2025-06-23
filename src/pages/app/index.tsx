@@ -83,10 +83,13 @@ const App: NextPage = () => {
     setNewChatModelChoice(modelId);
   };
 
-  // Redirect to home if not authenticated
+  // Redirect to home if not authenticated - but add delay to prevent rapid redirects
   useEffect(() => {
     if (isLoaded && !user) {
-      router.replace('/home');
+      const timer = setTimeout(() => {
+        router.replace('/home');
+      }, 500); // Small delay to prevent rapid redirect loops
+      return () => clearTimeout(timer);
     }
   }, [isLoaded, user, router]);
 

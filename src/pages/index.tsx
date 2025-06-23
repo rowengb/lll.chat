@@ -7,19 +7,21 @@ const Home: NextPage = () => {
   const { user, isLoaded } = useUser();
   const router = useRouter();
 
+  // Handle redirects based on authentication state
   useEffect(() => {
     if (isLoaded) {
-    if (user) {
-        // User is authenticated, redirect to app
-        router.replace('/app');
-      } else {
-        // User is not authenticated, redirect to home page
-        router.replace('/home');
-      }
+      const timer = setTimeout(() => {
+        if (user) {
+          router.replace('/app');
+        } else {
+          router.replace('/home');
+        }
+      }, 200);
+      return () => clearTimeout(timer);
     }
   }, [isLoaded, user, router]);
 
-  // Show minimal loading while redirecting
+  // Show loading while checking auth
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex items-center space-x-3">
@@ -29,7 +31,7 @@ const Home: NextPage = () => {
           <div className="h-2.5 w-2.5 animate-pulse rounded-full bg-primary/60 animation-delay-200"></div>
         </div>
         <span className="text-base text-foreground/80 animate-pulse">Loading...</span>
-          </div>
+      </div>
     </div>
   );
 };

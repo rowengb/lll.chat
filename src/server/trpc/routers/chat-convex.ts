@@ -139,6 +139,8 @@ export const chatConvexRouter = createTRPCRouter({
         ...msg,
         id: msg._id,
         threadId: msg.threadId,
+        isError: msg.isError || false,
+        rawErrorData: msg.rawErrorData,
       }));
     }),
 
@@ -205,6 +207,65 @@ export const chatConvexRouter = createTRPCRouter({
           model: input.model,
           isGrounded: input.isGrounded,
         },
+      };
+    }),
+
+  saveUserMessage: protectedProcedure
+    .input(z.object({ 
+      threadId: z.string(),
+      content: z.string(),
+      attachments: z.array(z.string()).optional(), // Array of file IDs
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      const messageId = await convex.mutation(api.messages.createMessage, {
+        content: input.content,
+        role: "user",
+        threadId: input.threadId as Id<"threads">,
+        userId: convexUser._id,
+        attachments: input.attachments?.map(id => id as Id<"files">),
+      });
+
+      return { 
+        id: messageId,
+        content: input.content,
+        role: "user",
+      };
+    }),
+
+  saveErrorMessage: protectedProcedure
+    .input(z.object({ 
+      threadId: z.string(),
+      content: z.string(),
+      rawErrorData: z.any().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      const messageId = await convex.mutation(api.messages.createMessage, {
+        content: input.content,
+        role: "assistant",
+        threadId: input.threadId as Id<"threads">,
+        userId: convexUser._id,
+        isError: true,
+        rawErrorData: input.rawErrorData,
+      });
+
+      return { 
+        id: messageId,
+        content: input.content,
+        role: "assistant",
+        isError: true,
+        rawErrorData: input.rawErrorData,
       };
     }),
 

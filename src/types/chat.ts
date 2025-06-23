@@ -25,6 +25,7 @@ export interface Message {
   imageUrl?: string;
   imageFileId?: string;
   stoppedByUser?: boolean;
+  rawErrorData?: any; // Store raw API error response for debugging
 }
 
 export interface GroundingSource {

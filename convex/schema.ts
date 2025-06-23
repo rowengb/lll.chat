@@ -52,6 +52,8 @@ export default defineSchema({
     imageFileId: v.optional(v.id("files")), // Stored image file ID in Convex
     imageData: v.optional(v.string()), // Base64 encoded image data
     stoppedByUser: v.optional(v.boolean()), // Flag to indicate if stream was stopped by user
+    isError: v.optional(v.boolean()), // Flag to indicate if this is an error message
+    rawErrorData: v.optional(v.any()), // Raw error data for debugging
   }).index("by_thread", ["threadId"]).index("by_user", ["userId"]),
 
   files: defineTable({

@@ -71,6 +71,8 @@ export const useChatData = (threadId: string | null) => {
   const generateTitle = trpc.chat.generateTitle.useMutation();
   const sendMessage = trpc.chat.sendMessage.useMutation();
   const saveStreamedMessage = trpc.chat.saveStreamedMessage.useMutation();
+  const saveUserMessage = trpc.chat.saveUserMessage.useMutation();
+  const saveErrorMessage = trpc.chat.saveErrorMessage.useMutation();
   const deleteMessage = trpc.chat.deleteMessage.useMutation();
   const deleteMessagesFromPoint = trpc.chat.deleteMessagesFromPoint.useMutation();
   const saveAssistantMessage = trpc.chat.saveAssistantMessage.useMutation();
@@ -94,6 +96,8 @@ export const useChatData = (threadId: string | null) => {
     generateTitle,
     sendMessage,
     saveStreamedMessage,
+    saveUserMessage,
+    saveErrorMessage,
     deleteMessage,
     deleteMessagesFromPoint,
     saveAssistantMessage,

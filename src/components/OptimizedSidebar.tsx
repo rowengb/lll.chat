@@ -22,33 +22,32 @@ const OptimizedSidebarComponent = ({
   onNewChat,
 }: OptimizedSidebarProps) => {
   const {
-    threads,
-    prefetchThread,
-    handleMouseDown,
-    handleHover,
-    registerThreadElement,
+    handleThreadHover,
+    handleThreadMouseDown,
+    observeVisibleThreads,
   } = useChatPrefetching({
-    prefetchOnHover: true,
-    prefetchOnMouseDown: true,
-    aggressivePrefetch: true,
+    enabled: true,
+    aggressiveMode: true,
   });
+
+  // Get threads data
+  const { data: threads } = trpc.chat.getThreads.useQuery();
 
   // Memoized thread items with aggressive optimization
   const threadItems = useMemo(() => {
     if (!threads) return [];
 
-    return threads.map((thread) => (
+    return threads.map((thread: any) => (
       <OptimizedThreadItem
         key={thread.id}
         thread={thread}
         isActive={thread.id === currentThreadId}
         onSelect={onThreadSelect}
-        onMouseDown={handleMouseDown}
-        onHover={handleHover}
-        registerElement={registerThreadElement}
+        onMouseDown={handleThreadMouseDown}
+        onHover={handleThreadHover}
       />
     ));
-  }, [threads, currentThreadId, onThreadSelect, handleMouseDown, handleHover, registerThreadElement]);
+  }, [threads, currentThreadId, onThreadSelect, handleThreadMouseDown, handleThreadHover]);
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
@@ -78,7 +77,6 @@ interface OptimizedThreadItemProps {
   onSelect: (threadId: string) => void;
   onMouseDown: (threadId: string) => void;
   onHover: (threadId: string) => void;
-  registerElement: (element: HTMLElement, threadId: string) => void;
 }
 
 /**
@@ -93,17 +91,8 @@ const OptimizedThreadItem = memo(({
   onSelect,
   onMouseDown,
   onHover,
-  registerElement,
 }: OptimizedThreadItemProps) => {
   const elementRef = useRef<HTMLDivElement>(null);
-
-  // Register for intersection observer
-  React.useEffect(() => {
-    if (elementRef.current) {
-      const cleanup = registerElement(elementRef.current, thread.id);
-      return cleanup;
-    }
-  }, [registerElement, thread.id]);
 
   const handleClick = useCallback(() => {
     onSelect(thread.id);

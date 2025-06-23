@@ -6,6 +6,20 @@ import { createOptimisticAssistantMessage, prepareMessagesForStreaming } from ".
 import { smartFocus } from "../utils/chatHelpers";
 import { performanceMonitor, debounce } from "../utils/performanceOptimizations";
 
+// Utility function to sanitize error data for database storage
+const sanitizeErrorForStorage = (error: any): any => {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      // Preserve any custom properties that might exist
+      ...(error as any).rawErrorData && { rawErrorData: (error as any).rawErrorData }
+    };
+  }
+  return error;
+};
+
 export const useChatStreaming = () => {
   const {
     getMessages,
@@ -194,7 +208,8 @@ export const useChatStreaming = () => {
     updateFileAssociations: any,
     updateThreadMetadata: any,
     generateTitle: any,
-    refetchThreads: any
+    refetchThreads: any,
+    saveErrorMessage?: any
   ) => {
     const streamStartTime = performance.now();
     performanceMonitor.mark(`stream-${threadId}-start`);
@@ -281,7 +296,19 @@ export const useChatStreaming = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorData: any = { status: response.status, statusText: response.statusText };
+        try {
+          const errorText = await response.text();
+          if (errorText) {
+            errorData = { ...errorData, response: JSON.parse(errorText) };
+          }
+        } catch (e) {
+          // Keep basic error data if parsing fails
+        }
+        
+        const error = new Error(`HTTP error! status: ${response.status}`);
+        (error as any).rawErrorData = errorData;
+        throw error;
       }
 
       // Read the streaming response with optimized processing
@@ -297,6 +324,7 @@ export const useChatStreaming = () => {
       let groundingMetadata: GroundingMetadata | undefined = undefined;
       let imageGenerated = false;
       let imageUrl = "";
+      let lineBuffer = ""; // Buffer for incomplete lines
 
       console.log(`[STREAM] Starting to read stream...`);
       const streamReadStart = performance.now();
@@ -310,7 +338,16 @@ export const useChatStreaming = () => {
           }
 
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n').filter(line => line.trim());
+          
+          // Buffer incomplete lines to handle chunks split in middle of JSON
+          lineBuffer += chunk;
+          const allLines = lineBuffer.split('\n');
+          
+          // Keep the last line in buffer (might be incomplete)
+          lineBuffer = allLines.pop() || "";
+          
+          // Process complete lines only
+          const lines = allLines.filter(line => line.trim());
 
           // Update streaming stats
           streamingStatsRef.current.totalBytes += chunk.length;
@@ -322,7 +359,14 @@ export const useChatStreaming = () => {
             if (line.startsWith('f:')) {
               // Metadata (message ID, grounding, etc.)
               try {
-                const metadata = JSON.parse(line.slice(2));
+                const jsonStr = line.slice(2);
+                
+                // Basic check for complete JSON - should start with { and end with }
+                if (!jsonStr.trim().startsWith('{') || !jsonStr.trim().endsWith('}')) {
+                  throw new Error(`Incomplete JSON metadata line: ${jsonStr}`);
+                }
+                
+                const metadata = JSON.parse(jsonStr);
                 if (metadata.messageId) {
                   messageId = metadata.messageId;
                   console.log(`[STREAM] Got message ID: ${messageId}`);
@@ -366,15 +410,73 @@ export const useChatStreaming = () => {
                 if (metadata.error) {
                   console.error(`[STREAM] API Error: ${metadata.error}`);
                   
+                  const errorContent = `**Error**: ${metadata.error}`;
+                  
+                  // Save error message to database if saveErrorMessage is available
+                  if (saveErrorMessage) {
+                    try {
+                      await saveErrorMessage.mutateAsync({
+                        threadId,
+                        content: errorContent,
+                        rawErrorData: metadata
+                      });
+                      console.log('[STREAM] Error message saved to database');
+                    } catch (error) {
+                      console.error('[STREAM] Failed to save error message:', error);
+                    }
+                  }
+                  
                   // Replace the optimistic assistant message with an error message
                   const currentMessages = getMessages(threadId);
                   const updatedMessages = currentMessages.map(msg => {
                     if (msg.id === optimisticAssistantMessage.id) {
                       return {
                         ...msg,
-                        content: `**Error**: ${metadata.error}`,
+                        content: errorContent,
                         isOptimistic: false,
-                        isError: true
+                        isError: true,
+                        rawErrorData: metadata
+                      };
+                    }
+                    return msg;
+                  });
+                  setMessages(threadId, updatedMessages);
+                  
+                  // Clear loading and streaming states
+                  setLoading(null, false);
+                  setStreaming(null, false);
+                  isStreamingRef.current = false;
+                  return; // Exit the stream processing
+                }
+                if (metadata.imageError) {
+                  console.error(`[STREAM] Image Generation Error: ${metadata.imageError}`);
+                  
+                  const errorContent = `**Error**: Image generation failed: ${metadata.imageError}`;
+                  
+                  // Save error message to database if saveErrorMessage is available
+                  if (saveErrorMessage) {
+                    try {
+                      await saveErrorMessage.mutateAsync({
+                        threadId,
+                        content: errorContent,
+                        rawErrorData: metadata
+                      });
+                      console.log('[STREAM] Image error message saved to database');
+                    } catch (error) {
+                      console.error('[STREAM] Failed to save image error message:', error);
+                    }
+                  }
+                  
+                  // Replace the optimistic assistant message with an error message
+                  const currentMessages = getMessages(threadId);
+                  const updatedMessages = currentMessages.map(msg => {
+                    if (msg.id === optimisticAssistantMessage.id) {
+                      return {
+                        ...msg,
+                        content: errorContent,
+                        isOptimistic: false,
+                        isError: true,
+                        rawErrorData: metadata
                       };
                     }
                     return msg;
@@ -389,12 +491,61 @@ export const useChatStreaming = () => {
                 }
               } catch (e) {
                 console.error('[STREAM] Failed to parse metadata:', e);
+                
+                const errorContent = `**Error**: Failed to parse response metadata`;
+                const errorData = { 
+                  parseError: sanitizeErrorForStorage(e), 
+                  rawLine: line 
+                };
+                
+                // Save error message to database if saveErrorMessage is available
+                if (saveErrorMessage) {
+                  try {
+                    await saveErrorMessage.mutateAsync({
+                      threadId,
+                      content: errorContent,
+                      rawErrorData: errorData
+                    });
+                    console.log('[STREAM] Parse error message saved to database');
+                  } catch (error) {
+                    console.error('[STREAM] Failed to save parse error message:', error);
+                  }
+                }
+                
+                // Replace the optimistic assistant message with an error message
+                const currentMessages = getMessages(threadId);
+                const updatedMessages = currentMessages.map(msg => {
+                  if (msg.id === optimisticAssistantMessage.id) {
+                    return {
+                      ...msg,
+                      content: errorContent,
+                      isOptimistic: false,
+                      isError: true,
+                      rawErrorData: errorData
+                    };
+                  }
+                  return msg;
+                });
+                setMessages(threadId, updatedMessages);
+                
+                // Clear loading and streaming states
+                setLoading(null, false);
+                setStreaming(null, false);
+                isStreamingRef.current = false;
+                return; // Exit the stream processing
               }
             }
             else if (line.startsWith('0:')) {
               // Content chunk - optimize for performance
               try {
-                const contentChunk = JSON.parse(line.slice(2));
+                const jsonStr = line.slice(2);
+                
+                // Basic validation for content JSON - should be a simple string value
+                if (!jsonStr.trim().startsWith('"') || !jsonStr.trim().endsWith('"')) {
+                  throw new Error(`Invalid content chunk format: ${jsonStr}`);
+                }
+                
+                const contentChunk = JSON.parse(jsonStr);
                 const isFirstChunk = fullContent === "";
                 
                 // Track first chunk timing
@@ -434,12 +585,61 @@ export const useChatStreaming = () => {
                 }
               } catch (e) {
                 console.error('[STREAM] Failed to parse content chunk:', e);
+                
+                const errorContent = `**Error**: Failed to parse response content`;
+                const errorData = { 
+                  parseError: sanitizeErrorForStorage(e), 
+                  rawLine: line 
+                };
+                
+                // Save error message to database if saveErrorMessage is available
+                if (saveErrorMessage) {
+                  try {
+                    await saveErrorMessage.mutateAsync({
+                      threadId,
+                      content: errorContent,
+                      rawErrorData: errorData
+                    });
+                    console.log('[STREAM] Content parse error message saved to database');
+                  } catch (error) {
+                    console.error('[STREAM] Failed to save content parse error message:', error);
+                  }
+                }
+                
+                // Replace the optimistic assistant message with an error message
+                const currentMessages = getMessages(threadId);
+                const updatedMessages = currentMessages.map(msg => {
+                  if (msg.id === optimisticAssistantMessage.id) {
+                    return {
+                      ...msg,
+                      content: errorContent,
+                      isOptimistic: false,
+                      isError: true,
+                      rawErrorData: errorData
+                    };
+                  }
+                  return msg;
+                });
+                setMessages(threadId, updatedMessages);
+                
+                // Clear loading and streaming states
+                setLoading(null, false);
+                setStreaming(null, false);
+                isStreamingRef.current = false;
+                return; // Exit the stream processing
               }
             }
             else if (line.startsWith('d:')) {
               // Done signal - flush final content and save
               try {
-                const doneData = JSON.parse(line.slice(2));
+                const jsonStr = line.slice(2);
+                
+                // Basic check for complete JSON object
+                if (!jsonStr.trim().startsWith('{') || !jsonStr.trim().endsWith('}')) {
+                  throw new Error(`Incomplete JSON done signal: ${jsonStr}`);
+                }
+                
+                const doneData = JSON.parse(jsonStr);
                 console.log(`[STREAM] Stream done, final content length: ${fullContent.length}, server reported: ${doneData.length || 'unknown'}`);
                 
                 // Force flush any remaining content
@@ -521,7 +721,147 @@ export const useChatStreaming = () => {
                 return;
               } catch (e) {
                 console.error('[STREAM] Failed to parse done signal:', e);
+                
+                const errorContent = `**Error**: Failed to parse completion signal`;
+                const errorData = { 
+                  parseError: sanitizeErrorForStorage(e), 
+                  rawLine: line 
+                };
+                
+                // Save error message to database if saveErrorMessage is available
+                if (saveErrorMessage) {
+                  try {
+                    await saveErrorMessage.mutateAsync({
+                      threadId,
+                      content: errorContent,
+                      rawErrorData: errorData
+                    });
+                    console.log('[STREAM] Done signal parse error message saved to database');
+                  } catch (error) {
+                    console.error('[STREAM] Failed to save done signal parse error message:', error);
+                  }
+                }
+                
+                // Replace the optimistic assistant message with an error message
+                const currentMessages = getMessages(threadId);
+                const updatedMessages = currentMessages.map(msg => {
+                  if (msg.id === optimisticAssistantMessage.id) {
+                    return {
+                      ...msg,
+                      content: errorContent,
+                      isOptimistic: false,
+                      isError: true,
+                      rawErrorData: errorData
+                    };
+                  }
+                  return msg;
+                });
+                setMessages(threadId, updatedMessages);
+                
+                // Clear loading and streaming states
+                setLoading(null, false);
+                setStreaming(null, false);
+                isStreamingRef.current = false;
+                return; // Exit the stream processing
               }
+            }
+          }
+        }
+        
+        // Process any remaining buffered line when stream ends
+        if (lineBuffer.trim()) {
+          console.log(`[STREAM] Processing final buffered line: ${lineBuffer.substring(0, 100)}...`);
+          
+                     // Handle the final line using the same logic
+           if (lineBuffer.startsWith('f:')) {
+             try {
+               const jsonStr = lineBuffer.slice(2);
+               
+               // Basic check for complete JSON
+               if (!jsonStr.trim().startsWith('{') || !jsonStr.trim().endsWith('}')) {
+                 throw new Error(`Incomplete JSON metadata in final buffer: ${jsonStr}`);
+               }
+               
+               const metadata = JSON.parse(jsonStr);
+              if (metadata.error) {
+                console.error(`[STREAM] Final line API Error: ${metadata.error}`);
+                
+                const errorContent = `**Error**: ${metadata.error}`;
+                
+                if (saveErrorMessage) {
+                  try {
+                    await saveErrorMessage.mutateAsync({
+                      threadId,
+                      content: errorContent,
+                      rawErrorData: metadata
+                    });
+                    console.log('[STREAM] Final line error message saved to database');
+                  } catch (error) {
+                    console.error('[STREAM] Failed to save final line error message:', error);
+                  }
+                }
+                
+                const currentMessages = getMessages(threadId);
+                const updatedMessages = currentMessages.map(msg => {
+                  if (msg.id === optimisticAssistantMessage.id) {
+                    return {
+                      ...msg,
+                      content: errorContent,
+                      isOptimistic: false,
+                      isError: true,
+                      rawErrorData: metadata
+                    };
+                  }
+                  return msg;
+                });
+                setMessages(threadId, updatedMessages);
+                
+                setLoading(null, false);
+                setStreaming(null, false);
+                isStreamingRef.current = false;
+                return;
+              }
+            } catch (e) {
+              console.error('[STREAM] Failed to parse final buffered metadata line:', e);
+              
+              const errorContent = `**Error**: Failed to parse final response metadata`;
+              const errorData = { 
+                parseError: sanitizeErrorForStorage(e), 
+                rawLine: lineBuffer 
+              };
+              
+              if (saveErrorMessage) {
+                try {
+                  await saveErrorMessage.mutateAsync({
+                    threadId,
+                    content: errorContent,
+                    rawErrorData: errorData
+                  });
+                  console.log('[STREAM] Final line parse error message saved to database');
+                } catch (error) {
+                  console.error('[STREAM] Failed to save final line parse error message:', error);
+                }
+              }
+              
+              const currentMessages = getMessages(threadId);
+              const updatedMessages = currentMessages.map(msg => {
+                if (msg.id === optimisticAssistantMessage.id) {
+                  return {
+                    ...msg,
+                    content: errorContent,
+                    isOptimistic: false,
+                    isError: true,
+                    rawErrorData: errorData
+                  };
+                }
+                return msg;
+              });
+              setMessages(threadId, updatedMessages);
+              
+              setLoading(null, false);
+              setStreaming(null, false);
+              isStreamingRef.current = false;
+              return;
             }
           }
         }
@@ -538,15 +878,36 @@ export const useChatStreaming = () => {
         return;
       }
       
+      const errorMessage = error.message || 'Failed to generate response';
+      const errorContent = `**Error**: ${errorMessage}`;
+      
+      // Sanitize error data for database storage
+      const sanitizedErrorData = sanitizeErrorForStorage(error);
+      
+      // Save error message to database if saveErrorMessage is available
+      if (saveErrorMessage) {
+        try {
+          await saveErrorMessage.mutateAsync({
+            threadId,
+            content: errorContent,
+            rawErrorData: sanitizedErrorData
+          });
+          console.log('[STREAM] Stream error message saved to database');
+        } catch (saveError) {
+          console.error('[STREAM] Failed to save stream error message:', saveError);
+        }
+      }
+      
       // Replace the optimistic assistant message with an error message
       const currentMessages = getMessages(threadId);
       const updatedMessages = currentMessages.map(msg => {
         if (msg.id === optimisticAssistantMessage.id) {
           return {
             ...msg,
-            content: `**Error**: ${error.message || 'Failed to generate response'}`,
+            content: errorContent,
             isOptimistic: false,
-            isError: true
+            isError: true,
+            rawErrorData: error
           };
         }
         return msg;

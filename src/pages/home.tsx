@@ -25,7 +25,6 @@ const Home: NextPage = () => {
   const { isSignedIn } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
 
@@ -33,24 +32,14 @@ const Home: NextPage = () => {
     setMounted(true);
   }, []);
 
-  // Redirect to app if user is authenticated
-  useEffect(() => {
-    if (isLoaded && user) {
-      setRedirecting(true);
-      // Use a small delay to ensure auth state is fully settled
-      const timer = setTimeout(() => {
-      router.replace('/app');
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoaded, user, router]);
+  // No automatic redirect - let users navigate manually if authenticated
 
   if (!mounted) {
     return null;
   }
 
-  // Show loading while checking auth or redirecting
-  if (!isLoaded || redirecting) {
+  // Show loading while checking auth
+  if (!isLoaded) {
     return (
       <div className="h-screen flex items-center justify-center bg-background">
         <div className="flex items-center space-x-3">
@@ -107,26 +96,46 @@ const Home: NextPage = () => {
                   </svg>
                   GitHub
                 </Button>
+                
+                {/* Show different buttons based on auth state */}
+                {user ? (
                   <Button 
-                    variant="ghost" 
-                  className="text-white/60 hover:text-white/80 hover:bg-white/[0.04] border-0 text-xs sm:text-sm font-[450] px-3 sm:px-4 py-2 h-auto"
-                  onClick={() => setShowSignInModal(true)}
+                    size="lg" 
+                    className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-xl font-medium px-4 sm:px-8 py-2.5 sm:py-3.5 h-auto text-sm sm:text-base transition-all duration-200 hover:scale-[1.02] overflow-hidden"
+                    onClick={() => router.push('/app')}
                   >
-                    Sign In
+                    {/* Blurry gradient background */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-600/60 to-blue-500/60 blur-2xl"></div>
+                    <div className="relative z-10 flex items-center">
+                      <span className="hidden sm:inline">Go to App</span>
+                      <span className="sm:hidden">App</span>
+                      <ArrowRightIcon className="w-4 h-4 sm:w-5 sm:h-5 ml-1 sm:ml-2" />
+                    </div>
                   </Button>
-                <Button 
-                  size="lg" 
-                  className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-xl font-medium px-4 sm:px-8 py-2.5 sm:py-3.5 h-auto text-sm sm:text-base transition-all duration-200 hover:scale-[1.02] overflow-hidden"
-                  onClick={() => setShowSignUpModal(true)}
-                >
-                  {/* Blurry gradient background */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-600/60 to-blue-500/60 blur-2xl"></div>
-                  <div className="relative z-10 flex items-center">
-                    <span className="hidden sm:inline">Get started</span>
-                    <span className="sm:hidden">Start</span>
-                    <ArrowRightIcon className="w-4 h-4 sm:w-5 sm:h-5 ml-1 sm:ml-2" />
-                  </div>
-                </Button>
+                ) : (
+                  <>
+                    <Button 
+                      variant="ghost" 
+                      className="text-white/60 hover:text-white/80 hover:bg-white/[0.04] border-0 text-xs sm:text-sm font-[450] px-3 sm:px-4 py-2 h-auto"
+                      onClick={() => setShowSignInModal(true)}
+                    >
+                      Sign In
+                    </Button>
+                    <Button 
+                      size="lg" 
+                      className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-xl font-medium px-4 sm:px-8 py-2.5 sm:py-3.5 h-auto text-sm sm:text-base transition-all duration-200 hover:scale-[1.02] overflow-hidden"
+                      onClick={() => setShowSignUpModal(true)}
+                    >
+                      {/* Blurry gradient background */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-blue-600/60 to-blue-500/60 blur-2xl"></div>
+                      <div className="relative z-10 flex items-center">
+                        <span className="hidden sm:inline">Get started</span>
+                        <span className="sm:hidden">Start</span>
+                        <ArrowRightIcon className="w-4 h-4 sm:w-5 sm:h-5 ml-1 sm:ml-2" />
+                      </div>
+                    </Button>
+                  </>
+                )}
             </div>
           </nav>
         </header>

@@ -1,0 +1,683 @@
+{
+  "count": 34,
+  "exportedAt": "2025-06-23T03:33:24.314Z",
+  "models": [
+    {
+      "apiUrl": "https://generativelanguage.googleapis.com",
+      "capabilities": [
+        "vision",
+        "web",
+        "documents"
+      ],
+      "contextWindow": 1000000,
+      "costPer1kTokens": 0.000075,
+      "description": "Fast multimodal model with enhanced capabilities",
+      "displayNameBottom": "2.5 Flash",
+      "displayNameTop": "Gemini",
+      "id": "gemini-2.5-flash-preview-05-20",
+      "isActive": true,
+      "isFavorite": true,
+      "maxTokens": 8192,
+      "name": "Gemini 2.5 Flash",
+      "openrouterModelId": "google/gemini-2.5-flash-preview",
+      "order": 1,
+      "provider": "gemini"
+    },
+    {
+      "apiUrl": "https://generativelanguage.googleapis.com",
+      "capabilities": [
+        "vision",
+        "web",
+        "documents",
+        "reasoning"
+      ],
+      "contextWindow": 2000000,
+      "costPer1kTokens": 0.0035,
+      "description": "Advanced reasoning and multimodal capabilities",
+      "displayNameBottom": "2.5 Pro",
+      "displayNameTop": "Gemini",
+      "id": "gemini-2.5-pro-preview-06-05",
+      "isActive": true,
+      "isFavorite": true,
+      "maxTokens": 8192,
+      "name": "Gemini 2.5 Pro",
+      "openrouterModelId": "google/gemini-2.5-pro-preview",
+      "order": 2,
+      "provider": "gemini"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/images/generations",
+      "capabilities": [
+        "vision",
+        "image-generation"
+      ],
+      "contextWindow": 4000,
+      "costPer1kTokens": 0.04,
+      "description": "OpenAI image generation model",
+      "displayNameBottom": "ImageGen",
+      "displayNameTop": "GPT",
+      "id": "gpt-image-1",
+      "isActive": true,
+      "isFavorite": true,
+      "maxTokens": 1000,
+      "name": "GPT ImageGen",
+      "order": 3,
+      "provider": "openai"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/",
+      "capabilities": [
+        "vision",
+        "reasoning"
+      ],
+      "contextWindow": 128000,
+      "costPer1kTokens": 0.003,
+      "description": "Efficient reasoning model",
+      "displayNameBottom": "Mini",
+      "displayNameTop": "o4",
+      "id": "o4-mini",
+      "isActive": true,
+      "isFavorite": true,
+      "maxTokens": 65536,
+      "name": "o4 mini",
+      "openrouterModelId": "openai/o4-mini",
+      "order": 4,
+      "provider": "openai"
+    },
+    {
+      "apiUrl": "https://api.anthropic.com/v1/messages",
+      "capabilities": [
+        "vision",
+        "documents"
+      ],
+      "contextWindow": 200000,
+      "costPer1kTokens": 0.003,
+      "description": "Advanced language model with exceptional reasoning",
+      "displayNameBottom": "4 Sonnet",
+      "displayNameTop": "Claude",
+      "id": "claude-sonnet-4-20250514",
+      "isActive": true,
+      "isFavorite": true,
+      "maxTokens": 8192,
+      "name": "Claude 4 Sonnet",
+      "openrouterModelId": "anthropic/claude-4-sonnet",
+      "order": 5,
+      "provider": "anthropic"
+    },
+    {
+      "apiUrl": "https://api.anthropic.com/v1/messages",
+      "capabilities": [
+        "vision",
+        "documents",
+        "reasoning"
+      ],
+      "contextWindow": 200000,
+      "costPer1kTokens": 0.003,
+      "description": "Enhanced reasoning capabilities (Reasoning)",
+      "displayNameBottom": "4 Sonnet",
+      "displayNameTop": "Claude",
+      "id": "claude-sonnet-4-20250514-reasoning",
+      "isActive": true,
+      "isFavorite": true,
+      "maxTokens": 8192,
+      "name": "Claude 4 Sonnet",
+      "openrouterModelId": "anthropic/claude-4-sonnet:thinking",
+      "order": 6,
+      "provider": "anthropic",
+      "subtitle": "(Reasoning)"
+    },
+    {
+      "apiUrl": "https://api.deepseek.com/",
+      "capabilities": [
+        "reasoning"
+      ],
+      "contextWindow": 32768,
+      "costPer1kTokens": 0.0001,
+      "description": "Distilled reasoning model (Llama Distilled)",
+      "displayNameBottom": "R1 Llama",
+      "displayNameTop": "DeepSeek",
+      "id": "deepseek-r1-llama-70b",
+      "isActive": true,
+      "isFavorite": true,
+      "maxTokens": 8192,
+      "name": "DeepSeek R1",
+      "openrouterModelId": "deepseek/deepseek-r1-distill-llama-70b",
+      "order": 7,
+      "provider": "deepseek",
+      "subtitle": "(Llama Distilled)"
+    },
+    {
+      "apiUrl": "https://generativelanguage.googleapis.com",
+      "capabilities": [
+        "vision",
+        "web",
+        "documents"
+      ],
+      "contextWindow": 1000000,
+      "costPer1kTokens": 0.000075,
+      "description": "Fast model with multimodal capabilities",
+      "displayNameBottom": "2.0 Flash",
+      "displayNameTop": "Gemini",
+      "id": "gemini-2.0-flash",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Gemini 2.0 Flash",
+      "openrouterModelId": "google/gemini-2.0-flash-001",
+      "order": 10,
+      "provider": "gemini"
+    },
+    {
+      "apiUrl": "https://generativelanguage.googleapis.com",
+      "capabilities": [
+        "vision"
+      ],
+      "contextWindow": 500000,
+      "costPer1kTokens": 0.000035,
+      "description": "Lightweight version of Gemini 2.0 Flash",
+      "displayNameBottom": "2.0 Lite",
+      "displayNameTop": "Gemini",
+      "id": "gemini-2.0-flash-lite",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 4096,
+      "name": "Gemini 2.0 Flash Lite",
+      "openrouterModelId": "google/gemini-2.0-flash-lite-001",
+      "order": 11,
+      "provider": "gemini"
+    },
+    {
+      "apiUrl": "https://generativelanguage.googleapis.com",
+      "capabilities": [
+        "vision",
+        "web",
+        "documents"
+      ],
+      "contextWindow": 1000000,
+      "costPer1kTokens": 0.000075,
+      "description": "Enhanced reasoning with thinking mode (Thinking)",
+      "displayNameBottom": "2.5 Flash",
+      "displayNameTop": "Gemini",
+      "id": "gemini-2.5-flash-preview-05-20-thinking",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Gemini 2.5 Flash",
+      "openrouterModelId": "google/gemini-2.5-flash-preview-05-20:thinking",
+      "order": 12,
+      "provider": "gemini",
+      "subtitle": "(Thinking)"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/",
+      "capabilities": [
+        "vision"
+      ],
+      "contextWindow": 128000,
+      "costPer1kTokens": 0.00015,
+      "description": "Compact and efficient OpenAI model",
+      "displayNameBottom": "4o Mini",
+      "displayNameTop": "GPT",
+      "id": "gpt-4o-mini",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 16384,
+      "name": "GPT 4o-mini",
+      "openrouterModelId": "openai/gpt-4o-mini",
+      "order": 13,
+      "provider": "openai"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/",
+      "capabilities": [
+        "vision"
+      ],
+      "contextWindow": 128000,
+      "costPer1kTokens": 0.0025,
+      "description": "OpenAI's flagship multimodal model",
+      "displayNameBottom": "4o",
+      "displayNameTop": "GPT",
+      "id": "gpt-4o",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 4096,
+      "name": "GPT 4o",
+      "openrouterModelId": "openai/gpt-4o",
+      "order": 14,
+      "provider": "openai"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/",
+      "capabilities": [
+        "vision"
+      ],
+      "contextWindow": 200000,
+      "costPer1kTokens": 0.003,
+      "description": "Next generation OpenAI model",
+      "displayNameBottom": "4.1",
+      "displayNameTop": "GPT",
+      "id": "gpt-4.1",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "GPT 4.1",
+      "openrouterModelId": "openai/gpt-4.1",
+      "order": 15,
+      "provider": "openai"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/",
+      "capabilities": [
+        "vision"
+      ],
+      "contextWindow": 128000,
+      "costPer1kTokens": 0.0008,
+      "description": "Compact version of GPT 4.1",
+      "displayNameBottom": "4.1 Mini",
+      "displayNameTop": "GPT",
+      "id": "gpt-4.1-mini",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 4096,
+      "name": "GPT 4.1 Mini",
+      "openrouterModelId": "openai/gpt-4.1-mini",
+      "order": 16,
+      "provider": "openai"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/",
+      "capabilities": [
+        "vision"
+      ],
+      "contextWindow": 32000,
+      "costPer1kTokens": 0.0002,
+      "description": "Ultra-compact version of GPT 4.1",
+      "displayNameBottom": "4.1 Nano",
+      "displayNameTop": "GPT",
+      "id": "gpt-4.1-nano",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 2048,
+      "name": "GPT 4.1 Nano",
+      "openrouterModelId": "openai/gpt-4.1-nano",
+      "order": 17,
+      "provider": "openai"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/",
+      "capabilities": [
+        "reasoning"
+      ],
+      "contextWindow": 128000,
+      "costPer1kTokens": 0.008,
+      "description": "Advanced reasoning model - compact version",
+      "displayNameBottom": "Mini",
+      "displayNameTop": "o3",
+      "id": "o3-mini",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 65536,
+      "name": "o3 mini",
+      "openrouterModelId": "openai/o3-mini",
+      "order": 18,
+      "provider": "openai"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/",
+      "capabilities": [
+        "vision",
+        "reasoning"
+      ],
+      "contextWindow": 200000,
+      "costPer1kTokens": 0.06,
+      "description": "Advanced reasoning model",
+      "displayNameBottom": "Full",
+      "displayNameTop": "o3",
+      "id": "o3",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 100000,
+      "name": "o3",
+      "openrouterModelId": "openai/o3",
+      "order": 19,
+      "provider": "openai"
+    },
+    {
+      "apiUrl": "https://api.anthropic.com/v1/messages",
+      "capabilities": [
+        "vision",
+        "documents"
+      ],
+      "contextWindow": 200000,
+      "costPer1kTokens": 0.003,
+      "description": "Balanced Claude model",
+      "displayNameBottom": "3.5 Sonnet",
+      "displayNameTop": "Claude",
+      "id": "claude-3-5-sonnet-20240620",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Claude 3.5 Sonnet",
+      "openrouterModelId": "anthropic/claude-3.5-sonnet-20240620",
+      "order": 20,
+      "provider": "anthropic"
+    },
+    {
+      "apiUrl": "https://api.anthropic.com/v1/messages",
+      "capabilities": [
+        "vision",
+        "documents"
+      ],
+      "contextWindow": 200000,
+      "costPer1kTokens": 0.0035,
+      "description": "Enhanced Claude model",
+      "displayNameBottom": "3.7 Sonnet",
+      "displayNameTop": "Claude",
+      "id": "claude-3-7-sonnet-20250219",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Claude 3.7 Sonnet",
+      "openrouterModelId": "anthropic/claude-3.7-sonnet",
+      "order": 21,
+      "provider": "anthropic"
+    },
+    {
+      "apiUrl": "https://api.anthropic.com/v1/messages",
+      "capabilities": [
+        "vision",
+        "documents",
+        "reasoning"
+      ],
+      "contextWindow": 200000,
+      "costPer1kTokens": 0.0035,
+      "description": "Enhanced reasoning capabilities (Reasoning)",
+      "displayNameBottom": "3.7 Sonnet",
+      "displayNameTop": "Claude",
+      "id": "claude-3-7-sonnet-20250219-reasoning",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Claude 3.7 Sonnet",
+      "openrouterModelId": "anthropic/claude-3.7-sonnet:thinking",
+      "order": 22,
+      "provider": "anthropic",
+      "subtitle": "(Reasoning)"
+    },
+    {
+      "apiUrl": "https://api.anthropic.com/v1/messages",
+      "capabilities": [
+        "vision",
+        "documents"
+      ],
+      "contextWindow": 200000,
+      "costPer1kTokens": 0.015,
+      "description": "Premium Claude model with advanced capabilities",
+      "displayNameBottom": "4 Opus",
+      "displayNameTop": "Claude",
+      "id": "claude-opus-4-20250514",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Claude 4 Opus",
+      "openrouterModelId": "anthropic/claude-4-opus",
+      "order": 23,
+      "provider": "anthropic"
+    },
+    {
+      "apiUrl": "https://api.together.xyz/v1/chat/completions",
+      "capabilities": [
+        "experimental"
+      ],
+      "contextWindow": 32768,
+      "costPer1kTokens": 0.0009,
+      "description": "Meta's large language model",
+      "displayNameBottom": "3.3 70b",
+      "displayNameTop": "Llama",
+      "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Llama 3.3 70b",
+      "openrouterModelId": "meta-llama/llama-3.3-70b-instruct",
+      "order": 24,
+      "provider": "together"
+    },
+    {
+      "apiUrl": "https://api.together.xyz/v1/chat/completions",
+      "capabilities": [
+        "vision"
+      ],
+      "contextWindow": 64000,
+      "costPer1kTokens": 0.0005,
+      "description": "Next-gen Meta model - Scout variant",
+      "displayNameBottom": "4 Scout",
+      "displayNameTop": "Llama",
+      "id": "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Llama 4 Scout",
+      "openrouterModelId": "meta-llama/llama-4-scout",
+      "order": 25,
+      "provider": "together"
+    },
+    {
+      "apiUrl": "https://api.together.xyz/v1/chat/completions",
+      "capabilities": [
+        "experimental"
+      ],
+      "contextWindow": 128000,
+      "costPer1kTokens": 0.0005,
+      "description": "Next-gen Meta model - Maverick variant",
+      "displayNameBottom": "4 Maverick",
+      "displayNameTop": "Llama",
+      "id": "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Llama 4 Maverick",
+      "openrouterModelId": "meta-llama/llama-4-maverick",
+      "order": 26,
+      "provider": "together"
+    },
+    {
+      "apiUrl": "https://api.fireworks.ai/inference/v1",
+      "capabilities": [
+        "experimental"
+      ],
+      "contextWindow": 64000,
+      "costPer1kTokens": 0.0002,
+      "description": "Advanced model via Fireworks (Fireworks)",
+      "displayNameBottom": "V3",
+      "displayNameTop": "DeepSeek",
+      "id": "accounts/fireworks/models/deepseek-v3",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "DeepSeek v3",
+      "openrouterModelId": "deepseek/deepseek-chat-v3-0324",
+      "order": 27,
+      "provider": "deepseek",
+      "subtitle": "(Fireworks)"
+    },
+    {
+      "apiUrl": "https://api.deepseek.com/",
+      "capabilities": [
+        "experimental"
+      ],
+      "contextWindow": 64000,
+      "costPer1kTokens": 0.0001,
+      "description": "Latest DeepSeek model (0324)",
+      "displayNameBottom": "V3",
+      "displayNameTop": "DeepSeek",
+      "id": "deepseek-v3-0324",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "DeepSeek v3",
+      "openrouterModelId": "deepseek/deepseek-chat-v3-0324",
+      "order": 28,
+      "provider": "deepseek",
+      "subtitle": "(0324)"
+    },
+    {
+      "apiUrl": "https://openrouter.ai/api/v1/chat/completions",
+      "capabilities": [
+        "reasoning"
+      ],
+      "contextWindow": 32768,
+      "costPer1kTokens": 0.0001,
+      "description": "Reasoning model via OpenRouter (OpenRouter)",
+      "displayNameBottom": "R1",
+      "displayNameTop": "DeepSeek",
+      "id": "deepseek/deepseek-r1",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "DeepSeek R1",
+      "openrouterModelId": "deepseek/deepseek-r1:free",
+      "order": 29,
+      "provider": "deepseek",
+      "subtitle": "(OpenRouter)"
+    },
+    {
+      "apiUrl": "https://api.deepseek.com/",
+      "capabilities": [
+        "reasoning",
+        "experimental"
+      ],
+      "contextWindow": 32768,
+      "costPer1kTokens": 0.0001,
+      "description": "Latest reasoning model (0528)",
+      "displayNameBottom": "R1",
+      "displayNameTop": "DeepSeek",
+      "id": "deepseek-r1-0528",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "DeepSeek R1",
+      "openrouterModelId": "deepseek/deepseek-r1:free",
+      "order": 30,
+      "provider": "deepseek",
+      "subtitle": "(0528)"
+    },
+    {
+      "apiUrl": "https://api.deepseek.com/",
+      "capabilities": [
+        "reasoning",
+        "experimental"
+      ],
+      "contextWindow": 32768,
+      "costPer1kTokens": 0.0001,
+      "description": "Distilled reasoning model (Qwen Distilled)",
+      "displayNameBottom": "R1 Qwen",
+      "displayNameTop": "DeepSeek",
+      "id": "deepseek-r1-distilled-qwen-32b",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "DeepSeek R1",
+      "openrouterModelId": "deepseek/deepseek-r1-distill-qwen-32b",
+      "order": 31,
+      "provider": "deepseek",
+      "subtitle": "(Qwen Distilled)"
+    },
+    {
+      "apiUrl": "https://api.x.ai/v1/chat/completions",
+      "capabilities": [
+        "experimental"
+      ],
+      "contextWindow": 128000,
+      "costPer1kTokens": 0.002,
+      "description": "X.AI's advanced language model",
+      "displayNameBottom": "3",
+      "displayNameTop": "Grok",
+      "id": "grok-3-beta",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Grok 3",
+      "openrouterModelId": "x-ai/grok-3-beta",
+      "order": 32,
+      "provider": "xai"
+    },
+    {
+      "apiUrl": "https://api.x.ai/v1/chat/completions",
+      "capabilities": [
+        "reasoning",
+        "experimental"
+      ],
+      "contextWindow": 64000,
+      "costPer1kTokens": 0.0005,
+      "description": "Compact version of Grok 3",
+      "displayNameBottom": "3 Mini",
+      "displayNameTop": "Grok",
+      "id": "grok-3-mini-beta",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 4096,
+      "name": "Grok 3 Mini",
+      "openrouterModelId": "x-ai/grok-3-mini-beta",
+      "order": 33,
+      "provider": "xai"
+    },
+    {
+      "apiUrl": "https://openrouter.ai/api/v1/chat/completions",
+      "capabilities": [
+        "reasoning"
+      ],
+      "contextWindow": 32768,
+      "costPer1kTokens": 0.0008,
+      "description": "Qwen question-answering model (OpenRouter only)",
+      "displayNameBottom": "QwQ 32B",
+      "displayNameTop": "Qwen",
+      "id": "Qwen/QwQ-32B",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Qwen qwkq-32b",
+      "openrouterModelId": "qwen/qwq-32b-preview",
+      "order": 34,
+      "provider": "qwen"
+    },
+    {
+      "apiUrl": "https://openrouter.ai/api/v1/chat/completions",
+      "capabilities": [
+        "experimental"
+      ],
+      "contextWindow": 32768,
+      "costPer1kTokens": 0.0008,
+      "description": "Alibaba's Qwen model (OpenRouter only)",
+      "displayNameBottom": "2.5 32b",
+      "displayNameTop": "Qwen",
+      "id": "qwen2.5-32b-instruct",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "Qwen 2.5 32b",
+      "openrouterModelId": "qwen/qwen-2.5-72b-instruct",
+      "order": 35,
+      "provider": "qwen"
+    },
+    {
+      "apiUrl": "https://api.openai.com/v1/",
+      "capabilities": [
+        "vision"
+      ],
+      "contextWindow": 200000,
+      "costPer1kTokens": 0.005,
+      "description": "Next generation OpenAI preview model",
+      "displayNameBottom": "4.5",
+      "displayNameTop": "GPT",
+      "id": "gpt-4.5-preview",
+      "isActive": true,
+      "isFavorite": false,
+      "maxTokens": 8192,
+      "name": "GPT 4.5",
+      "openrouterModelId": "openai/gpt-4.5-preview",
+      "order": 36,
+      "provider": "openai"
+    }
+  ]
+}

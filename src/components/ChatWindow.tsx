@@ -19,6 +19,7 @@ import { isImageGenerationModel } from '../utils/modelUtils';
 import { ApiKeyWarningBanner } from './ApiKeyWarningBanner';
 import { WelcomeScreen } from './chat/WelcomeScreen';
 import { MobileMenuButton } from './chat/MobileMenuButton';
+import { ErrorMessage } from './ErrorMessage';
 
 // Lazy load heavy components
 const ChunkedMarkdown = lazy(() => import('./ChunkedMarkdown').then(module => ({ default: module.ChunkedMarkdown })));
@@ -82,6 +83,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     updateThreadMetadata,
     generateTitle,
     saveStreamedMessage,
+    saveUserMessage,
+    saveErrorMessage,
     saveAssistantMessage,
     deleteMessagesFromPoint,
     createManyMessages,
@@ -404,7 +407,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       updateFileAssociations,
       updateThreadMetadata,
       generateTitle,
-      refetchThreads
+      refetchThreads,
+      saveErrorMessage
     );
   };
 
@@ -536,6 +540,39 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         
         smartFocus(inputRef, { delay: 50, reason: 'user-action' });
         
+        // Save user message to database immediately before attempting AI response
+        let savedUserMessage: { id: string; content: string; role: string } | null = null;
+        try {
+          savedUserMessage = await saveUserMessage.mutateAsync({
+            threadId,
+            content: editingContent.trim(),
+            attachments: [],
+          });
+          console.log('[CHAT] Edited user message saved to database:', savedUserMessage.id);
+        } catch (error) {
+          console.error('[CHAT] Failed to save edited user message:', error);
+        }
+
+        // Create custom save function that only saves assistant message
+        const customSaveStreamedMessage = {
+          mutateAsync: async (params: any) => {
+            const assistantResult = await saveAssistantMessage.mutateAsync({
+              threadId: params.threadId,
+              content: params.assistantContent,
+              model: params.model,
+              isGrounded: params.isGrounded,
+              groundingSources: params.groundingSources,
+              imageUrl: params.imageUrl,
+              stoppedByUser: params.stoppedByUser,
+            });
+
+            return {
+              userMessage: savedUserMessage || { id: null },
+              assistantMessage: assistantResult
+            };
+          }
+        };
+
         await streamResponse(
           threadId,
           editingContent.trim(),
@@ -544,11 +581,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           searchGroundingEnabled,
           inputRef,
           scrollToBottomPinned,
-          saveStreamedMessage,
+          customSaveStreamedMessage,
           updateFileAssociations,
           updateThreadMetadata,
           generateTitle,
-          refetchThreads
+          refetchThreads,
+          saveErrorMessage
         );
       }
 
@@ -700,7 +738,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           <div className={`${message.role === "user" ? "flex flex-col items-end" : "flex flex-col items-start"} group`}>
             <div
               tabIndex={-1}
-              className={`rounded-xl px-4 max-w-full overflow-hidden min-w-0 break-words ${isMobile ? 'cursor-pointer max-w-[calc(100vw-2rem)]' : 'sm:cursor-default'} ${
+              className={`${message.isError ? 'w-full' : 'rounded-xl px-4 max-w-full overflow-hidden min-w-0 break-words'} ${isMobile ? 'cursor-pointer max-w-[calc(100vw-2rem)]' : 'sm:cursor-default'} ${
                 message.role === "user"
                   ? "py-2" 
                   : "pt-1 pb-1"
@@ -708,7 +746,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                 message.role === "user"
                   ? "bg-primary/10 text-foreground border border-primary shadow-sm backdrop-blur-sm dark:bg-primary/30 dark:border-primary/50"
                   : message.isError
-                  ? "bg-destructive/10 text-destructive border border-destructive/30 shadow-sm"
+                  ? "bg-destructive/10 text-destructive border border-destructive/30 shadow-sm rounded-xl"
                   : "text-foreground"
               }`}
               onClick={() => isMobile && handleMobileMessageTap(message.id)}
@@ -764,17 +802,14 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               ) : (
                 <div>
                   {message.isError ? (
-                    <div className="flex items-center gap-3">
-                      <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
-                      <div className="flex-1">
-                        <Suspense fallback={<div>Loading...</div>}>
-                        <ChunkedMarkdown 
-                          content={message.content}
-                          chunkSize={75}
-                        />
-                        </Suspense>
-                      </div>
-                    </div>
+                    <ErrorMessage 
+                      message={message.content
+                        .replace(/^\*\*Error\*\*:\s*/, '')
+                        .replace(/<details>[\s\S]*?<\/details>/, '')
+                        .trim()
+                      } 
+                      rawErrorData={message.rawErrorData}
+                    />
                   ) : (
                     <Suspense fallback={<div>Loading...</div>}>
                     <ChunkedMarkdown 
@@ -954,6 +989,30 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         onThreadCreate(newThread.id);
         await refetchThreads();
 
+        // Save user message to database immediately before attempting AI response
+        let savedUserMessage: { id: string; content: string; role: string } | null = null;
+        try {
+          savedUserMessage = await saveUserMessage.mutateAsync({
+            threadId: newThread.id,
+            content: messageContent,
+            attachments: messageFiles.map(file => file.id),
+          });
+          console.log('[CHAT] User message saved to database:', savedUserMessage.id);
+          
+          // Update file associations if there are files
+          if (messageFiles.length > 0 && savedUserMessage.id) {
+            await updateFileAssociations.mutateAsync({
+              fileIds: messageFiles.map(file => file.id),
+              messageId: savedUserMessage.id,
+              threadId: newThread.id,
+            });
+            console.log('[CHAT] File associations updated for user message');
+          }
+        } catch (error) {
+          console.error('[CHAT] Failed to save user message:', error);
+          // Continue anyway - user message exists optimistically
+        }
+
         // Start title generation immediately in parallel (don't await)
         generateTitle.mutateAsync({
           threadId: newThread.id,
@@ -967,7 +1026,28 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           console.error("Failed to generate title:", error);
         });
 
-        // Start AI response streaming (also in parallel)
+        // Start AI response streaming with custom save function that only saves assistant message
+        const customSaveStreamedMessage = {
+          mutateAsync: async (params: any) => {
+            // Only save the assistant message since user message is already saved
+            const assistantResult = await saveAssistantMessage.mutateAsync({
+              threadId: params.threadId,
+              content: params.assistantContent,
+              model: params.model,
+              isGrounded: params.isGrounded,
+              groundingSources: params.groundingSources,
+              imageUrl: params.imageUrl,
+              stoppedByUser: params.stoppedByUser,
+            });
+
+            // Return format expected by streamResponse
+            return {
+              userMessage: savedUserMessage || { id: null },
+              assistantMessage: assistantResult
+            };
+          }
+        };
+
         await streamResponse(
           newThread.id,
           messageContent,
@@ -976,11 +1056,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           searchGroundingEnabled,
           inputRef,
           scrollToBottomPinned,
-          saveStreamedMessage,
+          customSaveStreamedMessage,
           updateFileAssociations,
           updateThreadMetadata,
           generateTitle,
-          refetchThreads
+          refetchThreads,
+          saveErrorMessage
         );
         
       } else {
@@ -1001,6 +1082,52 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
         }, 0);
 
+        // Save user message to database immediately before attempting AI response
+        let savedUserMessage: { id: string; content: string; role: string } | null = null;
+        try {
+          savedUserMessage = await saveUserMessage.mutateAsync({
+            threadId,
+            content: messageContent,
+            attachments: messageFiles.map(file => file.id),
+          });
+          console.log('[CHAT] User message saved to database:', savedUserMessage.id);
+          
+          // Update file associations if there are files
+          if (messageFiles.length > 0 && savedUserMessage.id) {
+            await updateFileAssociations.mutateAsync({
+              fileIds: messageFiles.map(file => file.id),
+              messageId: savedUserMessage.id,
+              threadId,
+            });
+            console.log('[CHAT] File associations updated for user message');
+          }
+        } catch (error) {
+          console.error('[CHAT] Failed to save user message:', error);
+          // Continue anyway - user message exists optimistically
+        }
+
+        // Start AI response streaming with custom save function that only saves assistant message
+        const customSaveStreamedMessage = {
+          mutateAsync: async (params: any) => {
+            // Only save the assistant message since user message is already saved
+            const assistantResult = await saveAssistantMessage.mutateAsync({
+              threadId: params.threadId,
+              content: params.assistantContent,
+              model: params.model,
+              isGrounded: params.isGrounded,
+              groundingSources: params.groundingSources,
+              imageUrl: params.imageUrl,
+              stoppedByUser: params.stoppedByUser,
+            });
+
+            // Return format expected by streamResponse
+            return {
+              userMessage: savedUserMessage || { id: null },
+              assistantMessage: assistantResult
+            };
+          }
+        };
+
         await streamResponse(
           threadId,
           messageContent,
@@ -1009,11 +1136,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
           searchGroundingEnabled,
           inputRef,
           scrollToBottomPinned,
-          saveStreamedMessage,
+          customSaveStreamedMessage,
           updateFileAssociations,
           updateThreadMetadata,
           generateTitle,
-          refetchThreads
+          refetchThreads,
+          saveErrorMessage
         );
       }
       

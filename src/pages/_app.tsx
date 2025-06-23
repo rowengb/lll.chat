@@ -52,8 +52,6 @@ function ClerkWrapper({ children }: { children: React.ReactNode }) {
       publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
       signInFallbackRedirectUrl="/app"
       signUpFallbackRedirectUrl="/app"
-      signInForceRedirectUrl="/app"
-      signUpForceRedirectUrl="/app"
       appearance={{
         baseTheme: resolvedTheme === 'dark' ? dark : undefined
       }}

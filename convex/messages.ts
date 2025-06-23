@@ -20,6 +20,8 @@ export const createMessage = mutation({
     imageFileId: v.optional(v.id("files")),
     imageData: v.optional(v.string()),
     stoppedByUser: v.optional(v.boolean()),
+    isError: v.optional(v.boolean()),
+    rawErrorData: v.optional(v.any()),
   },
   handler: async (ctx, args) => {
     const messageId = await ctx.db.insert("messages", {
@@ -35,6 +37,8 @@ export const createMessage = mutation({
       imageFileId: args.imageFileId,
       imageData: args.imageData,
       stoppedByUser: args.stoppedByUser,
+      isError: args.isError,
+      rawErrorData: args.rawErrorData,
     });
     
     return messageId;
