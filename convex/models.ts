@@ -1655,4 +1655,97 @@ export const updateModelsWithPricing = mutation({
     const updatedCount = existingModels.filter(model => pricingData[model.id] !== undefined).length;
     return { message: `Updated ${updatedCount} models with pricing information` };
   },
+});
+
+// Bulk clear all models (admin operation)
+export const clearAllModels = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const models = await ctx.db.query("models").collect();
+    
+    for (const model of models) {
+      await ctx.db.delete(model._id);
+    }
+    
+    return { deletedCount: models.length };
+  },
+});
+
+// Bulk insert models from backup (admin operation)
+export const bulkInsertModels = mutation({
+  args: {
+    models: v.array(v.object({
+      id: v.string(),
+      name: v.string(),
+      displayNameTop: v.optional(v.string()),
+      displayNameBottom: v.optional(v.string()),
+      description: v.string(),
+      subtitle: v.optional(v.string()),
+      provider: v.string(),
+      apiUrl: v.optional(v.string()),
+      openrouterModelId: v.optional(v.string()),
+      capabilities: v.array(v.string()),
+      isFavorite: v.boolean(),
+      isActive: v.boolean(),
+      order: v.number(),
+      contextWindow: v.optional(v.number()),
+      maxTokens: v.optional(v.number()),
+      costPer1kTokens: v.optional(v.number()),
+    }))
+  },
+  handler: async (ctx, { models }) => {
+    const insertedIds = [];
+    
+    for (const model of models) {
+      const id = await ctx.db.insert("models", model);
+      insertedIds.push(id);
+    }
+    
+    return { insertedCount: insertedIds.length, insertedIds };
+  },
+});
+
+// Migration function to update models from backup
+export const migrateModelsFromBackup = mutation({
+  args: {
+    models: v.array(v.object({
+      id: v.string(),
+      name: v.string(),
+      displayNameTop: v.optional(v.string()),
+      displayNameBottom: v.optional(v.string()),
+      description: v.string(),
+      subtitle: v.optional(v.string()),
+      provider: v.string(),
+      apiUrl: v.optional(v.string()),
+      openrouterModelId: v.optional(v.string()),
+      capabilities: v.array(v.string()),
+      isFavorite: v.boolean(),
+      isActive: v.boolean(),
+      order: v.number(),
+      contextWindow: v.optional(v.number()),
+      maxTokens: v.optional(v.number()),
+      costPer1kTokens: v.optional(v.number()),
+    }))
+  },
+  handler: async (ctx, { models }) => {
+    // First, clear all existing models
+    const existingModels = await ctx.db.query("models").collect();
+    
+    for (const model of existingModels) {
+      await ctx.db.delete(model._id);
+    }
+    
+    // Then insert new models
+    const insertedIds = [];
+    for (const model of models) {
+      const id = await ctx.db.insert("models", model);
+      insertedIds.push(id);
+    }
+    
+    return { 
+      deletedCount: existingModels.length, 
+      insertedCount: insertedIds.length, 
+      insertedIds 
+    };
+  },
 }); 

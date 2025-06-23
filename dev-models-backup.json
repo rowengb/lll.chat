@@ -19,7 +19,7 @@
       "isFavorite": true,
       "maxTokens": 8192,
       "name": "Gemini 2.5 Flash",
-      "openrouterModelId": "google/gemini-2.5-flash-preview",
+      "openrouterModelId": "google/gemini-2.5-flash",
       "order": 1,
       "provider": "gemini"
     },
@@ -41,7 +41,7 @@
       "isFavorite": true,
       "maxTokens": 8192,
       "name": "Gemini 2.5 Pro",
-      "openrouterModelId": "google/gemini-2.5-pro-preview",
+      "openrouterModelId": "google/gemini-2.5-pro",
       "order": 2,
       "provider": "gemini"
     },
@@ -61,6 +61,7 @@
       "isFavorite": true,
       "maxTokens": 1000,
       "name": "GPT ImageGen",
+      "openrouterModelId": "openai/dall-e-3",
       "order": 3,
       "provider": "openai"
     },
@@ -100,7 +101,7 @@
       "isFavorite": true,
       "maxTokens": 8192,
       "name": "Claude 4 Sonnet",
-      "openrouterModelId": "anthropic/claude-4-sonnet",
+      "openrouterModelId": "anthropic/claude-sonnet-4",
       "order": 5,
       "provider": "anthropic"
     },
@@ -121,7 +122,7 @@
       "isFavorite": true,
       "maxTokens": 8192,
       "name": "Claude 4 Sonnet",
-      "openrouterModelId": "anthropic/claude-4-sonnet:thinking",
+      "openrouterModelId": "anthropic/claude-sonnet-4:thinking",
       "order": 6,
       "provider": "anthropic",
       "subtitle": "(Reasoning)"
@@ -163,7 +164,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "Gemini 2.0 Flash",
-      "openrouterModelId": "google/gemini-2.0-flash-001",
+      "openrouterModelId": "google/gemini-2.0-flash",
       "order": 10,
       "provider": "gemini"
     },
@@ -182,7 +183,7 @@
       "isFavorite": false,
       "maxTokens": 4096,
       "name": "Gemini 2.0 Flash Lite",
-      "openrouterModelId": "google/gemini-2.0-flash-lite-001",
+      "openrouterModelId": "google/gemini-2.0-flash",
       "order": 11,
       "provider": "gemini"
     },
@@ -203,7 +204,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "Gemini 2.5 Flash",
-      "openrouterModelId": "google/gemini-2.5-flash-preview-05-20:thinking",
+      "openrouterModelId": "google/gemini-2.5-flash:thinking",
       "order": 12,
       "provider": "gemini",
       "subtitle": "(Thinking)"
@@ -358,7 +359,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "Claude 3.5 Sonnet",
-      "openrouterModelId": "anthropic/claude-3.5-sonnet-20240620",
+      "openrouterModelId": "anthropic/claude-3.5-sonnet",
       "order": 20,
       "provider": "anthropic"
     },
@@ -496,7 +497,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "DeepSeek v3",
-      "openrouterModelId": "deepseek/deepseek-chat-v3-0324",
+      "openrouterModelId": "deepseek/deepseek-chat-v3",
       "order": 27,
       "provider": "deepseek",
       "subtitle": "(Fireworks)"
@@ -516,7 +517,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "DeepSeek v3",
-      "openrouterModelId": "deepseek/deepseek-chat-v3-0324",
+      "openrouterModelId": "deepseek/deepseek-chat-v3",
       "order": 28,
       "provider": "deepseek",
       "subtitle": "(0324)"
@@ -536,7 +537,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "DeepSeek R1",
-      "openrouterModelId": "deepseek/deepseek-r1:free",
+      "openrouterModelId": "deepseek/deepseek-r1",
       "order": 29,
       "provider": "deepseek",
       "subtitle": "(OpenRouter)"
@@ -557,7 +558,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "DeepSeek R1",
-      "openrouterModelId": "deepseek/deepseek-r1:free",
+      "openrouterModelId": "deepseek/deepseek-r1",
       "order": 30,
       "provider": "deepseek",
       "subtitle": "(0528)"
@@ -598,7 +599,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "Grok 3",
-      "openrouterModelId": "x-ai/grok-3-beta",
+      "openrouterModelId": "x-ai/grok-3",
       "order": 32,
       "provider": "xai"
     },
@@ -618,7 +619,7 @@
       "isFavorite": false,
       "maxTokens": 4096,
       "name": "Grok 3 Mini",
-      "openrouterModelId": "x-ai/grok-3-mini-beta",
+      "openrouterModelId": "x-ai/grok-3-mini",
       "order": 33,
       "provider": "xai"
     },
@@ -637,7 +638,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "Qwen qwkq-32b",
-      "openrouterModelId": "qwen/qwq-32b-preview",
+      "openrouterModelId": "qwen/qwen-2.5-32b-instruct",
       "order": 34,
       "provider": "qwen"
     },
@@ -656,7 +657,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "Qwen 2.5 32b",
-      "openrouterModelId": "qwen/qwen-2.5-72b-instruct",
+      "openrouterModelId": "qwen/qwen-2.5-32b-instruct",
       "order": 35,
       "provider": "qwen"
     },
@@ -675,7 +676,7 @@
       "isFavorite": false,
       "maxTokens": 8192,
       "name": "GPT 4.5",
-      "openrouterModelId": "openai/gpt-4.5-preview",
+      "openrouterModelId": "openai/gpt-4.5",
       "order": 36,
       "provider": "openai"
     }
