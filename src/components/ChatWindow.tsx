@@ -40,6 +40,9 @@ import { ChatWindowProps, Message, FileAttachmentData } from '../types/chat';
 // Constants
 import { sharedLayoutClasses, sharedGridClasses, chatboxLayoutClasses, chatboxGridClasses } from '../constants/chatLayout';
 
+// Logger
+import { debugLog, errorLog } from '../utils/logger';
+
 const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelChange, sidebarCollapsed, sidebarWidth, onToggleSidebar, onOpenSearch, currentView, onNavigateToSettings }: ChatWindowProps) => {
   // Local state
   const [input, setInput] = useState("");
@@ -351,7 +354,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       toast.dismiss();
       toast.success("Message copied to clipboard");
     } catch (error) {
-      console.error("Failed to copy message:", error);
+      errorLog("Failed to copy message:", error);
       toast.dismiss();
       toast.error("Failed to copy message");
     }
@@ -489,7 +492,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         }
       }
     } catch (error) {
-      console.error("Error retrying message:", error);
+      errorLog("Error retrying message:", error);
       setLoading(null, false);
     }
   };
@@ -548,9 +551,9 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             content: editingContent.trim(),
             attachments: [],
           });
-          console.log('[CHAT] Edited user message saved to database:', savedUserMessage.id);
+          debugLog('[CHAT] Edited user message saved to database:', savedUserMessage.id);
         } catch (error) {
-          console.error('[CHAT] Failed to save edited user message:', error);
+          errorLog('[CHAT] Failed to save edited user message:', error);
         }
 
         // Create custom save function that only saves assistant message
@@ -595,7 +598,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       toast.dismiss();
       toast.success("Message edited and conversation updated");
     } catch (error) {
-      console.error("Failed to save edit:", error);
+      errorLog("Failed to save edit:", error);
       toast.dismiss();
       toast.error("Failed to save edit");
     }
@@ -718,7 +721,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         toast.success("Conversation branched successfully with all attachments and images");
       }
     } catch (error) {
-      console.error("Error branching conversation:", error);
+      errorLog("Error branching conversation:", error);
       toast.dismiss();
       toast.error("Failed to branch conversation");
     } finally {
@@ -997,7 +1000,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             content: messageContent,
             attachments: messageFiles.map(file => file.id),
           });
-          console.log('[CHAT] User message saved to database:', savedUserMessage.id);
+          debugLog('[CHAT] User message saved to database:', savedUserMessage.id);
           
           // Update file associations if there are files
           if (messageFiles.length > 0 && savedUserMessage.id) {
@@ -1006,10 +1009,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               messageId: savedUserMessage.id,
               threadId: newThread.id,
             });
-            console.log('[CHAT] File associations updated for user message');
+            debugLog('[CHAT] File associations updated for user message');
           }
         } catch (error) {
-          console.error('[CHAT] Failed to save user message:', error);
+          errorLog('[CHAT] Failed to save user message:', error);
           // Continue anyway - user message exists optimistically
         }
 
@@ -1023,7 +1026,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             refetchThreads();
           }
         }).catch((error) => {
-          console.error("Failed to generate title:", error);
+          errorLog("Failed to generate title:", error);
         });
 
         // Start AI response streaming with custom save function that only saves assistant message
@@ -1090,7 +1093,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
             content: messageContent,
             attachments: messageFiles.map(file => file.id),
           });
-          console.log('[CHAT] User message saved to database:', savedUserMessage.id);
+          debugLog('[CHAT] User message saved to database:', savedUserMessage.id);
           
           // Update file associations if there are files
           if (messageFiles.length > 0 && savedUserMessage.id) {
@@ -1099,10 +1102,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               messageId: savedUserMessage.id,
               threadId,
             });
-            console.log('[CHAT] File associations updated for user message');
+            debugLog('[CHAT] File associations updated for user message');
           }
         } catch (error) {
-          console.error('[CHAT] Failed to save user message:', error);
+          errorLog('[CHAT] Failed to save user message:', error);
           // Continue anyway - user message exists optimistically
         }
 
@@ -1146,7 +1149,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       }
       
     } catch (error) {
-      console.error("Error sending message:", error);
+      errorLog("Error sending message:", error);
       setLoading(null, false);
     }
   };

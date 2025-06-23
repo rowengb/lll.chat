@@ -12,6 +12,7 @@ import Head from "next/head";
 import dynamic from 'next/dynamic';
 import { LoadingDots } from '@/components/LoadingDots';
 import { performanceMonitor } from '@/utils/performanceOptimizations';
+import { debugLog } from '@/utils/logger';
 
 // Intelligent code splitting with preloading  
 const ChatWindow = dynamic(() => import('@/components/ChatWindow').then(mod => ({ default: mod.ChatWindow })), {
@@ -71,7 +72,7 @@ function PerformanceWrapper({ children }: { children: React.ReactNode }) {
       const start = performance.now();
       setNavigationStart(start);
       performanceMonitor.mark(`navigation-${url}-start`);
-      console.log(`[NAVIGATION] Starting navigation to ${url}`);
+      debugLog(`[NAVIGATION] Starting navigation to ${url}`);
     };
 
     const handleRouteChangeComplete = (url: string) => {
@@ -81,16 +82,16 @@ function PerformanceWrapper({ children }: { children: React.ReactNode }) {
       performanceMonitor.mark(`navigation-${url}-end`);
       performanceMonitor.measure(`navigation-${url}`, `navigation-${url}-start`, `navigation-${url}-end`);
       
-      console.log(`[NAVIGATION] Completed navigation to ${url} in ${duration.toFixed(2)}ms`);
+      debugLog(`[NAVIGATION] Completed navigation to ${url} in ${duration.toFixed(2)}ms`);
       
       // Warn about slow navigations
       if (duration > 1000) {
-        console.warn(`[NAVIGATION] Slow navigation detected: ${url} took ${duration.toFixed(2)}ms`);
+        debugLog(`[NAVIGATION] Slow navigation detected: ${url} took ${duration.toFixed(2)}ms`);
       }
     };
 
     const handleRouteChangeError = (err: any, url: string) => {
-      console.error(`[NAVIGATION] Navigation error to ${url}:`, err);
+      debugLog(`[NAVIGATION] Navigation error to ${url}:`, err);
     };
 
     router.events.on('routeChangeStart', handleRouteChangeStart);
@@ -176,7 +177,7 @@ const MyApp: AppType = ({
     setMounted(true);
     
     const mountEnd = performance.now();
-    console.log(`[APP] App mounted in ${(mountEnd - mountStart).toFixed(2)}ms`);
+    debugLog(`[APP] App mounted in ${(mountEnd - mountStart).toFixed(2)}ms`);
   }, []);
 
   // Don't render until mounted to prevent hydration issues

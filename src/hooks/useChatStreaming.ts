@@ -5,6 +5,7 @@ import { isImageGenerationModel } from "../utils/modelUtils";
 import { createOptimisticAssistantMessage, prepareMessagesForStreaming } from "../utils/messageUtils";
 import { smartFocus } from "../utils/chatHelpers";
 import { performanceMonitor, debounce } from "../utils/performanceOptimizations";
+import { debugLog, errorLog } from "../utils/logger";
 
 // Utility function to sanitize error data for database storage
 const sanitizeErrorForStorage = (error: any): any => {
@@ -110,7 +111,7 @@ export const useChatStreaming = () => {
   );
 
   const stopStream = async () => {
-    console.log('[STREAM] Stop requested by user');
+    debugLog('[STREAM] Stop requested by user');
     performanceMonitor.mark('stream-stop-start');
     
     if (abortControllerRef.current) {
@@ -172,9 +173,9 @@ export const useChatStreaming = () => {
         
         setMessages(streamData.threadId, updatedMessages);
         
-        console.log('[STREAM] Partial response saved after user stop');
+        debugLog('[STREAM] Partial response saved after user stop');
       } catch (error) {
-        console.error('[STREAM] Failed to save partial response:', error);
+        errorLog('[STREAM] Failed to save partial response:', error);
       }
     }
     
@@ -213,7 +214,7 @@ export const useChatStreaming = () => {
   ) => {
     const streamStartTime = performance.now();
     performanceMonitor.mark(`stream-${threadId}-start`);
-    console.log(`[STREAM] Starting stream for thread: ${threadId} with model: ${selectedModel}`);
+    debugLog(`[STREAM] Starting stream for thread: ${threadId} with model: ${selectedModel}`);
     
     // Reset streaming stats
     streamingStatsRef.current = {
@@ -234,7 +235,7 @@ export const useChatStreaming = () => {
     // Create optimistic assistant message for streaming
     const optimisticAssistantMessage = createOptimisticAssistantMessage();
     
-    console.log(`🎨 [STREAM] Created optimistic message for model ${selectedModel}, isImageGen: ${isImageGenerationModel(selectedModel)}`);
+    debugLog(`🎨 [STREAM] Created optimistic message for model ${selectedModel}, isImageGen: ${isImageGenerationModel(selectedModel)}`);
 
     addMessage(threadId, optimisticAssistantMessage);
     
@@ -260,7 +261,7 @@ export const useChatStreaming = () => {
       // Add the new user message
       messages.push({ role: "user", content });
 
-      console.log(`[STREAM] Sending request with ${messages.length} messages`);
+      debugLog(`[STREAM] Sending request with ${messages.length} messages`);
 
       // Store current stream data for potential stopping
       currentStreamDataRef.current = {
@@ -326,14 +327,14 @@ export const useChatStreaming = () => {
       let imageUrl = "";
       let lineBuffer = ""; // Buffer for incomplete lines
 
-      console.log(`[STREAM] Starting to read stream...`);
+      debugLog(`[STREAM] Starting to read stream...`);
       const streamReadStart = performance.now();
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
-            console.log(`[STREAM] Stream completed in ${(performance.now() - streamReadStart).toFixed(2)}ms`);
+            debugLog(`[STREAM] Stream completed in ${(performance.now() - streamReadStart).toFixed(2)}ms`);
             break;
           }
 
@@ -369,18 +370,18 @@ export const useChatStreaming = () => {
                 const metadata = JSON.parse(jsonStr);
                 if (metadata.messageId) {
                   messageId = metadata.messageId;
-                  console.log(`[STREAM] Got message ID: ${messageId}`);
+                  debugLog(`[STREAM] Got message ID: ${messageId}`);
                   // Update stream data
                   if (currentStreamDataRef.current) {
                     currentStreamDataRef.current.messageId = messageId;
                   }
                   
-                  console.log(`[STREAM] Got message ID - waiting for first content chunk to clear loading`);
+                  debugLog(`[STREAM] Got message ID - waiting for first content chunk to clear loading`);
                 }
                 if (metadata.grounding) {
                   isGrounded = true;
                   groundingMetadata = metadata.grounding;
-                  console.log(`🔍 [STREAM] Grounding metadata received with ${groundingMetadata?.sources?.length || 0} sources`);
+                  debugLog(`🔍 [STREAM] Grounding metadata received with ${groundingMetadata?.sources?.length || 0} sources`);
                     
                     // Update stream data
                     if (currentStreamDataRef.current) {
@@ -391,7 +392,7 @@ export const useChatStreaming = () => {
                 if (metadata.imageGenerated) {
                   imageGenerated = true;
                   imageUrl = metadata.imageUrl || "";
-                  console.log(`🎨 [STREAM] Image generated: ${imageUrl}`);
+                  debugLog(`🎨 [STREAM] Image generated: ${imageUrl}`);
                   
                   // Update stream data
                   if (currentStreamDataRef.current) {
@@ -405,10 +406,10 @@ export const useChatStreaming = () => {
                   // Auto-scroll to bottom when image is generated to keep it visible
                   debouncedScroll(() => scrollToBottomPinned());
                   
-                  console.log(`🎨 [STREAM] Image URL received, keeping loading state until image loads`);
+                  debugLog(`🎨 [STREAM] Image URL received, keeping loading state until image loads`);
                 }
                 if (metadata.error) {
-                  console.error(`[STREAM] API Error: ${metadata.error}`);
+                  errorLog(`[STREAM] API Error: ${metadata.error}`);
                   
                   const errorContent = `**Error**: ${metadata.error}`;
                   
@@ -420,9 +421,9 @@ export const useChatStreaming = () => {
                         content: errorContent,
                         rawErrorData: metadata
                       });
-                      console.log('[STREAM] Error message saved to database');
+                      debugLog('[STREAM] Error message saved to database');
                     } catch (error) {
-                      console.error('[STREAM] Failed to save error message:', error);
+                      errorLog('[STREAM] Failed to save error message:', error);
                     }
                   }
                   
@@ -449,7 +450,7 @@ export const useChatStreaming = () => {
                   return; // Exit the stream processing
                 }
                 if (metadata.imageError) {
-                  console.error(`[STREAM] Image Generation Error: ${metadata.imageError}`);
+                  errorLog(`[STREAM] Image Generation Error: ${metadata.imageError}`);
                   
                   const errorContent = `**Error**: Image generation failed: ${metadata.imageError}`;
                   
@@ -461,9 +462,9 @@ export const useChatStreaming = () => {
                         content: errorContent,
                         rawErrorData: metadata
                       });
-                      console.log('[STREAM] Image error message saved to database');
+                      debugLog('[STREAM] Image error message saved to database');
                     } catch (error) {
-                      console.error('[STREAM] Failed to save image error message:', error);
+                      errorLog('[STREAM] Failed to save image error message:', error);
                     }
                   }
                   
@@ -490,7 +491,7 @@ export const useChatStreaming = () => {
                   return; // Exit the stream processing
                 }
               } catch (e) {
-                console.error('[STREAM] Failed to parse metadata:', e);
+                errorLog('[STREAM] Failed to parse metadata:', e);
                 
                 const errorContent = `**Error**: Failed to parse response metadata`;
                 const errorData = { 
@@ -506,9 +507,9 @@ export const useChatStreaming = () => {
                       content: errorContent,
                       rawErrorData: errorData
                     });
-                    console.log('[STREAM] Parse error message saved to database');
-                  } catch (error) {
-                    console.error('[STREAM] Failed to save parse error message:', error);
+                                          debugLog('[STREAM] Parse error message saved to database');
+                    } catch (error) {
+                      errorLog('[STREAM] Failed to save parse error message:', error);
                   }
                 }
                 
@@ -552,11 +553,11 @@ export const useChatStreaming = () => {
                 if (isFirstChunk && streamingStatsRef.current.firstChunkTime === 0) {
                   streamingStatsRef.current.firstChunkTime = performance.now();
                   const ttfb = streamingStatsRef.current.firstChunkTime - streamStartTime;
-                  console.log(`[STREAM] TTFB: ${ttfb.toFixed(2)}ms`);
+                  debugLog(`[STREAM] TTFB: ${ttfb.toFixed(2)}ms`);
                   
                   // Clear loading state on first content chunk
                   setLoading(null, false);
-                  console.log(`[STREAM] First content chunk received - cleared loading state`);
+                  debugLog(`[STREAM] First content chunk received - cleared loading state`);
                 }
                 
                 fullContent += contentChunk;
@@ -584,7 +585,7 @@ export const useChatStreaming = () => {
                   smartFocus(inputRef, { reason: 'stream-content' });
                 }
               } catch (e) {
-                console.error('[STREAM] Failed to parse content chunk:', e);
+                errorLog('[STREAM] Failed to parse content chunk:', e);
                 
                 const errorContent = `**Error**: Failed to parse response content`;
                 const errorData = { 
@@ -600,9 +601,9 @@ export const useChatStreaming = () => {
                       content: errorContent,
                       rawErrorData: errorData
                     });
-                    console.log('[STREAM] Content parse error message saved to database');
-                  } catch (error) {
-                    console.error('[STREAM] Failed to save content parse error message:', error);
+                                          debugLog('[STREAM] Content parse error message saved to database');
+                    } catch (error) {
+                      errorLog('[STREAM] Failed to save content parse error message:', error);
                   }
                 }
                 
@@ -640,7 +641,7 @@ export const useChatStreaming = () => {
                 }
                 
                 const doneData = JSON.parse(jsonStr);
-                console.log(`[STREAM] Stream done, final content length: ${fullContent.length}, server reported: ${doneData.length || 'unknown'}`);
+                debugLog(`[STREAM] Stream done, final content length: ${fullContent.length}, server reported: ${doneData.length || 'unknown'}`);
                 
                 // Force flush any remaining content
                 flushContentBuffer(threadId, optimisticAssistantMessage.id, true);
@@ -653,7 +654,7 @@ export const useChatStreaming = () => {
                 const avgChunkSize = streamingStatsRef.current.totalBytes / streamingStatsRef.current.totalChunks;
                 const tokensPerSecond = finalContent.length / (streamDuration / 1000);
                 
-                console.log(`[STREAM] Final stats: ${streamDuration.toFixed(2)}ms, ${streamingStatsRef.current.totalChunks} chunks, ${avgChunkSize.toFixed(1)} avg chunk size, ${tokensPerSecond.toFixed(1)} chars/sec`);
+                debugLog(`[STREAM] Final stats: ${streamDuration.toFixed(2)}ms, ${streamingStatsRef.current.totalChunks} chunks, ${avgChunkSize.toFixed(1)} avg chunk size, ${tokensPerSecond.toFixed(1)} chars/sec`);
                 
                 // Stream complete - save to DB and clean up
                 const savedMessages = await saveStreamedMessage.mutateAsync({
@@ -720,7 +721,7 @@ export const useChatStreaming = () => {
                 
                 return;
               } catch (e) {
-                console.error('[STREAM] Failed to parse done signal:', e);
+                errorLog('[STREAM] Failed to parse done signal:', e);
                 
                 const errorContent = `**Error**: Failed to parse completion signal`;
                 const errorData = { 
@@ -736,9 +737,9 @@ export const useChatStreaming = () => {
                       content: errorContent,
                       rawErrorData: errorData
                     });
-                    console.log('[STREAM] Done signal parse error message saved to database');
-                  } catch (error) {
-                    console.error('[STREAM] Failed to save done signal parse error message:', error);
+                                          debugLog('[STREAM] Done signal parse error message saved to database');
+                    } catch (error) {
+                      errorLog('[STREAM] Failed to save done signal parse error message:', error);
                   }
                 }
                 
@@ -770,7 +771,7 @@ export const useChatStreaming = () => {
         
         // Process any remaining buffered line when stream ends
         if (lineBuffer.trim()) {
-          console.log(`[STREAM] Processing final buffered line: ${lineBuffer.substring(0, 100)}...`);
+          debugLog(`[STREAM] Processing final buffered line: ${lineBuffer.substring(0, 100)}...`);
           
                      // Handle the final line using the same logic
            if (lineBuffer.startsWith('f:')) {
@@ -784,7 +785,7 @@ export const useChatStreaming = () => {
                
                const metadata = JSON.parse(jsonStr);
               if (metadata.error) {
-                console.error(`[STREAM] Final line API Error: ${metadata.error}`);
+                errorLog(`[STREAM] Final line API Error: ${metadata.error}`);
                 
                 const errorContent = `**Error**: ${metadata.error}`;
                 
@@ -795,9 +796,9 @@ export const useChatStreaming = () => {
                       content: errorContent,
                       rawErrorData: metadata
                     });
-                    console.log('[STREAM] Final line error message saved to database');
+                    debugLog('[STREAM] Final line error message saved to database');
                   } catch (error) {
-                    console.error('[STREAM] Failed to save final line error message:', error);
+                    errorLog('[STREAM] Failed to save final line error message:', error);
                   }
                 }
                 
@@ -822,7 +823,7 @@ export const useChatStreaming = () => {
                 return;
               }
             } catch (e) {
-              console.error('[STREAM] Failed to parse final buffered metadata line:', e);
+              errorLog('[STREAM] Failed to parse final buffered metadata line:', e);
               
               const errorContent = `**Error**: Failed to parse final response metadata`;
               const errorData = { 
@@ -837,9 +838,9 @@ export const useChatStreaming = () => {
                     content: errorContent,
                     rawErrorData: errorData
                   });
-                  console.log('[STREAM] Final line parse error message saved to database');
-                } catch (error) {
-                  console.error('[STREAM] Failed to save final line parse error message:', error);
+                                      debugLog('[STREAM] Final line parse error message saved to database');
+                  } catch (error) {
+                    errorLog('[STREAM] Failed to save final line parse error message:', error);
                 }
               }
               
@@ -870,11 +871,11 @@ export const useChatStreaming = () => {
       }
 
     } catch (error: any) {
-      console.error('[STREAM] Streaming error:', error);
+      errorLog('[STREAM] Streaming error:', error);
       
       // Handle abort gracefully
       if (error.name === 'AbortError') {
-        console.log('[STREAM] Stream aborted by user');
+        debugLog('[STREAM] Stream aborted by user');
         return;
       }
       
@@ -892,9 +893,9 @@ export const useChatStreaming = () => {
             content: errorContent,
             rawErrorData: sanitizedErrorData
           });
-          console.log('[STREAM] Stream error message saved to database');
+          debugLog('[STREAM] Stream error message saved to database');
         } catch (saveError) {
-          console.error('[STREAM] Failed to save stream error message:', saveError);
+          errorLog('[STREAM] Failed to save stream error message:', saveError);
         }
       }
       
