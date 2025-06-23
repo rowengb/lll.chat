@@ -54,6 +54,11 @@ const SettingsPage: NextPage = () => {
   const [selectedDefaultModel, setSelectedDefaultModel] = useState<string>("");
   const [titleGenerationModelSaved, setTitleGenerationModelSaved] = useState(false);
   const [selectedTitleGenerationModel, setSelectedTitleGenerationModel] = useState<string>("");
+  
+  // Delete account state
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { useOpenRouter, setUseOpenRouter } = useOpenRouterStore();
   const [activeSettingsTab, setActiveSettingsTab] = useState<'api-keys' | 'account'>('account');
@@ -69,6 +74,7 @@ const SettingsPage: NextPage = () => {
   const setDefaultModelMutation = trpc.userPreferences.setDefaultModel.useMutation();
   const setTitleGenerationModelMutation = trpc.userPreferences.setTitleGenerationModel.useMutation();
   const setOpenRouterModeMutation = trpc.userPreferences.setOpenRouterMode.useMutation();
+  const deleteAccountMutation = trpc.userPreferences.deleteAccount.useMutation();
   const utils = trpc.useUtils();
 
   // Set active tab based on URL parameter
@@ -406,6 +412,39 @@ const SettingsPage: NextPage = () => {
     router.push('/settings?tab=api-keys', undefined, { shallow: true });
   };
 
+  const handleDeleteAccount = () => {
+    setShowDeleteConfirmation(true);
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirmation(false);
+    setDeleteConfirmationText("");
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deleteConfirmationText !== "DELETE MY ACCOUNT") {
+      toast.error("Please type 'DELETE MY ACCOUNT' exactly as shown");
+      return;
+    }
+
+    setIsDeleting(true);
+    
+    try {
+      await deleteAccountMutation.mutateAsync({
+        confirmationText: deleteConfirmationText,
+      });
+      
+      toast.success("Account deleted successfully");
+      
+      // Sign out the user and redirect to home
+      window.location.href = '/';
+    } catch (error: any) {
+      console.error("Error deleting account:", error);
+      toast.error(error.message || "Failed to delete account");
+      setIsDeleting(false);
+    }
+  };
+
   // Redirect to home if not authenticated
   if (!isLoaded) {
     return (
@@ -451,10 +490,10 @@ const SettingsPage: NextPage = () => {
         <div className="sm:hidden fixed top-0 left-0 right-0 z-50 bg-background border-b border-border">
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={navigateToWelcome}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={navigateToWelcome}
                 className="rounded-xl hover:bg-white dark:hover:bg-muted p-2"
               >
                 <ArrowLeftIcon className="h-4 w-4" />
@@ -504,48 +543,48 @@ const SettingsPage: NextPage = () => {
                 size="sm"
                 onClick={navigateToWelcome}
                 className="rounded-xl hover:bg-white dark:hover:bg-muted p-2"
-              >
-                <ArrowLeftIcon className="h-4 w-4" />
-              </Button>
-              <div>
+                >
+                  <ArrowLeftIcon className="h-4 w-4" />
+                </Button>
+                <div>
                 <h1 className="text-lg font-semibold text-foreground">Settings</h1>
                 <p className="text-xs text-muted-foreground">
                   Manage your preferences
-                </p>
+                  </p>
+                </div>
               </div>
-            </div>
 
             {/* Navigation Tabs */}
             <div className="flex-1 p-4">
               <nav className="space-y-2">
-                <button
-                  onClick={switchToAccountTab}
+                    <button
+                      onClick={switchToAccountTab}
                   className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all ${
-                    activeSettingsTab === 'account'
+                        activeSettingsTab === 'account'
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground hover:bg-white dark:hover:bg-muted'
-                  }`}
+                      }`}
                   style={{ borderRadius: '12px' }}
-                >
-                  <UserIcon className="h-4 w-4" />
-                  Account
-                </button>
-                <button
-                  onClick={switchToApiKeysTab}
+                    >
+                        <UserIcon className="h-4 w-4" />
+                        Account
+                    </button>
+                    <button
+                      onClick={switchToApiKeysTab}
                   className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-all ${
-                    activeSettingsTab === 'api-keys'
+                        activeSettingsTab === 'api-keys'
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground hover:bg-white dark:hover:bg-muted'
-                  }`}
+                      }`}
                   style={{ borderRadius: '12px' }}
-                >
-                  <KeyIcon className="h-4 w-4" />
-                  API Keys
-                </button>
-              </nav>
+                    >
+                        <KeyIcon className="h-4 w-4" />
+                        API Keys
+                    </button>
+                  </nav>
             </div>
           </div>
-        </div>
+                </div>
 
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0">
@@ -556,292 +595,400 @@ const SettingsPage: NextPage = () => {
                 <div className="px-4 sm:px-8 py-4 sm:py-8 pb-16">
                   <div className="max-w-4xl">
                     <div className="p-3 sm:p-6">
-                      {activeSettingsTab === 'account' ? (
+                  {activeSettingsTab === 'account' ? (
                         <div className="space-y-4 sm:space-y-4">
                           {/* Header with Sign Out Button */}
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                            <div>
-                              <h2 className="text-lg font-medium text-foreground">Account Settings</h2>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                Manage your account settings and preferences
-                              </p>
-                            </div>
-                            <SignOutButton>
+                        <div>
+                          <h2 className="text-lg font-medium text-foreground">Account Settings</h2>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Manage your account settings and preferences
+                          </p>
+                        </div>
+                        <SignOutButton>
                               <Button variant="outline" size="sm" className="flex items-center gap-2 w-full sm:w-auto justify-center">
-                                <LogOutIcon className="h-4 w-4" />
-                                Sign Out
-                              </Button>
-                            </SignOutButton>
-                          </div>
+                            <LogOutIcon className="h-4 w-4" />
+                            Sign Out
+                          </Button>
+                        </SignOutButton>
+                      </div>
 
                           {/* Divider */}
                           <div className="border-t border-border"></div>
 
-                          {/* Theme Toggle */}
+                      {/* Theme Toggle */}
                           <div className="pt-2 sm:pt-6">
-                            <ThemeToggle />
-                          </div>
+                        <ThemeToggle />
+                      </div>
 
-                          {/* Profile Management */}
+                      {/* Profile Management */}
                           <div className="pt-2 sm:pt-6 border-t border-border">
-                            <div className="mb-4">
+                        <div className="mb-4">
                               <h4 className="text-lg font-medium text-foreground mb-2">Profile Management</h4>
+                          <p className="text-sm text-muted-foreground">
+                            Manage your profile, security settings, and connected accounts
+                          </p>
+                        </div>
+                        
+                        <div className="w-full">
+                          <UserProfile 
+                            routing="hash"
+                            appearance={{
+                              elements: {
+                                rootBox: {
+                                  boxShadow: "none !important",
+                                  width: "100%",
+                                  maxWidth: "none",
+                                  border: "1px solid hsl(var(--border))",
+                                  borderRadius: "0.75rem"
+                                },
+                                card: {
+                                  boxShadow: "none !important",
+                                  width: "100%",
+                                  maxWidth: "none",
+                                  border: "none"
+                                },
+                                cardBox: {
+                                  boxShadow: "none !important",
+                                  width: "100%",
+                                  maxWidth: "none",
+                                  border: "none"
+                                },
+                                main: {
+                                  boxShadow: "none !important",
+                                  width: "100%",
+                                  border: "none"
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                          {/* Delete Account Section */}
+                          <div className="pt-6 border-t border-border">
+                            <div className="mb-4">
+                              <h4 className="text-lg font-medium text-destructive mb-2">Danger Zone</h4>
                               <p className="text-sm text-muted-foreground">
-                                Manage your profile, security settings, and connected accounts
+                                Permanently delete your account and all associated data. This action cannot be undone.
                               </p>
                             </div>
                             
-                            <div className="w-full">
-                              <UserProfile 
-                                routing="hash"
-                                appearance={{
-                                  elements: {
-                                    rootBox: {
-                                      boxShadow: "none !important",
-                                      width: "100%",
-                                      maxWidth: "none",
-                                      border: "1px solid hsl(var(--border))",
-                                      borderRadius: "0.75rem"
-                                    },
-                                    card: {
-                                      boxShadow: "none !important",
-                                      width: "100%",
-                                      maxWidth: "none",
-                                      border: "none"
-                                    },
-                                    cardBox: {
-                                      boxShadow: "none !important",
-                                      width: "100%",
-                                      maxWidth: "none",
-                                      border: "none"
-                                    },
-                                    main: {
-                                      boxShadow: "none !important",
-                                      width: "100%",
-                                      border: "none"
-                                    }
-                                  }
-                                }}
-                              />
+                            <div className="p-4 border border-destructive/20 rounded-xl bg-destructive/5">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                <div>
+                                  <h5 className="text-sm font-medium text-foreground mb-1">Delete Account</h5>
+                                  <p className="text-xs text-muted-foreground">
+                                    This will permanently delete your account, all conversations, files, and settings.
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={handleDeleteAccount}
+                                  className="w-full sm:w-auto"
+                                >
+                                  <TrashIcon className="h-4 w-4 mr-2" />
+                                  Delete Account
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ) : (
+                    </div>
+                  ) : (
                         <div className="space-y-4 sm:space-y-6">
-                          {/* API Keys Content */}
-                          <div>
-                            <h2 className="text-lg font-medium text-foreground">API Keys</h2>
+                      {/* API Keys Content */}
+                      <div>
+                          <h2 className="text-lg font-medium text-foreground">API Keys</h2>
                             <p className="text-sm text-muted-foreground mt-1">
-                              Configure your API keys for different AI providers
-                            </p>
-                          </div>
+                          Configure your API keys for different AI providers
+                        </p>
+                      </div>
 
                           {/* Divider */}
                           <div className="border-t border-border"></div>
 
-                          {/* Mode Toggle */}
+                      {/* Mode Toggle */}
                           <div className="p-3 sm:p-4 bg-muted/50 border border-border rounded-xl">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                               <div className="flex-1">
                                 <h3 className="text-sm font-medium text-foreground mb-1">API Key Mode</h3>
-                                <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                   Choose between individual API keys or OpenRouter for unified access
-                                </p>
-                              </div>
+                              </p>
+                            </div>
                               <div className="flex items-center gap-3 justify-center sm:justify-end">
-                                <span className={`text-xs font-medium ${!useOpenRouter ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                  Individual
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleMode(!useOpenRouter)}
-                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
-                                    useOpenRouter ? 'bg-primary' : 'bg-muted-foreground/20'
-                                  }`}
-                                >
-                                  <span
-                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                      useOpenRouter ? 'translate-x-6' : 'translate-x-1'
-                                    }`}
-                                  />
-                                </button>
-                                <span className={`text-xs font-medium ${useOpenRouter ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                  OpenRouter
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="space-y-4 sm:space-y-6">
-                            {(Object.keys(apiKeys) as Array<keyof ApiKeys>)
-                              .filter(provider => useOpenRouter ? provider === 'openrouter' : provider !== 'openrouter')
-                              .map((provider) => (
-                              <div key={provider} className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <label className="text-sm font-medium text-foreground">
-                                    {getProviderInfo(provider).name}
-                                  </label>
-                                  {apiKeys[provider] && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleClear(provider)}
-                                      className="text-destructive hover:text-destructive hover:bg-destructive/10 p-2 h-8 w-8"
-                                    >
-                                      <TrashIcon className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                                
-                                <div className="relative">
-                                  <Input
-                                    type={showKeys[provider] ? "text" : "password"}
-                                    placeholder={getProviderInfo(provider).placeholder}
-                                    value={showKeys[provider] ? apiKeys[provider] : maskKey(apiKeys[provider])}
-                                    onChange={(e) => handleKeyChange(provider, e.target.value)}
-                                    onFocus={() => setShowKeys(prev => ({ ...prev, [provider]: true }))}
-                                    onBlur={() => setShowKeys(prev => ({ ...prev, [provider]: false }))}
-                                    className="pr-12 bg-muted border-border focus:bg-background focus:border-ring transition-colors h-12 text-base sm:text-sm sm:h-10"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleKeyVisibility(provider)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
-                                  >
-                                    {showKeys[provider] ? (
-                                      <EyeOffIcon className="h-4 w-4" />
-                                    ) : (
-                                      <EyeIcon className="h-4 w-4" />
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                            
-                            <div className="pt-4 border-t border-border">
-                              <Button 
-                                onClick={handleSave}
-                                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-3 px-4 transition-colors h-12 text-base font-medium"
-                              >
-                                {saved ? (
-                                  <span className="flex items-center gap-2">
-                                    <CheckIcon className="h-4 w-4" />
-                                    Saved!
-                                  </span>
-                                ) : (
-                                  "Save API Keys"
-                                )}
-                              </Button>
-                              
-                              <p className="text-xs text-muted-foreground mt-3 text-center px-2">
-                                API keys are encrypted and stored securely in the database.
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Default Chat Model Section */}
-                          <div className="pt-6 border-t border-border">
-                            <div className="mb-4">
-                              <h3 className="text-lg font-medium text-foreground mb-2 flex items-center gap-2">
-                                <MessageSquare className="h-5 w-5 text-black dark:text-primary" />
-                                Default Chat Model
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                Choose your preferred AI model for new conversations
-                              </p>
-                            </div>
-                            
-                            <div className="space-y-4">
-                              <div className="px-3 sm:px-4 py-3 sm:py-2 border border-border rounded-xl bg-muted">
-                                <ModelSelector
-                                  selectedModel={selectedDefaultModel || ""}
-                                  onModelChange={handleSetDefaultModel}
-                                  size="lg"
-                                  favoriteModels={favoriteModels}
-                                  otherModels={otherModels}
-                                  apiKeys={dbApiKeys}
-                                />
-                              </div>
-                              
-                              {selectedDefaultModel && (
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl">
-                                  <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                                    <CheckIcon className="h-4 w-4" />
-                                    <span className="text-sm font-medium">
-                                      {defaultModelSaved ? "Default model updated!" : "Default model set"}
-                                    </span>
-                                  </div>
-                                  <button
-                                    onClick={handleClearDefaultModel}
-                                    className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-sm underline self-start sm:self-auto"
-                                  >
-                                    Clear
-                                  </button>
-                                </div>
-                              )}
-                              
-                              <p className="text-xs text-muted-foreground px-1">
-                                Only models with API keys are available for selection. When no default is set, the cheapest available model will be used automatically.
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Title Generation Model Section */}
-                          <div className="pt-6 border-t border-border">
-                            <div className="mb-4">
-                              <h3 className="text-lg font-medium text-foreground mb-2 flex items-center gap-2">
-                                <TypeIcon className="h-5 w-5 text-black dark:text-primary" />
-                                Default Title Generation Model
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                Choose the AI model used to automatically generate chat titles
-                              </p>
-                            </div>
-                            
-                            <div className="space-y-4">
-                              <div className="px-3 sm:px-4 py-3 sm:py-2 border border-border rounded-xl bg-muted">
-                                <ModelSelector
-                                  selectedModel={selectedTitleGenerationModel || "gpt-4o-mini"}
-                                  onModelChange={handleSetTitleGenerationModel}
-                                  size="lg"
-                                  favoriteModels={favoriteModels}
-                                  otherModels={otherModels}
-                                  apiKeys={dbApiKeys}
-                                />
-                              </div>
-                              
-                              {selectedTitleGenerationModel && (
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl">
-                                  <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                                    <CheckIcon className="h-4 w-4" />
-                                    <span className="text-sm font-medium">
-                                      {titleGenerationModelSaved ? "Title generation model updated!" : "Title generation model set"}
-                                    </span>
-                                  </div>
-                                  <button
-                                    onClick={handleClearTitleGenerationModel}
-                                    className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-sm underline self-start sm:self-auto"
-                                  >
-                                    Reset to Default
-                                  </button>
-                                </div>
-                              )}
-                              
-                              <p className="text-xs text-muted-foreground px-1">
-                                This model will be used to automatically generate descriptive titles for your conversations. Defaults to GPT-4o Mini for cost efficiency.
-                              </p>
-                            </div>
+                            <span className={`text-xs font-medium ${!useOpenRouter ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              Individual
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleMode(!useOpenRouter)}
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
+                                useOpenRouter ? 'bg-primary' : 'bg-muted-foreground/20'
+                              }`}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  useOpenRouter ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                            <span className={`text-xs font-medium ${useOpenRouter ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              OpenRouter
+                            </span>
                           </div>
                         </div>
-                      )}
+                      </div>
+                      
+                          <div className="space-y-4 sm:space-y-6">
+                        {(Object.keys(apiKeys) as Array<keyof ApiKeys>)
+                          .filter(provider => useOpenRouter ? provider === 'openrouter' : provider !== 'openrouter')
+                          .map((provider) => (
+                          <div key={provider} className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <label className="text-sm font-medium text-foreground">
+                                {getProviderInfo(provider).name}
+                              </label>
+                              {apiKeys[provider] && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleClear(provider)}
+                                      className="text-destructive hover:text-destructive hover:bg-destructive/10 p-2 h-8 w-8"
+                                >
+                                  <TrashIcon className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                            
+                            <div className="relative">
+                              <Input
+                                type={showKeys[provider] ? "text" : "password"}
+                                placeholder={getProviderInfo(provider).placeholder}
+                                value={showKeys[provider] ? apiKeys[provider] : maskKey(apiKeys[provider])}
+                                onChange={(e) => handleKeyChange(provider, e.target.value)}
+                                onFocus={() => setShowKeys(prev => ({ ...prev, [provider]: true }))}
+                                onBlur={() => setShowKeys(prev => ({ ...prev, [provider]: false }))}
+                                    className="pr-12 bg-muted border-border focus:bg-background focus:border-ring transition-colors h-12 text-base sm:text-sm sm:h-10"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => toggleKeyVisibility(provider)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
+                              >
+                                {showKeys[provider] ? (
+                                  <EyeOffIcon className="h-4 w-4" />
+                                ) : (
+                                  <EyeIcon className="h-4 w-4" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        <div className="pt-4 border-t border-border">
+                          <Button 
+                            onClick={handleSave}
+                                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl py-3 px-4 transition-colors h-12 text-base font-medium"
+                          >
+                            {saved ? (
+                              <span className="flex items-center gap-2">
+                                <CheckIcon className="h-4 w-4" />
+                                Saved!
+                              </span>
+                            ) : (
+                              "Save API Keys"
+                            )}
+                          </Button>
+                          
+                              <p className="text-xs text-muted-foreground mt-3 text-center px-2">
+                            API keys are encrypted and stored securely in the database.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Default Chat Model Section */}
+                      <div className="pt-6 border-t border-border">
+                        <div className="mb-4">
+                          <h3 className="text-lg font-medium text-foreground mb-2 flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5 text-black dark:text-primary" />
+                            Default Chat Model
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Choose your preferred AI model for new conversations
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                              <div className="px-3 sm:px-4 py-3 sm:py-2 border border-border rounded-xl bg-muted">
+                            <ModelSelector
+                              selectedModel={selectedDefaultModel || ""}
+                              onModelChange={handleSetDefaultModel}
+                              size="lg"
+                                  favoriteModels={favoriteModels}
+                                  otherModels={otherModels}
+                                  apiKeys={dbApiKeys}
+                            />
+                          </div>
+                          
+                          {selectedDefaultModel && (
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl">
+                              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                                <CheckIcon className="h-4 w-4" />
+                                <span className="text-sm font-medium">
+                                  {defaultModelSaved ? "Default model updated!" : "Default model set"}
+                                </span>
+                              </div>
+                              <button
+                                onClick={handleClearDefaultModel}
+                                    className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-sm underline self-start sm:self-auto"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          )}
+                          
+                              <p className="text-xs text-muted-foreground px-1">
+                            Only models with API keys are available for selection. When no default is set, the cheapest available model will be used automatically.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Title Generation Model Section */}
+                      <div className="pt-6 border-t border-border">
+                        <div className="mb-4">
+                          <h3 className="text-lg font-medium text-foreground mb-2 flex items-center gap-2">
+                            <TypeIcon className="h-5 w-5 text-black dark:text-primary" />
+                            Default Title Generation Model
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            Choose the AI model used to automatically generate chat titles
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-4">
+                              <div className="px-3 sm:px-4 py-3 sm:py-2 border border-border rounded-xl bg-muted">
+                            <ModelSelector
+                              selectedModel={selectedTitleGenerationModel || "gpt-4o-mini"}
+                              onModelChange={handleSetTitleGenerationModel}
+                              size="lg"
+                                  favoriteModels={favoriteModels}
+                                  otherModels={otherModels}
+                                  apiKeys={dbApiKeys}
+                            />
+                          </div>
+                          
+                          {selectedTitleGenerationModel && (
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-xl">
+                              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                                <CheckIcon className="h-4 w-4" />
+                                <span className="text-sm font-medium">
+                                  {titleGenerationModelSaved ? "Title generation model updated!" : "Title generation model set"}
+                                </span>
+                              </div>
+                              <button
+                                onClick={handleClearTitleGenerationModel}
+                                    className="text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 text-sm underline self-start sm:self-auto"
+                              >
+                                Reset to Default
+                              </button>
+                            </div>
+                          )}
+                          
+                              <p className="text-xs text-muted-foreground px-1">
+                            This model will be used to automatically generate descriptive titles for your conversations. Defaults to GPT-4o Mini for cost efficiency.
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </main>
-            </CustomScrollbar>
+                  )}
+              </div>
+            </div>
           </div>
+        </main>
+            </CustomScrollbar>
+      </div>
         </div>
       </div>
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteConfirmation && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-50 px-4"
+          onClick={handleCancelDelete}
+        >
+          <div 
+            className="bg-card rounded-lg shadow-xl max-w-md w-full mx-4 p-6 border border-border"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 bg-destructive/10 rounded-full flex items-center justify-center">
+                <TrashIcon className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Delete Account</h3>
+                <p className="text-sm text-muted-foreground">This action cannot be undone</p>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-foreground mb-4">
+                This will permanently delete your account and all associated data including:
+              </p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1 mb-4">
+                <li>All conversations and messages</li>
+                <li>Uploaded files and attachments</li>
+                <li>API keys and settings</li>
+                <li>Model preferences and favorites</li>
+              </ul>
+              <p className="text-foreground font-medium">
+                To confirm, type <span className="font-mono bg-muted px-2 py-1 rounded text-destructive">DELETE MY ACCOUNT</span> below:
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <Input
+                type="text"
+                value={deleteConfirmationText}
+                onChange={(e) => setDeleteConfirmationText(e.target.value)}
+                placeholder="Type 'DELETE MY ACCOUNT' to confirm"
+                className="w-full"
+                disabled={isDeleting}
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={handleCancelDelete}
+                className="flex-1"
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleConfirmDelete}
+                className="flex-1"
+                disabled={isDeleting || deleteConfirmationText !== "DELETE MY ACCOUNT"}
+              >
+                {isDeleting ? (
+                  <>
+                    <LoadingDots />
+                    <span className="ml-2">Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <TrashIcon className="h-4 w-4 mr-2" />
+                    Delete Forever
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

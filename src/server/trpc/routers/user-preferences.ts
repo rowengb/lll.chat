@@ -3,9 +3,15 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { createClerkClient } from "@clerk/nextjs/server";
 
 // Initialize Convex client for server-side operations
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
+// Initialize Clerk client for server-side operations
+const clerkClient = createClerkClient({
+  secretKey: process.env.CLERK_SECRET_KEY,
+});
 
 // Type definition for model data from Convex
 interface ModelData {
@@ -204,5 +210,48 @@ export const userPreferencesRouter = createTRPCRouter({
       modelName: null,
       useOpenRouterMode
     };
+  }),
+
+  // Delete user account and all associated data
+  deleteAccount: protectedProcedure
+    .input(z.object({
+      confirmationText: z.string().min(1, "Confirmation text is required"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Verify confirmation text
+      if (input.confirmationText !== "DELETE MY ACCOUNT") {
+        throw new Error("Confirmation text must be exactly 'DELETE MY ACCOUNT'");
+      }
+
+      try {
+        // Step 1: Delete all user data from Convex database
+        console.log("Deleting user data from Convex...");
+        const result = await convex.mutation(api.users.deleteAccount, {
+          authId: ctx.userId,
+        });
+
+        // Step 2: Delete user from Clerk
+        console.log("Deleting user from Clerk...");
+        await clerkClient.users.deleteUser(ctx.userId);
+
+        console.log("Account deletion completed successfully");
+        return { 
+          success: true, 
+          message: "Your account and all associated data have been permanently deleted from both our database and authentication provider." 
+        };
+      } catch (error) {
+        console.error("Error deleting account:", error);
+        
+        // Provide more specific error messages
+        if (error instanceof Error) {
+          if (error.message.includes("User not found")) {
+            throw new Error("Account not found. It may have already been deleted.");
+          } else if (error.message.includes("clerk")) {
+            throw new Error("Failed to delete account from authentication provider. Please contact support.");
+          }
+        }
+        
+        throw new Error("Failed to delete account. Please try again or contact support.");
+      }
   }),
 }); 

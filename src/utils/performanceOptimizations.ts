@@ -250,5 +250,219 @@ export const performanceMonitor = {
       return performance.getEntriesByType('measure');
     }
     return [];
+  },
+
+  measureRender(componentName: string, renderFn: () => void): void {
+    const start = performance.now();
+    renderFn();
+    const end = performance.now();
+    
+    if (end - start > 16) {
+      console.warn(`Slow render detected: ${componentName} took ${(end - start).toFixed(2)}ms`);
+    }
+  },
+
+  measureAsync<T>(name: string, asyncFn: () => Promise<T>): Promise<T> {
+    const start = performance.now();
+    return asyncFn().finally(() => {
+      const end = performance.now();
+      if (end - start > 100) {
+        console.warn(`Slow async operation: ${name} took ${(end - start).toFixed(2)}ms`);
+      }
+    });
+  }
+};
+
+// Performance optimization utilities for chat application
+
+// Compression utilities for localStorage
+export const compression = {
+  compress(data: any): string {
+    try {
+      const jsonString = JSON.stringify(data);
+      // Simple compression using a basic dictionary approach
+      const dict: Record<string, string> = {
+        '"id"': '§i',
+        '"title"': '§t',
+        '"model"': '§m',
+        '"content"': '§c',
+        '"role"': '§r',
+        '"user"': '§u',
+        '"assistant"': '§a',
+        '"_creationTime"': '§ct',
+        '"threadId"': '§ti',
+        '"messages"': '§ms',
+        '"threads"': '§ts',
+        'true': '§T',
+        'false': '§F',
+        'null': '§N'
+      };
+      
+      let compressed = jsonString;
+      Object.entries(dict).forEach(([key, value]) => {
+        compressed = compressed.replace(new RegExp(key, 'g'), value);
+      });
+      
+      return compressed;
+    } catch {
+      return JSON.stringify(data);
+    }
+  },
+
+  decompress(compressedData: string): any {
+    try {
+      const dict: Record<string, string> = {
+        '§i': '"id"',
+        '§t': '"title"',
+        '§m': '"model"',
+        '§c': '"content"',
+        '§r': '"role"',
+        '§u': '"user"',
+        '§a': '"assistant"',
+        '§ct': '"_creationTime"',
+        '§ti': '"threadId"',
+        '§ms': '"messages"',
+        '§ts': '"threads"',
+        '§T': 'true',
+        '§F': 'false',
+        '§N': 'null'
+      };
+      
+      let decompressed = compressedData;
+      Object.entries(dict).forEach(([key, value]) => {
+        decompressed = decompressed.replace(new RegExp(key, 'g'), value);
+      });
+      
+      return JSON.parse(decompressed);
+    } catch {
+      return JSON.parse(compressedData);
+    }
+  }
+};
+
+// Cache management utilities
+export const cacheUtils = {
+  set(key: string, data: any, ttl: number = 300000): void {
+    try {
+      const item = {
+        data,
+        timestamp: Date.now(),
+        ttl
+      };
+      const compressed = compression.compress(item);
+      localStorage.setItem(key, compressed);
+    } catch (error) {
+      // Handle storage quota exceeded
+      console.warn('Cache storage failed:', error);
+      this.cleanup();
+    }
+  },
+
+  get<T>(key: string): T | null {
+    try {
+      const item = localStorage.getItem(key);
+      if (!item) return null;
+      
+      const decompressed = compression.decompress(item);
+      
+      if (Date.now() - decompressed.timestamp > decompressed.ttl) {
+        localStorage.removeItem(key);
+        return null;
+      }
+      
+      return decompressed.data;
+    } catch {
+      localStorage.removeItem(key);
+      return null;
+    }
+  },
+
+  isStale(key: string, staleTime: number = 60000): boolean {
+    try {
+      const item = localStorage.getItem(key);
+      if (!item) return true;
+      
+      const decompressed = compression.decompress(item);
+      return Date.now() - decompressed.timestamp > staleTime;
+    } catch {
+      return true;
+    }
+  },
+
+  cleanup(): void {
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('chat_cache_')) {
+        try {
+          const item = localStorage.getItem(key);
+          if (item) {
+            const decompressed = compression.decompress(item);
+            if (Date.now() - decompressed.timestamp > decompressed.ttl) {
+              keysToRemove.push(key);
+            }
+          }
+        } catch {
+          keysToRemove.push(key);
+        }
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+  }
+};
+
+
+
+// Memory management
+export const memoryUtils = {
+  clearOldCaches(): void {
+    cacheUtils.cleanup();
+  },
+
+  getMemoryUsage(): { used: number; total: number } {
+    if ('storage' in navigator && 'estimate' in navigator.storage) {
+      return navigator.storage.estimate().then(estimate => ({
+        used: estimate.usage || 0,
+        total: estimate.quota || 0
+      })) as any;
+    }
+    return { used: 0, total: 0 };
+  }
+};
+
+// Prefetch queue management
+export const prefetchQueue = {
+  queue: new Set<string>(),
+  processing: false,
+
+  add(key: string): void {
+    this.queue.add(key);
+    this.process();
+  },
+
+  async process(): Promise<void> {
+    if (this.processing || this.queue.size === 0) return;
+    
+    this.processing = true;
+    const items = Array.from(this.queue);
+    this.queue.clear();
+    
+    // Process items in batches to avoid overwhelming the system
+    for (let i = 0; i < items.length; i += 3) {
+      const batch = items.slice(i, i + 3);
+      await Promise.allSettled(
+        batch.map(async (key) => {
+          // Custom prefetch logic would go here
+          await new Promise(resolve => setTimeout(resolve, 10));
+        })
+      );
+    }
+    
+    this.processing = false;
+    
+    // Process any new items that were added during processing
+    if (this.queue.size > 0) {
+      this.process();
+    }
   }
 }; 

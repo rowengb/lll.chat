@@ -20,11 +20,11 @@ export function LoadingDots({ text = "Loading", size = 'md', className = '' }: L
   return (
     <div className={`flex items-center space-x-3 ${className}`}>
       <div className="flex items-center space-x-1">
-        <div className={`${dotSizes[size]} animate-pulse rounded-full bg-muted-foreground`}></div>
-        <div className={`${dotSizes[size]} animate-pulse rounded-full bg-muted-foreground animation-delay-100`}></div>
-        <div className={`${dotSizes[size]} animate-pulse rounded-full bg-muted-foreground animation-delay-200`}></div>
+        <div className={`${dotSizes[size]} animate-pulse rounded-full bg-foreground/70`}></div>
+        <div className={`${dotSizes[size]} animate-pulse rounded-full bg-foreground/70 animation-delay-100`}></div>
+        <div className={`${dotSizes[size]} animate-pulse rounded-full bg-foreground/70 animation-delay-200`}></div>
       </div>
-      <span className={`${textSizes[size]} text-muted-foreground animate-pulse`}>{text}...</span>
+      <span className={`${textSizes[size]} text-foreground/80 animate-pulse`}>{text}...</span>
     </div>
   );
 } 

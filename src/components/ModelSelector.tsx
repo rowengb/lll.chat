@@ -195,38 +195,47 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
   
   // Fetch models from database only if not provided as props
   const { data: fetchedFavoriteModels = [] } = trpc.models.getFavoriteModels.useQuery(undefined, {
-    enabled: !propFavoriteModels
+    enabled: propFavoriteModels === undefined
   });
   const { data: fetchedOtherModels = [] } = trpc.models.getOtherModels.useQuery(undefined, {
-    enabled: !propOtherModels
+    enabled: propOtherModels === undefined
   });
   
   // Use props if available, otherwise use fetched data
-  const favoriteModels = propFavoriteModels || fetchedFavoriteModels;
-  const otherModels = propOtherModels || fetchedOtherModels;
+  const favoriteModels = propFavoriteModels ?? fetchedFavoriteModels;
+  const otherModels = propOtherModels ?? fetchedOtherModels;
   const allModels = [...favoriteModels, ...otherModels];
   
-  // Initialize store with first available model if no model is selected
+  // Sync store with prop when selectedModel changes
   useEffect(() => {
-    if (!selectedModelData && allModels.length > 0 && !selectedModel) {
+    if (selectedModel && allModels.length > 0) {
+      const modelFromProp = allModels.find(model => model.id === selectedModel);
+      // Only update if the model exists and is different from what's in the store
+      if (modelFromProp && selectedModelData?.id !== selectedModel) {
+        setSelectedModel(selectedModel, modelFromProp);
+      }
+    } else if (!selectedModel && !selectedModelData && allModels.length > 0) {
+      // Initialize with first model if nothing is selected
       const firstModel = allModels[0];
       if (firstModel) {
         setSelectedModel(firstModel.id, firstModel);
         // Don't call onModelChange here - only call it when user explicitly selects a model
       }
     }
-  }, [allModels.length, selectedModelData, selectedModel, setSelectedModel]);
+  }, [selectedModel, allModels.length, setSelectedModel]); // Removed selectedModelData from deps
   
-  // Fallback to tRPC data if store doesn't have the current model
-  const currentModel = selectedModelData || allModels.find(model => model.id === selectedModel);
+  // Always prioritize the prop over the store for display
+  const currentModel = selectedModel 
+    ? allModels.find(model => model.id === selectedModel) || selectedModelData
+    : selectedModelData;
   
   // Fetch API keys only if not provided as props
   const { data: fetchedApiKeys } = trpc.apiKeys.getApiKeys.useQuery(undefined, {
-    enabled: !propApiKeys
+    enabled: propApiKeys === undefined
   });
   
   // Use props if available, otherwise use fetched data
-  const apiKeys = propApiKeys || fetchedApiKeys;
+  const apiKeys = propApiKeys ?? fetchedApiKeys;
   
   // Get tRPC utils for query invalidation
   const utils = trpc.useUtils();
@@ -330,7 +339,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
           'xai': 'xAI'
         };
         return `${providerNames[model.provider] || model.provider} API key required`;
-      }
+    }
       return "";
     }
   };
@@ -488,7 +497,7 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
       <Button
         type="button"
         variant="ghost"
-                  onClick={() => {
+        onClick={() => {
             // Check if user has any API keys - already computed above
           
           if (!hasAnyApiKey && onClick) {

@@ -1109,7 +1109,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                             </div>
                           </div>
                         ) : (
-                          <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
+                          <div className="max-w-full rounded-lg bg-muted/80 px-5 py-3">
                             <LoadingDots text="AI is thinking" size="sm" />
                           </div>
                         )}
@@ -1150,7 +1150,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                             </div>
                           </div>
                         ) : (
-                          <div className="max-w-full rounded-2xl bg-muted px-5 py-3 shadow-sm">
+                          <div className="max-w-full rounded-lg bg-muted/80 px-5 py-3">
                             <LoadingDots text="AI is thinking" size="sm" />
                           </div>
                         )}

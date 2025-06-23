@@ -109,3 +109,86 @@ export const update = mutation({
     return await ctx.db.patch(id, updates);
   },
 }); 
+
+// Delete user account and all associated data
+export const deleteAccount = mutation({
+  args: { authId: v.string() },
+  handler: async (ctx, args) => {
+    // Get the user first
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q) => q.eq("authId", args.authId))
+      .unique();
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    const userId = user._id;
+    
+    // Delete all user's threads and their messages
+    const userThreads = await ctx.db
+      .query("threads")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    
+    for (const thread of userThreads) {
+      // Delete all messages in this thread
+      const threadMessages = await ctx.db
+        .query("messages")
+        .withIndex("by_thread", (q) => q.eq("threadId", thread._id))
+        .collect();
+      
+      for (const message of threadMessages) {
+        await ctx.db.delete(message._id);
+      }
+      
+      // Delete the thread
+      await ctx.db.delete(thread._id);
+    }
+    
+    // Delete all user's files
+    const userFiles = await ctx.db
+      .query("files")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    
+    for (const file of userFiles) {
+      // Delete from storage
+      try {
+        await ctx.storage.delete(file.storageId);
+      } catch (error) {
+        console.error("Error deleting file from storage:", error);
+        // Continue with deletion even if storage deletion fails
+      }
+      
+      // Delete file record
+      await ctx.db.delete(file._id);
+    }
+    
+    // Delete all user's API keys
+    const userApiKeys = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    
+    for (const apiKey of userApiKeys) {
+      await ctx.db.delete(apiKey._id);
+    }
+    
+    // Delete all user's model favorites
+    const userFavorites = await ctx.db
+      .query("userModelFavorites")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    
+    for (const favorite of userFavorites) {
+      await ctx.db.delete(favorite._id);
+    }
+    
+    // Finally, delete the user record
+    await ctx.db.delete(userId);
+    
+    return { success: true, message: "Account and all associated data deleted successfully" };
+  },
+}); 

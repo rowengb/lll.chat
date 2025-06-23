@@ -25,6 +25,18 @@ export const trpc = createTRPCNext<AppRouter>({
           url: `${getBaseUrl()}/api/trpc`,
         }),
       ],
+      queryClientConfig: {
+        defaultOptions: {
+          queries: {
+            // Aggressive caching for frequently accessed data
+            staleTime: 2 * 60 * 1000, // 2 minutes - data is fresh
+            cacheTime: 10 * 60 * 1000, // 10 minutes - keep in cache
+            refetchOnWindowFocus: false, // Don't refetch on window focus
+            refetchOnMount: false, // Don't refetch on component mount if cache is fresh
+            retry: 1, // Only retry once on failure
+          },
+        },
+      },
     };
   },
   ssr: false,
