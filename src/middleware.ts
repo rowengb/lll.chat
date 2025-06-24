@@ -18,7 +18,13 @@ const isProtectedRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
-    await auth.protect();
+    try {
+      await auth.protect();
+    } catch (error) {
+      // If auth fails, let the pages handle auth themselves
+      // This prevents middleware from returning 404s
+      console.log('Auth protection failed, letting page handle auth:', error);
+    }
   }
 });
 

@@ -102,7 +102,7 @@ const Home: NextPage = () => {
                   <Button 
                     size="lg" 
                     className="relative bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white border-0 shadow-xl font-medium px-4 sm:px-8 py-2.5 sm:py-3.5 h-auto text-sm sm:text-base transition-all duration-200 hover:scale-[1.02] overflow-hidden"
-                    onClick={() => router.push('/app')}
+                    onClick={() => router.push('/chat/new')}
                   >
                     {/* Blurry gradient background */}
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-600/60 to-blue-500/60 blur-2xl"></div>

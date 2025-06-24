@@ -18,6 +18,7 @@ import { LoadingDots } from './LoadingDots';
 import { isImageGenerationModel } from '../utils/modelUtils';
 import { ApiKeyWarningBanner } from './ApiKeyWarningBanner';
 import { WelcomeScreen } from './chat/WelcomeScreen';
+import { InstantWelcomeScreen } from './chat/InstantWelcomeScreen';
 import { MobileMenuButton } from './chat/MobileMenuButton';
 import { ErrorMessage } from './ErrorMessage';
 
@@ -1154,10 +1155,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     }
   };
 
-  // Show welcome screen when no thread is selected
+  // Show instant welcome screen when no thread is selected - renders immediately!
   if (!threadId) {
     return (
-      <WelcomeScreen
+      <InstantWelcomeScreen
         sidebarCollapsed={sidebarCollapsed}
         sidebarWidth={sidebarWidth}
         onToggleSidebar={onToggleSidebar}
@@ -1300,8 +1301,8 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         
       </div>
       
-      {/* Chatbox - fixed at bottom on mobile with keyboard awareness, absolute on desktop */}
-        <div className="fixed sm:absolute bottom-0 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth}px` : '0px' }}>
+      {/* Chatbox - floating up from bottom with margins */}
+        <div className="fixed sm:absolute bottom-5 left-0 z-20 right-0 sm:left-0" style={{ right: window.innerWidth >= 640 ? `${scrollbarWidth + 16}px` : '16px' }}>
           <div className="px-3 sm:hidden">
             <div className="max-w-[85%] w-full mx-auto">
               <Chatbox
@@ -1324,7 +1325,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               />
             </div>
           </div>
-          <div className={`hidden sm:block ${chatboxGridClasses}`}>
+          <div className={`hidden sm:block ${chatboxGridClasses}`} style={{ paddingLeft: '16px' }}>
             <div></div>
             <div className="w-full">
               <div className={chatboxLayoutClasses}>

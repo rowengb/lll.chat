@@ -534,8 +534,8 @@ const SettingsPage: NextPage = () => {
         </div>
 
         {/* Desktop Sidebar - hidden on mobile */}
-        <div className="hidden sm:flex flex-shrink-0 bg-gray-100 dark:bg-card border-r border-border w-72">
-          <div className="flex flex-col h-full w-full">
+        <div className="hidden sm:flex flex-shrink-0 w-72 p-4 pt-4 pb-4 pl-4">
+          <div className="flex flex-col h-full w-full bg-gray-100 dark:bg-card border border-border shadow-lg" style={{ borderRadius: '16px' }}>
             {/* Sidebar Header */}
             <div className="flex items-center gap-3 p-6 border-b border-border">
               <Button

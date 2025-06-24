@@ -52,8 +52,8 @@ export const MobileMenuButton: React.FC<MobileMenuButtonProps> = ({
             </Button>
             <Button
               onClick={() => {
-                // Handle new chat - navigate to home/welcome
-                window.location.href = '/';
+                // Instant navigation to unified chat route
+                window.location.href = '/chat/new';
               }}
               size="sm"
               variant="ghost"

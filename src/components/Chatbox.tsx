@@ -944,7 +944,7 @@ export function Chatbox({
     <div 
       className={`relative chatbox-stable ${className} ${
         isDragOver ? 'ring-2 ring-primary ring-offset-2' : ''
-      } rounded-t-2xl sm:rounded-t-2xl sm:rounded-b-none`}
+      } rounded-2xl`}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -952,18 +952,14 @@ export function Chatbox({
     >
       {/* Enhanced glassmorphic background with complex styling */}
       <div 
-        className={`absolute inset-0 bg-white/50 dark:bg-secondary/[0.045] backdrop-blur-md border border-b-0 border-white/50 dark:border-[hsl(0,0%,83%)]/[0.04] outline outline-4 outline-blue-500/20 dark:outline-blue-400/25 ${
+        className={`absolute inset-0 bg-white/50 dark:bg-secondary/[0.045] backdrop-blur-md border border-white/50 dark:border-[hsl(0,0%,83%)]/[0.04] outline outline-4 outline-blue-500/20 dark:outline-blue-400/25 ${
           isDragOver ? 'bg-primary/5 border-primary/30' : ''
         }`}
         style={{
-          borderRadius: '16px 16px 0 0',
+          borderRadius: '16px',
           boxShadow: `
-            rgba(0, 0, 0, 0.1) 0px 80px 50px 0px,
-            rgba(0, 0, 0, 0.07) 0px 50px 30px 0px,
-            rgba(0, 0, 0, 0.06) 0px 30px 15px 0px,
-            rgba(0, 0, 0, 0.04) 0px 15px 8px,
-            rgba(0, 0, 0, 0.04) 0px 6px 4px,
-            rgba(0, 0, 0, 0.02) 0px 2px 2px
+            rgba(0, 0, 0, 0.08) 0px 4px 16px 0px,
+            rgba(0, 0, 0, 0.04) 0px 2px 8px 0px
           `
         }}
       />
@@ -973,7 +969,7 @@ export function Chatbox({
       {/* Drag overlay */}
       {isDragOver && (
         <div 
-          className="absolute inset-0 flex items-center justify-center bg-primary/10 backdrop-blur-sm z-20 rounded-t-xl"
+          className="absolute inset-0 flex items-center justify-center bg-primary/10 backdrop-blur-sm z-20 rounded-2xl"
         >
           <div className="text-center">
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-primary/20 flex items-center justify-center">

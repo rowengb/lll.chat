@@ -1,5 +1,4 @@
 import { type NextPage } from "next";
-import { useUser } from "@clerk/nextjs";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
@@ -8,14 +7,27 @@ import { ChatWindow } from "@/components/ChatWindow";
 import { LoadingDots } from "@/components/LoadingDots";
 import { useChatStore } from "@/stores/chatStore";
 import { trpc } from "@/utils/trpc";
-import { useOpenRouterStore } from '@/stores/openRouterStore';
 import { SearchCommand } from '@/components/SearchCommand';
 import { useSearchCommand } from '@/hooks/useSearchCommand';
+import { useAppData } from '@/hooks/useAppData';
+import { PerformanceProfiler } from '@/components/PerformanceProfiler';
+import { useUser } from '@clerk/nextjs';
+import { useHyperspeed, useInstantRender } from '@/hooks/useHyperspeed';
 
 const ChatPage: NextPage = () => {
-  const { user, isLoaded } = useUser();
   const router = useRouter();
   const { threadId } = router.query;
+  
+  // Eager loaded app data - instant access!
+  const { 
+    user, 
+    isLoaded, 
+    isAuthenticated, 
+    threads, 
+    selectedModel: defaultModel, 
+    isInitialLoad 
+  } = useAppData();
+  
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   
   const { 
@@ -28,29 +40,22 @@ const ChatPage: NextPage = () => {
   // Search command hook
   const { isOpen: isSearchOpen, openSearch, closeSearch } = useSearchCommand();
 
-  // Get user's best default model
-  const { data: bestDefaultModel } = trpc.userPreferences.getBestDefaultModel.useQuery(
-    undefined,
-    { enabled: !!user }
-  );
+  // 🚀 HYPERSPEED OPTIMIZATIONS - Enable ALL performance features
+  const { predictivelyPrefetch } = useHyperspeed();
+  useInstantRender();
 
-  // Get thread data to determine the last used model
-  const { data: threads } = trpc.chat.getThreads.useQuery();
-  const currentThread = threads?.find(thread => thread.id === threadId);
+  const normalizedThreadId = typeof threadId === 'string' ? threadId : null;
+  const currentThread = threads?.find(thread => thread.id === normalizedThreadId);
   const utils = trpc.useUtils();
 
   const updateThreadMetadataMutation = trpc.chat.updateThreadMetadata.useMutation();
 
   // Initialize selectedModel based on user preferences
   useEffect(() => {
-    if (bestDefaultModel && selectedModel === null) {
-      if (bestDefaultModel.modelId) {
-        setSelectedModel(bestDefaultModel.modelId);
-      } else {
-        setSelectedModel('gpt-4o');
-      }
+    if (defaultModel && selectedModel === null) {
+      setSelectedModel(defaultModel);
     }
-  }, [bestDefaultModel, selectedModel]);
+  }, [defaultModel, selectedModel]);
 
   // Update model when switching threads, but preserve explicit user selections
   useEffect(() => {
@@ -63,9 +68,9 @@ const ChatPage: NextPage = () => {
     }
   }, [currentThread?.id]); // Only run when thread ID changes
 
-  // Navigation functions
+  // Navigation functions - all instant with shallow routing
   const navigateToWelcome = () => {
-    router.push('/', undefined, { shallow: true });
+    router.push('/chat/new', undefined, { shallow: true });
   };
 
   const navigateToChat = (newThreadId: string) => {
@@ -107,13 +112,13 @@ const ChatPage: NextPage = () => {
   };
 
   // Redirect to sign-in if not authenticated
-  if (isLoaded && !user) {
+  if (isLoaded && !isAuthenticated) {
     router.push('/sign-in');
     return null;
   }
 
-  // Show loading while checking auth
-  if (!isLoaded) {
+  // Show loading while checking auth or loading critical data
+  if (!isLoaded || isInitialLoad) {
     return (
       <div className="min-h-screen-mobile flex items-center justify-center">
         <LoadingDots text="Loading" size="lg" />
@@ -121,14 +126,8 @@ const ChatPage: NextPage = () => {
     );
   }
 
-  // Show loading if no threadId yet
-  if (!threadId || typeof threadId !== 'string') {
-    return (
-      <div className="min-h-screen-mobile flex items-center justify-center">
-        <LoadingDots text="Loading chat" size="lg" />
-      </div>
-    );
-  }
+  // Handle welcome screen case (no threadId means new chat)
+  const isWelcomeScreen = !normalizedThreadId || normalizedThreadId === 'new';
 
   return (
     <>
@@ -138,8 +137,8 @@ const ChatPage: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="flex h-screen-mobile bg-background">
-        {/* Sidebar */}
+      <div className="flex h-screen-mobile bg-background" data-instant="true">
+        {/* Sidebar - Instant render */}
         <Sidebar
           collapsed={sidebarCollapsed}
           onToggleCollapse={toggleSidebar}
@@ -149,7 +148,7 @@ const ChatPage: NextPage = () => {
           onNavigateToSettings={navigateToSettings}
           onNavigateToAccount={navigateToAccount}
           onNavigateToWelcome={navigateToWelcome}
-          currentThreadId={threadId}
+          currentThreadId={normalizedThreadId}
           onOpenSearch={openSearch}
         />
 
@@ -157,7 +156,7 @@ const ChatPage: NextPage = () => {
         <div className="flex-1 flex flex-col min-w-0">
           {selectedModel ? (
             <ChatWindow 
-              threadId={threadId}
+              threadId={isWelcomeScreen ? null : normalizedThreadId}
               onThreadCreate={handleThreadCreate}
               selectedModel={selectedModel}
               onModelChange={handleModelChange}
@@ -165,7 +164,7 @@ const ChatPage: NextPage = () => {
               sidebarWidth={sidebarWidth}
               onToggleSidebar={toggleSidebar}
               onOpenSearch={openSearch}
-              currentView="chat"
+              currentView={isWelcomeScreen ? "welcome" : "chat"}
               onNavigateToSettings={navigateToSettings}
             />
           ) : (
@@ -184,6 +183,9 @@ const ChatPage: NextPage = () => {
           onNavigateToSettings={navigateToSettings}
           onNavigateToAccount={navigateToAccount}
         />
+
+        {/* Performance Profiler - Only in development */}
+        <PerformanceProfiler />
       </div>
     </>
   );

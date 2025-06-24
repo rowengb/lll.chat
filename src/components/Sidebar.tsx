@@ -334,29 +334,30 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
           onClick={onClose}
         />
         
-        {/* Sidebar Panel flush with edges */}
+        {/* Sidebar Panel with rounded corners and margins */}
         <div 
           className={`fixed transition-opacity duration-300 ease-out ${
             isOpen ? 'opacity-100' : 'opacity-0'
           }`}
           style={{
-            top: '0px',
-            left: '0px',
-            right: '0px',
-            maxHeight: '100vh',
+            top: '16px',
+            left: '16px',
+            right: '16px',
+            maxHeight: 'calc(100vh - 32px)',
             minHeight: 'auto'
           }}
         >
           <div 
             className="relative max-h-full"
           >
-            {/* Background with bottom border */}
+            {/* Background with rounded corners and shadow */}
             <div 
-              className="absolute inset-0 bg-gray-100 dark:bg-gray-950 border-b border-gray-400/30 dark:border-gray-500/30"
+              className="absolute inset-0 bg-gray-100 dark:bg-gray-950 border border-gray-400/30 dark:border-gray-500/30 shadow-lg"
+              style={{ borderRadius: '16px' }}
             />
             
             {/* Content */}
-            <div className="relative z-10 flex flex-col overflow-hidden">
+            <div className="relative z-10 flex flex-col overflow-hidden" style={{ borderRadius: '16px' }}>
               {/* Floating buttons inside mobile sidebar */}
               <div 
                 className="absolute z-50 transition-opacity duration-200 ease-out opacity-100"
@@ -739,7 +740,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
   // Notify parent component when sidebar width changes during resizing
   useEffect(() => {
     if (!collapsed) {
-      onWidthChange?.(sidebarWidth);
+      // Add 16px for right margin between sidebar and content
+      onWidthChange?.(sidebarWidth + 16);
     }
   }, [sidebarWidth, collapsed, onWidthChange]);
 
@@ -747,8 +749,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     if (onNewChat) {
       onNewChat();
     } else {
-      // Fallback to router navigation if no prop provided
-      router.push("/");
+      // Instant navigation to unified chat route
+      router.replace("/chat/new", undefined, { shallow: true });
     }
   };
 
@@ -756,8 +758,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     if (onNewChat) {
       onNewChat();
     } else {
-      // Fallback to router navigation if no prop provided
-      router.push("/");
+      // Instant navigation to unified chat route
+      router.replace("/chat/new", undefined, { shallow: true });
     }
   };
 
@@ -1019,8 +1021,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           collapsed ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{
-          top: '16px', // Align with header padding
-          left: '16px' // Same as expanded state for proper alignment
+          top: '32px', // Align with where sidebar would be positioned
+          left: '32px' // Same as expanded state for proper alignment
         }}
       >
         <div 
@@ -1068,8 +1070,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           !collapsed ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
         style={{
-          top: '16px', // Align with header padding
-          left: '16px' // Align with header padding, accounting for flush design
+          top: '32px', // Align with sidebar top margin + internal padding
+          left: '32px' // Align with sidebar left margin + internal padding
         }}
       >
         <div 
@@ -1108,25 +1110,25 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           collapsed ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'
         } hidden sm:flex`}
         style={{ 
-          width: `${sidebarWidth}px`, // Full width without padding
-          top: '0px', // Flush with top
-          bottom: '0px', // Flush with bottom  
-          left: '0px' // Flush with left
+          width: `${sidebarWidth - 32}px`, // Reduce width to account for margins
+          top: '16px', // Top margin
+          bottom: '16px', // Bottom margin
+          left: '16px' // Left margin
         }}
       >
         <div 
           className="h-full relative"
         >
-          {/* Background with black drop shadow */}
+          {/* Background with rounded corners and shadow */}
           <div 
-            className="absolute inset-0 bg-gray-100 dark:bg-gray-950 border-r border-gray-400/30 dark:border-gray-500/30"
+            className="absolute inset-0 bg-gray-100 dark:bg-gray-950 border border-gray-400/30 dark:border-gray-500/30 shadow-lg"
             style={{
-              borderRadius: '0', // No rounded corners
+              borderRadius: '16px', // Rounded corners
             }}
           />
           
           {/* Content */}
-          <div className="relative z-10 h-full flex flex-col overflow-hidden" style={{ borderRadius: '0 20px 20px 0' }}>
+          <div className="relative z-10 h-full flex flex-col overflow-hidden" style={{ borderRadius: '16px' }}>
           {/* Header */}
           <div className="flex items-center p-4 border-b border-border gap-3">
             <div className="w-20 flex-shrink-0"></div> {/* Spacer for floating buttons */}
