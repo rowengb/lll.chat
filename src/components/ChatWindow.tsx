@@ -736,7 +736,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
   // Unified Message Render
   const renderMessage = (message: Message) => {
     const isMobile = window.innerWidth < 640;
-    const showActions = !message.isOptimistic && !message.isError;
+    const showActions = !message.isOptimistic; // Show actions on both normal and error messages
     const mobileActionsVisible = isMobile && mobileActiveMessageId === message.id;
        
     return (

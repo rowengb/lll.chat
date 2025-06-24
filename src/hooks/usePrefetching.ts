@@ -53,7 +53,10 @@ export function usePrefetching() {
 
     // 🎯 HOVER PREFETCHING - Load on hover (300ms before click)
     const handleMouseEnter = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
+      const target = e.target;
+      // Check if target is an Element that has the closest method
+      if (!(target instanceof Element)) return;
+      
       const link = target.closest('a, button[data-prefetch]');
       
       if (link) {
@@ -71,7 +74,10 @@ export function usePrefetching() {
     };
 
     const handleMouseLeave = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
+      const target = e.target;
+      // Check if target is an Element that has the closest method
+      if (!(target instanceof Element)) return;
+      
       const link = target.closest('a, button[data-prefetch]');
       
       if (link) {
@@ -85,7 +91,10 @@ export function usePrefetching() {
 
     // 📱 TOUCH PREFETCHING - Prefetch on touchstart (faster than touchend)
     const handleTouchStart = (e: TouchEvent) => {
-      const target = e.target as HTMLElement;
+      const target = e.target;
+      // Check if target is an Element that has the closest method
+      if (!(target instanceof Element)) return;
+      
       const link = target.closest('a, button[data-prefetch]');
       
       if (link) {

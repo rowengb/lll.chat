@@ -74,6 +74,8 @@
     backface-visibility: hidden;
     perspective: 1000px;
   }
+
+
   
   html {
     /* Optimize font rendering */
@@ -213,6 +215,26 @@
   textarea {
     line-height: 1.5;
   }
+}
+
+/* Fix Next.js webpack error overlay positioning - only when they exist */
+[data-nextjs-dialog-overlay][style*="position"],
+.__next-error-overlay[style*="position"],
+[data-nextjs-errors-overlay][style*="position"] {
+  position: fixed !important;
+  z-index: 9999 !important;
+  transform: none !important;
+  contain: none !important;
+  isolation: auto !important;
+}
+
+/* Override global transform for Next.js error content only */
+[data-nextjs-dialog-overlay] *,
+.__next-error-overlay *,
+[data-nextjs-errors-overlay] * {
+  transform: none !important;
+  contain: none !important;
+  isolation: auto !important;
 }
 
 /* Syntax highlighting for code blocks */

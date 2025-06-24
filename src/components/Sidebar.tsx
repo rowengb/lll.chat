@@ -1305,11 +1305,15 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
           {/* Resize Handle */}
           {!collapsed && (
             <div
-              className="absolute top-0 right-0 w-2 h-full cursor-col-resize bg-transparent hover:bg-primary/10 transition-colors group z-10"
+              className="absolute top-4 bottom-4 -right-0.5 w-1 cursor-col-resize bg-transparent hover:bg-primary transition-colors rounded-full z-10"
               onMouseDown={() => setIsResizing(true)}
-            >
-              <div className="w-0.5 h-full bg-transparent group-hover:bg-primary ml-auto transition-colors" />
-            </div>
+              onDoubleClick={() => {
+                setSidebarWidth(288); // Reset to default width
+                toast.dismiss();
+                toast.success("Sidebar width reset to default");
+              }}
+              title="Drag to resize • Double-click to reset"
+            />
           )}
         </div>
       </div>
