@@ -332,11 +332,11 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
       const target = event.target;
       // Check if target is an Element that has the closest method
       if (target instanceof Element) {
-        // Don't close if clicking on the entire action cluster
-        if (
-          target.closest('.message-actions-container') ||
-          target.closest('[data-action-button]')
-        ) return;
+      // Don't close if clicking on the entire action cluster
+      if (
+        target.closest('.message-actions-container') ||
+        target.closest('[data-action-button]')
+      ) return;
       }
       
       setMobileActiveMessageId(null);

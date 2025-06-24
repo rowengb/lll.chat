@@ -21,9 +21,9 @@ export default clerkMiddleware(async (auth, req) => {
     try {
       await auth.protect();
     } catch (error) {
-      // If auth fails, let the pages handle auth themselves
-      // This prevents middleware from returning 404s
-      console.log('Auth protection failed, letting page handle auth:', error);
+      // Redirect unauthenticated users to /home instead of /sign-in
+      const homeUrl = new URL('/home', req.url);
+      return Response.redirect(homeUrl);
     }
   }
 });

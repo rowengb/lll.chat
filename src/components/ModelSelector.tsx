@@ -468,8 +468,8 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
         const target = event.target;
         // Check if target is an Element that has the closest method
         if (target instanceof Element) {
-          const isFilterButton = target.closest('[data-filter-toggle]');
-          if (!isFilterButton) {
+        const isFilterButton = target.closest('[data-filter-toggle]');
+        if (!isFilterButton) {
             setShowFilters(false);
           }
         } else {

@@ -379,3 +379,4 @@ Auth protection failed, letting page handle auth: Error: NEXT_HTTP_ERROR_FALLBAC
  GET /api/trpc/chat.getThreads 200 in 334ms
  ✓ Compiled in 749ms (1611 modules)
  ✓ Compiled in 267ms (1611 modules)
+ ✓ Compiled in 167ms (1611 modules)

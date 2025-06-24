@@ -125,11 +125,11 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                       {examplePrompts.map((example, index) => {
                         const IconComponent = example.icon;
                         return (
-                                                      <button
-                              key={index}
-                              onClick={() => handleExampleClick(example.prompt)}
+                          <button
+                            key={index}
+                            onClick={() => handleExampleClick(example.prompt)}
                               className="group text-left p-3 bg-gradient-to-br from-card/80 to-muted/60 dark:from-slate-800/80 dark:to-slate-700/60 backdrop-blur-sm hover:from-muted/90 hover:to-muted/70 dark:hover:from-slate-700/90 dark:hover:to-slate-600/70 rounded-2xl border border-border/60 hover:border-border/80 shadow-lg shadow-muted/20 hover:shadow-xl hover:shadow-muted/30 transition-all duration-300 hover:-translate-y-1 backdrop-saturate-150"
-                            >
+                          >
                             <div className="flex items-start gap-3">
                               <div className="text-muted-foreground mt-1 group-hover:text-foreground transition-colors">
                                 <IconComponent className="h-5 w-5" />
