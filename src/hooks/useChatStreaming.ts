@@ -129,6 +129,11 @@ export const useChatStreaming = () => {
       const streamData = currentStreamDataRef.current;
       
       try {
+        // Determine search provider from grounding metadata
+        const searchProvider = streamData.groundingMetadata?.rawData?.searchProvider === 'exa' || streamData.groundingMetadata?.rawData?.toolCall === true 
+          ? 'exa' 
+          : (streamData.isGrounded ? 'google' : undefined);
+
         // Save the partial response to database
         await streamData.saveStreamedMessage.mutateAsync({
           threadId: streamData.threadId,
@@ -137,6 +142,7 @@ export const useChatStreaming = () => {
           model: streamData.selectedModel,
           userAttachments: streamData.files.map(file => file.id),
           isGrounded: streamData.isGrounded,
+          searchProvider,
           groundingSources: streamData.groundingMetadata?.sources && streamData.groundingMetadata.sources.length > 0 ? streamData.groundingMetadata.sources : undefined,
           imageUrl: streamData.imageGenerated ? streamData.imageUrl : undefined,
           stoppedByUser: true, // Flag to indicate this was stopped by user
@@ -656,6 +662,11 @@ export const useChatStreaming = () => {
                 
                 debugLog(`[STREAM] Final stats: ${streamDuration.toFixed(2)}ms, ${streamingStatsRef.current.totalChunks} chunks, ${avgChunkSize.toFixed(1)} avg chunk size, ${tokensPerSecond.toFixed(1)} chars/sec`);
                 
+                // Determine search provider from grounding metadata
+                const searchProvider = groundingMetadata?.rawData?.searchProvider === 'exa' || groundingMetadata?.rawData?.toolCall === true 
+                  ? 'exa' 
+                  : (isGrounded ? 'google' : undefined);
+
                 // Stream complete - save to DB and clean up
                 const savedMessages = await saveStreamedMessage.mutateAsync({
                   threadId,
@@ -664,6 +675,7 @@ export const useChatStreaming = () => {
                   model: selectedModel,
                   userAttachments: files.map(file => file.id),
                   isGrounded,
+                  searchProvider,
                   groundingSources: groundingMetadata?.sources && groundingMetadata.sources.length > 0 ? groundingMetadata.sources : undefined,
                   imageUrl: imageGenerated ? imageUrl : undefined,
                 });

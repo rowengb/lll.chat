@@ -9,6 +9,7 @@ export const createMessage = mutation({
     model: v.optional(v.string()),
     userId: v.id("users"),
     isGrounded: v.optional(v.boolean()),
+    searchProvider: v.optional(v.string()),
     groundingSources: v.optional(v.array(v.object({
       title: v.string(),
       url: v.string(),
@@ -31,6 +32,7 @@ export const createMessage = mutation({
       model: args.model,
       userId: args.userId,
       isGrounded: args.isGrounded,
+      searchProvider: args.searchProvider,
       groundingSources: args.groundingSources,
       attachments: args.attachments,
       imageUrl: args.imageUrl,
@@ -66,6 +68,7 @@ export const createMany = mutation({
       userId: v.id("users"),
       attachments: v.optional(v.array(v.id("files"))),
       isGrounded: v.optional(v.boolean()),
+      searchProvider: v.optional(v.string()),
       groundingSources: v.optional(v.array(v.object({
         title: v.string(),
         url: v.string(),
@@ -95,6 +98,7 @@ export const createAssistantMessage = mutation({
     userId: v.id("users"),
     attachments: v.optional(v.array(v.id("files"))),
     isGrounded: v.optional(v.boolean()),
+    searchProvider: v.optional(v.string()),
     groundingSources: v.optional(v.array(v.object({
       title: v.string(),
       url: v.string(),
@@ -115,6 +119,7 @@ export const createAssistantMessage = mutation({
       userId: args.userId,
       attachments: args.attachments,
       isGrounded: args.isGrounded,
+      searchProvider: args.searchProvider,
       groundingSources: args.groundingSources,
       imageUrl: args.imageUrl,
       imageFileId: args.imageFileId,
@@ -208,6 +213,110 @@ export const updateGroundingSourceUnfurl = mutation({
   handler: async (ctx, args) => {
     const { messageId, sourceIndex, userId, unfurledData } = args;
     
+    // Retry logic for optimistic concurrency control
+    const MAX_RETRIES = 5;
+    let retryCount = 0;
+    
+    while (retryCount < MAX_RETRIES) {
+      try {
+        // Get the message (fresh read each retry)
+        const message = await ctx.db.get(messageId);
+        if (!message) {
+          throw new Error("Message not found");
+        }
+        
+        // Check if user owns this message
+        if (message.userId !== userId) {
+          throw new Error("Not authorized");
+        }
+        
+        // Update the grounding source with unfurled data
+        if (message.groundingSources && message.groundingSources[sourceIndex]) {
+          const updatedSources = [...message.groundingSources];
+          const currentSource = updatedSources[sourceIndex];
+          
+          // Double-check that currentSource exists (TypeScript safety)
+          if (!currentSource) {
+            return { success: false, error: "Source not found" };
+          }
+          
+          // Check if this source is already unfurled to avoid unnecessary updates
+          if (currentSource.unfurledAt && 
+              currentSource.unfurledTitle === unfurledData.title &&
+              currentSource.unfurledFavicon === unfurledData.favicon) {
+            return { success: true, skipped: true };
+          }
+          
+          // Ensure required fields are preserved and create updated source
+          const updatedSource = {
+            title: currentSource.title, // Required field - preserve original
+            url: currentSource.url, // Required field - preserve original
+            snippet: currentSource.snippet,
+            confidence: currentSource.confidence,
+            unfurledTitle: unfurledData.title !== undefined ? unfurledData.title : currentSource.unfurledTitle,
+            unfurledDescription: unfurledData.description !== undefined ? unfurledData.description : currentSource.unfurledDescription,
+            unfurledImage: unfurledData.image !== undefined ? unfurledData.image : currentSource.unfurledImage,
+            unfurledFavicon: unfurledData.favicon !== undefined ? unfurledData.favicon : currentSource.unfurledFavicon,
+            unfurledSiteName: unfurledData.siteName !== undefined ? unfurledData.siteName : currentSource.unfurledSiteName,
+            unfurledFinalUrl: unfurledData.finalUrl !== undefined ? unfurledData.finalUrl : currentSource.unfurledFinalUrl,
+            unfurledAt: Date.now(),
+          };
+          
+          updatedSources[sourceIndex] = updatedSource;
+          
+          await ctx.db.patch(messageId, {
+            groundingSources: updatedSources,
+          });
+          
+          return { success: true, retryCount };
+        }
+        
+        return { success: false, error: "Source not found" };
+        
+      } catch (error: any) {
+        if (error.message?.includes("OptimisticConcurrencyControlFailure")) {
+          retryCount++;
+          console.log(`🔄 Unfurl retry ${retryCount}/${MAX_RETRIES} for message ${messageId}, source ${sourceIndex}`);
+          
+          // Exponential backoff with jitter to reduce thundering herd
+          const baseDelay = Math.pow(2, retryCount) * 10; // 20ms, 40ms, 80ms, 160ms, 320ms
+          const jitter = Math.random() * 10; // 0-10ms random jitter
+          await new Promise(resolve => setTimeout(resolve, baseDelay + jitter));
+          
+          continue; // Retry the operation
+        } else {
+          // Non-concurrency error, don't retry
+          throw error;
+        }
+      }
+    }
+    
+    // All retries exhausted
+    console.error(`❌ Failed to unfurl source after ${MAX_RETRIES} retries for message ${messageId}, source ${sourceIndex}`);
+    return { success: false, error: "Concurrency conflict - too many simultaneous updates" };
+  },
+});
+
+// New batch unfurl mutation to handle multiple sources at once
+export const batchUpdateGroundingSourceUnfurl = mutation({
+  args: {
+    messageId: v.id("messages"),
+    userId: v.id("users"),
+    unfurls: v.array(v.object({
+      sourceIndex: v.number(),
+      unfurledData: v.object({
+        title: v.optional(v.string()),
+        description: v.optional(v.string()),
+        image: v.optional(v.string()),
+        favicon: v.optional(v.string()),
+        siteName: v.optional(v.string()),
+        finalUrl: v.optional(v.string()),
+      }),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const { messageId, userId, unfurls } = args;
+    
     // Get the message
     const message = await ctx.db.get(messageId);
     if (!message) {
@@ -219,41 +328,52 @@ export const updateGroundingSourceUnfurl = mutation({
       throw new Error("Not authorized");
     }
     
-    // Update the grounding source with unfurled data
-    if (message.groundingSources && message.groundingSources[sourceIndex]) {
-      const updatedSources = [...message.groundingSources];
-      const currentSource = updatedSources[sourceIndex];
+    if (!message.groundingSources) {
+      return { success: false, error: "No grounding sources found" };
+    }
+    
+    // Update all sources in a single operation
+    const updatedSources = [...message.groundingSources];
+    let updatedCount = 0;
+    
+    for (const unfurl of unfurls) {
+      const { sourceIndex, unfurledData } = unfurl;
       
-      // Double-check that currentSource exists (TypeScript safety)
-      if (!currentSource) {
-        return { success: false, error: "Source not found" };
+      if (sourceIndex >= 0 && sourceIndex < updatedSources.length) {
+        const currentSource = updatedSources[sourceIndex];
+        
+        // Skip if already unfurled with same data
+        if (currentSource.unfurledAt && 
+            currentSource.unfurledTitle === unfurledData.title &&
+            currentSource.unfurledFavicon === unfurledData.favicon) {
+          continue;
+        }
+        
+        // Update the source
+        updatedSources[sourceIndex] = {
+          title: currentSource.title,
+          url: currentSource.url,
+          snippet: currentSource.snippet,
+          confidence: currentSource.confidence,
+          unfurledTitle: unfurledData.title !== undefined ? unfurledData.title : currentSource.unfurledTitle,
+          unfurledDescription: unfurledData.description !== undefined ? unfurledData.description : currentSource.unfurledDescription,
+          unfurledImage: unfurledData.image !== undefined ? unfurledData.image : currentSource.unfurledImage,
+          unfurledFavicon: unfurledData.favicon !== undefined ? unfurledData.favicon : currentSource.unfurledFavicon,
+          unfurledSiteName: unfurledData.siteName !== undefined ? unfurledData.siteName : currentSource.unfurledSiteName,
+          unfurledFinalUrl: unfurledData.finalUrl !== undefined ? unfurledData.finalUrl : currentSource.unfurledFinalUrl,
+          unfurledAt: Date.now(),
+        };
+        updatedCount++;
       }
-      
-      // Ensure required fields are preserved and create updated source
-      const updatedSource = {
-        title: currentSource.title, // Required field - preserve original
-        url: currentSource.url, // Required field - preserve original
-        snippet: currentSource.snippet,
-        confidence: currentSource.confidence,
-        unfurledTitle: unfurledData.title !== undefined ? unfurledData.title : currentSource.unfurledTitle,
-        unfurledDescription: unfurledData.description !== undefined ? unfurledData.description : currentSource.unfurledDescription,
-        unfurledImage: unfurledData.image !== undefined ? unfurledData.image : currentSource.unfurledImage,
-        unfurledFavicon: unfurledData.favicon !== undefined ? unfurledData.favicon : currentSource.unfurledFavicon,
-        unfurledSiteName: unfurledData.siteName !== undefined ? unfurledData.siteName : currentSource.unfurledSiteName,
-        unfurledFinalUrl: unfurledData.finalUrl !== undefined ? unfurledData.finalUrl : currentSource.unfurledFinalUrl,
-        unfurledAt: Date.now(),
-      };
-      
-      updatedSources[sourceIndex] = updatedSource;
-      
+    }
+    
+    if (updatedCount > 0) {
       await ctx.db.patch(messageId, {
         groundingSources: updatedSources,
       });
-      
-      return { success: true };
     }
     
-    return { success: false, error: "Source not found" };
+    return { success: true, updatedCount };
   },
 });
 

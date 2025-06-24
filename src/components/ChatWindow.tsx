@@ -247,6 +247,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               finalUrl: source.unfurledFinalUrl,
             } : undefined,
           })),
+          rawData: { searchProvider: msg.searchProvider || (msg.isGrounded ? 'google' : undefined) }
         } : undefined,
         attachments: msg.attachments ? msg.attachments.map(fileId => ({
           id: fileId,
@@ -568,6 +569,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               content: params.assistantContent,
               model: params.model,
               isGrounded: params.isGrounded,
+              searchProvider: params.searchProvider,
               groundingSources: params.groundingSources,
               imageUrl: params.imageUrl,
               stoppedByUser: params.stoppedByUser,
@@ -831,6 +833,10 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                       sources={message.groundingMetadata.sources}
                       messageId={message.id}
                       onToggle={handleGroundingSourcesToggle}
+                      rawData={{
+                        ...message.groundingMetadata.rawData,
+                        searchProvider: (message as any).searchProvider || message.groundingMetadata.rawData?.searchProvider
+                      }}
                     />
                   )}
                   
@@ -1042,6 +1048,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               content: params.assistantContent,
               model: params.model,
               isGrounded: params.isGrounded,
+              searchProvider: params.searchProvider,
               groundingSources: params.groundingSources,
               imageUrl: params.imageUrl,
               stoppedByUser: params.stoppedByUser,
@@ -1122,6 +1129,7 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
               content: params.assistantContent,
               model: params.model,
               isGrounded: params.isGrounded,
+              searchProvider: params.searchProvider,
               groundingSources: params.groundingSources,
               imageUrl: params.imageUrl,
               stoppedByUser: params.stoppedByUser,

@@ -9,11 +9,20 @@ export default defineSchema({
     image: v.optional(v.string()),
     // NextAuth fields
     authId: v.string(), // Maps to NextAuth user.id
+    createdAt: v.optional(v.number()), // Timestamp when user signed up in Clerk
     // User preferences
     defaultModel: v.optional(v.string()), // User's preferred default model ID
     titleGenerationModel: v.optional(v.string()), // User's preferred model for generating chat titles
     useOpenRouter: v.optional(v.boolean()), // Whether user prefers OpenRouter mode
-  }).index("by_email", ["email"]).index("by_auth_id", ["authId"]),
+    // Subscription fields
+    isPaidUser: v.optional(v.boolean()), // Whether user has active paid subscription
+    subDate: v.optional(v.number()), // Subscription start date (timestamp)
+    subEndDate: v.optional(v.number()), // Subscription end date (timestamp)
+    subStatus: v.optional(v.string()), // Subscription status: "active", "canceled", "expired", "trialing"
+    subPlan: v.optional(v.string()), // Subscription plan: "monthly", "yearly", "lifetime"
+    stripeCustomerId: v.optional(v.string()), // Stripe customer ID
+    stripeSubscriptionId: v.optional(v.string()), // Stripe subscription ID
+  }).index("by_email", ["email"]).index("by_auth_id", ["authId"]).index("by_paid_status", ["isPaidUser"]),
 
   threads: defineTable({
     title: v.optional(v.string()),
@@ -32,7 +41,8 @@ export default defineSchema({
     threadId: v.id("threads"),
     userId: v.id("users"),
     attachments: v.optional(v.array(v.id("files"))), // Array of file IDs
-    isGrounded: v.optional(v.boolean()), // Indicates if response was grounded with Google Search
+    isGrounded: v.optional(v.boolean()), // Indicates if response was grounded with search
+    searchProvider: v.optional(v.string()), // Search provider: "exa", "google", etc.
     groundingSources: v.optional(v.array(v.object({
       title: v.string(), // Domain name (e.g., "pbs.org", "democracynow.org")
       url: v.string(), // Vertexaisearch redirect URL

@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useUploadStore } from '@/stores/uploadStore';
 import { FileViewerModal } from './FileViewerModal';
 import { createPortal } from 'react-dom';
+import * as Popover from '@radix-ui/react-popover';
 
 interface ChatboxProps {
   input: string;
@@ -31,6 +32,8 @@ interface ChatboxProps {
   onTextareaFocus?: () => void;
   onTextareaBlur?: () => void;
 }
+
+
 
 // Circular progress component
 const CircularProgress = ({ progress, size = 32, strokeWidth = 3, children }: {
@@ -258,11 +261,27 @@ export function Chatbox({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   
-  // Check if the selected model supports Google Search grounding
-  const supportsGrounding = selectedModel.includes('gemini-2.0') || 
-                           selectedModel.includes('gemini-2.5') || 
-                           selectedModel.includes('gemini-2-0') || 
-                           selectedModel.includes('gemini-2-5');
+  // Fetch model data to check capabilities
+  const { data: modelData } = trpc.models.getModel.useQuery(
+    { modelId: selectedModel },
+    { enabled: !!selectedModel }
+  );
+
+  // Check if the selected model supports web search (has "web" capability)
+  const supportsGrounding = modelData?.capabilities?.includes('web') ?? false;
+  
+  // Check if user is paid (for non-Gemini models)
+  const { data: userSubscription } = trpc.userPreferences.getSubscription.useQuery();
+  const isPaidUser = userSubscription?.isPaidUser ?? false;
+  
+  // Check if this is a Gemini model with built-in grounding (free)
+  const isGeminiWithBuiltinGrounding = selectedModel.includes('gemini-2.0') || 
+                                     selectedModel.includes('gemini-2.5') || 
+                                     selectedModel.includes('gemini-2-0') || 
+                                     selectedModel.includes('gemini-2-5');
+  
+  // Determine if user can use web search
+  const canUseWebSearch = supportsGrounding && (isGeminiWithBuiltinGrounding || isPaidUser);
   
   // Upload store for progress tracking
   const uploads = useUploadStore((s) => s.uploads);
@@ -1093,22 +1112,71 @@ export function Chatbox({
             </div>
             <div className="flex items-center gap-1.5">
               {supportsGrounding && onSearchGroundingChange && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onSearchGroundingChange(!searchGroundingEnabled)}
-                  disabled={isLoading}
-                  className={`h-7 transition-colors border rounded-full mobile-button ${
-                    searchGroundingEnabled 
-                      ? 'text-primary bg-primary/10 border-primary/20 hover:bg-primary/20 hover:border-primary/30' 
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border hover:border-border/80'
-                  } px-5 sm:px-3`}
-                  title={searchGroundingEnabled ? "Disable Google Search grounding" : "Enable Google Search grounding"}
-                >
-                  <GlobeIcon className="h-3.5 w-3.5" />
-                  <span className="ml-1 hidden sm:inline">Search</span>
-                </Button>
+                <Popover.Root>
+                  <Popover.Trigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (canUseWebSearch) {
+                          onSearchGroundingChange(!searchGroundingEnabled);
+                        }
+                        // If can't use web search, the popover will open automatically via Radix
+                      }}
+                      disabled={isLoading}
+                      className={`h-7 transition-colors border rounded-full mobile-button ${
+                        searchGroundingEnabled && canUseWebSearch
+                          ? 'text-primary bg-primary/10 border-primary/20 hover:bg-primary/20 hover:border-primary/30' 
+                          : !canUseWebSearch && !isGeminiWithBuiltinGrounding
+                          ? 'text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-200 hover:border-blue-300 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-900/20 dark:border-blue-800 dark:hover:border-blue-700'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-muted border-border hover:border-border/80'
+                      } px-5 sm:px-3`}
+                      title={
+                        !canUseWebSearch && !isGeminiWithBuiltinGrounding
+                          ? "Web search is a premium feature for non-Gemini models"
+                          : isGeminiWithBuiltinGrounding
+                          ? searchGroundingEnabled ? "Disable Google Search grounding (free with Gemini)" : "Enable Google Search grounding (free with Gemini)"
+                          : searchGroundingEnabled ? "Disable web search" : "Enable web search"
+                      }
+                    >
+                      <GlobeIcon className="h-3.5 w-3.5" />
+                      <span className="ml-1 hidden sm:inline">Search</span>
+                    </Button>
+                  </Popover.Trigger>
+                  
+                  {!canUseWebSearch && !isGeminiWithBuiltinGrounding && (
+                    <Popover.Portal>
+                      <Popover.Content
+                        className="z-50 w-80 rounded-2xl bg-white dark:bg-gray-900 p-6 shadow-xl border border-blue-200 dark:border-blue-800"
+                        side="top"
+                        align="center"
+                        sideOffset={10}
+                      >
+                        <div className="text-center">
+                          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                            Upgrade to Pro
+                          </h3>
+                          <p className="text-gray-600 dark:text-gray-300 mb-6 text-sm leading-relaxed">
+                            Get access to web search and more features with Pro
+                          </p>
+                          
+                          <Button
+                            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                            onClick={() => {
+                              // TODO: Implement actual upgrade flow
+                              toast.success("Upgrade flow coming soon!");
+                            }}
+                          >
+                            Upgrade Now - $8/month
+                          </Button>
+                        </div>
+                        
+                        <Popover.Arrow className="fill-white dark:fill-gray-900 stroke-blue-200 dark:stroke-blue-800" />
+                      </Popover.Content>
+                    </Popover.Portal>
+                  )}
+                </Popover.Root>
               )}
               <Button
                 type="button"

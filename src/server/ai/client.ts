@@ -17,25 +17,46 @@ export interface StreamChunk {
   tokenUsage?: TokenUsage;
   isComplete?: boolean;
   groundingMetadata?: any; // Gemini grounding metadata
+  toolCalls?: ToolCall[];
+}
+
+export interface ToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+export interface Tool {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: any;
+  };
 }
 
 export interface AIClient {
   createChatCompletion(params: {
-    messages: Array<{ role: string; content: string }>;
+    messages: Array<{ role: string; content: string | any[] }>;
     model?: string;
     stream?: boolean;
     apiKey?: string;
     enableGrounding?: boolean;
+    tools?: Tool[];
   }): Promise<AsyncIterable<StreamChunk> | string>;
 }
 
 class MockAIClient implements AIClient {
   async createChatCompletion(params: {
-    messages: Array<{ role: string; content: string }>;
+    messages: Array<{ role: string; content: string | any[] }>;
     model?: string;
     stream?: boolean;
     apiKey?: string;
     enableGrounding?: boolean;
+    tools?: Tool[];
   }): Promise<AsyncIterable<StreamChunk> | string> {
     const lastMessage = params.messages[params.messages.length - 1];
     const response = `Mock response to: "${lastMessage?.content}" (using ${params.model || 'mock-model'})`;
@@ -78,11 +99,12 @@ class OpenAIClient implements AIClient {
   }
   
   async createChatCompletion(params: {
-    messages: Array<{ role: string; content: string }>;
+    messages: Array<{ role: string; content: string | any[] }>;
     model?: string;
     stream?: boolean;
     apiKey?: string;
     enableGrounding?: boolean;
+    tools?: Tool[];
   }): Promise<AsyncIterable<StreamChunk> | string> {
     // Configure API endpoint based on provider
     const clientConfig: any = {
@@ -98,14 +120,22 @@ class OpenAIClient implements AIClient {
     
     const client = new OpenAI(clientConfig);
 
-    debugLog(`🔍 [${this.provider?.toUpperCase() || 'OPENAI'}-DEBUG] Creating completion with model: ${params.model || "gpt-3.5-turbo"}, stream: ${params.stream}`);
+    debugLog(`🔍 [${this.provider?.toUpperCase() || 'OPENAI'}-DEBUG] Creating completion with model: ${params.model || "gpt-3.5-turbo"}, stream: ${params.stream}, tools: ${params.tools ? 'enabled' : 'none'}`);
     
-    const completion = await client.chat.completions.create({
+    const requestConfig: any = {
       model: params.model || "gpt-3.5-turbo",
       messages: params.messages as any,
       stream: params.stream || false,
       stream_options: params.stream ? { include_usage: true } : undefined,
-    });
+    };
+
+    // Add tools if provided
+    if (params.tools && params.tools.length > 0) {
+      requestConfig.tools = params.tools;
+      requestConfig.tool_choice = "auto"; // Let the model decide when to use tools
+    }
+    
+    const completion = await client.chat.completions.create(requestConfig);
     
     debugLog(`🔍 [${this.provider?.toUpperCase() || 'OPENAI'}-DEBUG] Completion request sent successfully`);
 
@@ -121,6 +151,8 @@ class OpenAIClient implements AIClient {
     let inputTokens = 0;
     let outputTokens = 0;
     let contentChunks = 0;
+    let pendingToolCalls: any = {};
+    let hasToolCalls = false;
 
     debugLog(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Starting stream processing...`);
 
@@ -128,10 +160,33 @@ class OpenAIClient implements AIClient {
       const content = chunk.choices[0]?.delta?.content;
       const usage = chunk.usage;
       const finishReason = chunk.choices[0]?.finish_reason;
+      const toolCalls = chunk.choices[0]?.delta?.tool_calls;
       
       // Debug what we're actually getting (only log chunks with content or usage)
-      if (contentChunks < 3 && (content || usage)) {
-        debugLog(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Chunk ${contentChunks + 1} - Content: "${content}", Usage: ${JSON.stringify(usage)}, FinishReason: ${finishReason}`);
+      if (contentChunks < 3 && (content || usage || toolCalls)) {
+        debugLog(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Chunk ${contentChunks + 1} - Content: "${content}", ToolCalls: ${!!toolCalls}, Usage: ${JSON.stringify(usage)}, FinishReason: ${finishReason}`);
+      }
+
+      // Handle tool calls
+      if (toolCalls) {
+        hasToolCalls = true;
+        for (const toolCall of toolCalls) {
+          if (!pendingToolCalls[toolCall.index]) {
+            pendingToolCalls[toolCall.index] = {
+              id: toolCall.id,
+              type: "function",
+              function: {
+                name: toolCall.function?.name || "",
+                arguments: ""
+              }
+            };
+          }
+          
+          // Accumulate function arguments
+          if (toolCall.function?.arguments) {
+            pendingToolCalls[toolCall.index].function.arguments += toolCall.function.arguments;
+          }
+        }
       }
 
       // Track token usage when it comes in (usually at the end)
@@ -142,7 +197,25 @@ class OpenAIClient implements AIClient {
         
         debugLog(`🔍 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Usage chunk received - Input: ${inputTokens}, Output: ${outputTokens}, Total: ${totalTokens}`);
         
-        // Send a token update chunk
+        // If we have tool calls and this is the final usage chunk, send them
+        if (hasToolCalls && Object.keys(pendingToolCalls).length > 0) {
+          const completedToolCalls = Object.values(pendingToolCalls) as ToolCall[];
+          debugLog(`🔧 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Tool calls completed: ${completedToolCalls.map(tc => tc.function.name).join(', ')}`);
+          
+          yield {
+            content: "",
+            toolCalls: completedToolCalls,
+            tokenUsage: {
+              inputTokens,
+              outputTokens,
+              totalTokens
+            },
+            isComplete: true
+          };
+          return; // End the stream here for tool calls
+        }
+        
+        // Send a token update chunk for non-tool-call responses
         yield {
           content: "",
           tokenUsage: {
@@ -169,8 +242,25 @@ class OpenAIClient implements AIClient {
         };
       }
 
+      // Send tool calls when complete (backup check)
+      if (finishReason === "tool_calls" && Object.keys(pendingToolCalls).length > 0) {
+        const completedToolCalls = Object.values(pendingToolCalls) as ToolCall[];
+        debugLog(`🔧 [${provider?.toUpperCase() || 'OPENAI'}-DEBUG] Tool calls completed via finish_reason: ${completedToolCalls.map(tc => tc.function.name).join(', ')}`);
+        
+        yield {
+          content: "",
+          toolCalls: completedToolCalls,
+          tokenUsage: totalTokens > 0 ? {
+            inputTokens,
+            outputTokens,
+            totalTokens
+          } : undefined,
+          isComplete: true
+        };
+      }
+
       // Final completion signal
-      if (finishReason && !usage) {
+      if (finishReason && finishReason !== "tool_calls" && !usage && !hasToolCalls) {
         yield {
           content: "",
           tokenUsage: totalTokens > 0 ? {
@@ -187,11 +277,12 @@ class OpenAIClient implements AIClient {
 
 class AnthropicClient implements AIClient {
   async createChatCompletion(params: {
-    messages: Array<{ role: string; content: string }>;
+    messages: Array<{ role: string; content: string | any[] }>;
     model?: string;
     stream?: boolean;
     apiKey?: string;
     enableGrounding?: boolean;
+    tools?: Tool[];
   }): Promise<AsyncIterable<StreamChunk> | string> {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -277,11 +368,12 @@ class GeminiClient implements AIClient {
   private static readonly MIN_REQUEST_INTERVAL = 1000; // 1 second between requests
 
   async createChatCompletion(params: {
-    messages: Array<{ role: string; content: string }>;
+    messages: Array<{ role: string; content: string | any[] }>;
     model?: string;
     stream?: boolean;
     apiKey?: string;
     enableGrounding?: boolean;
+    tools?: Tool[];
   }): Promise<AsyncIterable<StreamChunk> | string> {
     const model = params.model || "gemini-pro";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${params.apiKey}`;

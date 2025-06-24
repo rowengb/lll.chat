@@ -8,6 +8,7 @@ export const create = mutation({
     name: v.optional(v.string()),
     email: v.optional(v.string()),
     image: v.optional(v.string()),
+    createdAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     // Check if user already exists
@@ -22,10 +23,21 @@ export const create = mutation({
         name: args.name,
         email: args.email,
         image: args.image,
+        createdAt: args.createdAt,
       });
     } else {
-      // Create new user
-      const userId = await ctx.db.insert("users", args);
+      // Create new user with default subscription fields
+      const userId = await ctx.db.insert("users", {
+        ...args,
+        createdAt: args.createdAt || Date.now(), // Use provided createdAt or current timestamp
+        isPaidUser: false, // Default to free user
+        subStatus: undefined,
+        subPlan: undefined,
+        subDate: undefined,
+        subEndDate: undefined,
+        stripeCustomerId: undefined,
+        stripeSubscriptionId: undefined,
+      });
       
       // Seed default favorites for the new user  
       const defaultFavorites = await ctx.db
@@ -109,6 +121,158 @@ export const update = mutation({
     return await ctx.db.patch(id, updates);
   },
 }); 
+
+// Check if user is paid (has active subscription)
+export const isPaidUser = query({
+  args: { authId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q) => q.eq("authId", args.authId))
+      .unique();
+    
+    if (!user) return false;
+    
+    // Check if user has active subscription
+    if (!user.isPaidUser) return false;
+    
+    // Check if subscription is still valid (not expired)
+    if (user.subEndDate && user.subEndDate < Date.now()) {
+      return false;
+    }
+    
+    // Check subscription status
+    return user.subStatus === "active" || user.subStatus === "trialing";
+  },
+});
+
+// Get subscription information
+export const getSubscription = query({
+  args: { authId: v.string() },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q) => q.eq("authId", args.authId))
+      .unique();
+    
+    if (!user) return null;
+    
+    return {
+      isPaidUser: user.isPaidUser || false,
+      subStatus: user.subStatus,
+      subPlan: user.subPlan,
+      subDate: user.subDate,
+      subEndDate: user.subEndDate,
+      stripeCustomerId: user.stripeCustomerId,
+      stripeSubscriptionId: user.stripeSubscriptionId,
+    };
+  },
+});
+
+// Update subscription status
+export const updateSubscription = mutation({
+  args: {
+    authId: v.string(),
+    isPaidUser: v.boolean(),
+    subStatus: v.optional(v.string()),
+    subPlan: v.optional(v.string()),
+    subDate: v.optional(v.number()),
+    subEndDate: v.optional(v.number()),
+    stripeCustomerId: v.optional(v.string()),
+    stripeSubscriptionId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q) => q.eq("authId", args.authId))
+      .unique();
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    const { authId, ...updates } = args;
+    return await ctx.db.patch(user._id, updates);
+  },
+});
+
+// Admin function to make a user paid (for testing)
+export const makeUserPaid = mutation({
+  args: {
+    authId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q) => q.eq("authId", args.authId))
+      .unique();
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    await ctx.db.patch(user._id, {
+      isPaidUser: true,
+      subStatus: "active",
+      subPlan: "monthly",
+      subDate: Date.now(),
+      subEndDate: Date.now() + (30 * 24 * 60 * 60 * 1000), // 30 days from now
+    });
+    
+    return { success: true, message: "User is now paid" };
+  },
+});
+
+// Admin function to make a user free (for testing)
+export const makeUserFree = mutation({
+  args: {
+    authId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_auth_id", (q) => q.eq("authId", args.authId))
+      .unique();
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    await ctx.db.patch(user._id, {
+      isPaidUser: false,
+      subStatus: undefined,
+      subPlan: undefined,
+      subDate: undefined,
+      subEndDate: undefined,
+    });
+    
+    return { success: true, message: "User is now free" };
+  },
+});
+
+// Admin query to list all users with complete data
+export const listAllUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    const users = await ctx.db.query("users").collect();
+    
+    return users.map(user => ({
+      id: user._id,
+      authId: user.authId,
+      name: user.name,
+      email: user.email,
+      image: user.image,
+      createdAt: user.createdAt,
+      isPaidUser: user.isPaidUser,
+      subStatus: user.subStatus,
+      subPlan: user.subPlan,
+      subDate: user.subDate,
+      subEndDate: user.subEndDate,
+    }));
+  },
+});
+
+
 
 // Delete user account and all associated data
 export const deleteAccount = mutation({

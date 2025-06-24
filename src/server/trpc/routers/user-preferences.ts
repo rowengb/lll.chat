@@ -69,6 +69,38 @@ export const userPreferencesRouter = createTRPCRouter({
     return preferences || { defaultModel: null };
   }),
 
+  // Get user subscription information
+  getSubscription: protectedProcedure.query(async ({ ctx }) => {
+    const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+    if (!convexUser) {
+      throw new Error("Failed to get or create user");
+    }
+
+    const subscription = await convex.query(api.users.getSubscription, {
+      authId: ctx.userId,
+    });
+
+    return subscription || { 
+      isPaidUser: false, 
+      subStatus: null, 
+      subPlan: null, 
+      subDate: null, 
+      subEndDate: null,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null 
+    };
+  }),
+
+  // Check if user is paid
+  isPaidUser: protectedProcedure.query(async ({ ctx }) => {
+    const isPaid = await convex.query(api.users.isPaidUser, {
+      authId: ctx.userId,
+    });
+
+    return isPaid;
+  }),
+
   // Set user's default model
   setDefaultModel: protectedProcedure
     .input(z.object({

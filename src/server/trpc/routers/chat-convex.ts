@@ -152,6 +152,7 @@ export const chatConvexRouter = createTRPCRouter({
       model: z.string().optional(),
       userAttachments: z.array(z.string()).optional(), // Array of file IDs
       isGrounded: z.boolean().optional(),
+      searchProvider: z.string().optional(),
       groundingSources: z.array(z.object({
         title: z.string(),
         url: z.string(),
@@ -186,6 +187,7 @@ export const chatConvexRouter = createTRPCRouter({
             threadId: input.threadId as Id<"threads">,
             userId: convexUser._id,
             isGrounded: input.isGrounded,
+            searchProvider: input.searchProvider,
             groundingSources: input.groundingSources,
             imageUrl: input.imageUrl,
             imageData: input.imageData,
@@ -275,6 +277,7 @@ export const chatConvexRouter = createTRPCRouter({
       content: z.string(),
       model: z.string().optional(),
       isGrounded: z.boolean().optional(),
+      searchProvider: z.string().optional(),
       groundingSources: z.array(z.object({
         title: z.string(),
         url: z.string(),
@@ -299,6 +302,7 @@ export const chatConvexRouter = createTRPCRouter({
         threadId: input.threadId as Id<"threads">,
         userId: convexUser._id,
         isGrounded: input.isGrounded,
+        searchProvider: input.searchProvider,
         groundingSources: input.groundingSources,
         imageUrl: input.imageUrl,
         imageData: input.imageData,
@@ -577,6 +581,37 @@ export const chatConvexRouter = createTRPCRouter({
         sourceIndex: input.sourceIndex,
         userId: convexUser._id,
         unfurledData: input.unfurledData,
+      });
+
+      return result;
+    }),
+
+  batchUpdateGroundingSourceUnfurl: protectedProcedure
+    .input(z.object({
+      messageId: z.string(),
+      unfurls: z.array(z.object({
+        sourceIndex: z.number(),
+        unfurledData: z.object({
+          title: z.string().optional(),
+          description: z.string().optional(),
+          image: z.string().optional(),
+          favicon: z.string().optional(),
+          siteName: z.string().optional(),
+          finalUrl: z.string().optional(),
+        }),
+      })),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const convexUser = await getOrCreateConvexUser(ctx.userId);
+
+      if (!convexUser) {
+        throw new Error("Failed to get or create user");
+      }
+
+      const result = await convex.mutation(api.messages.batchUpdateGroundingSourceUnfurl, {
+        messageId: input.messageId as Id<"messages">,
+        userId: convexUser._id,
+        unfurls: input.unfurls,
       });
 
       return result;

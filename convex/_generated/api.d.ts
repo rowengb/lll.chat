@@ -14,6 +14,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as apiKeys from "../apiKeys.js";
+import type * as clerkSync from "../clerkSync.js";
 import type * as files from "../files.js";
 import type * as messages from "../messages.js";
 import type * as migrateModels from "../migrateModels.js";
@@ -32,6 +33,7 @@ import type * as users from "../users.js";
  */
 declare const fullApi: ApiFromModules<{
   apiKeys: typeof apiKeys;
+  clerkSync: typeof clerkSync;
   files: typeof files;
   messages: typeof messages;
   migrateModels: typeof migrateModels;

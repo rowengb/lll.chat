@@ -6,6 +6,79 @@ import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import CryptoJS from 'crypto-js';
 import { debugLog, errorLog, warnLog, forceLog } from '@/utils/logger';
+import { availableTools, type ToolCall, type WebSearchArgs } from '@/utils/toolDefinitions';
+
+// Interface for web search results
+interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet?: string;
+  confidence?: number;
+  unfurled?: any;
+}
+
+// Interface for web search API response
+interface WebSearchResponse {
+  searchResults: WebSearchResult[];
+  context: string;
+  rawData: any;
+  searchPerformed: boolean;
+}
+
+// Function to execute web search tool
+async function executeWebSearchTool(args: WebSearchArgs, req: NextRequest): Promise<string> {
+  try {
+    debugLog(`🔧 [TOOL-CALL] Executing web search: "${args.query}"`);
+    
+    const searchResponse = await fetch(`${req.url.split('/api/')[0]}/api/web-search`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': req.headers.get('authorization') || '',
+        'Cookie': req.headers.get('cookie') || ''
+      },
+      body: JSON.stringify({
+        query: args.query,
+        numResults: 5
+      })
+    });
+
+    if (!searchResponse.ok) {
+      throw new Error(`Web search API returned ${searchResponse.status}`);
+    }
+
+    const searchData: WebSearchResponse = await searchResponse.json();
+    
+    if (searchData.searchResults.length === 0) {
+      return JSON.stringify({
+        aiContent: `No search results found for "${args.query}".`,
+        searchResults: []
+      });
+    }
+
+    // Format results for the AI
+    const formattedResults = searchData.searchResults.map((result, index) => 
+      `[${index + 1}] ${result.title}\nURL: ${result.url}\n${result.snippet || 'No snippet available'}\n`
+    ).join('\n---\n');
+
+    const aiContent = `Search results for "${args.query}":\n\n${formattedResults}`;
+    
+    debugLog(`🔧 [TOOL-CALL] Web search completed with ${searchData.searchResults.length} results`);
+    
+    // Return JSON with both AI content and raw search results for source extraction
+    return JSON.stringify({
+      aiContent,
+      searchResults: searchData.searchResults
+    });
+    
+  } catch (error) {
+    errorLog(`❌ [TOOL-CALL] Web search failed:`, error);
+    return JSON.stringify({
+      aiContent: `Web search failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      searchResults: []
+    });
+  }
+}
 
 // Force edge runtime to prevent response buffering in production
 export const config = {
@@ -313,6 +386,46 @@ export default async function handler(req: NextRequest) {
 
         debugLog(`🤖 [LLL.CHAT] Sending ${aiMessages.length} messages to AI (${processedFiles.length} files processed)`);
 
+        // Tool Calling Integration for Web Search
+        let webSearchResults: WebSearchResult[] | null = null;
+
+        // Check if we should enable tools for web search
+        const isGeminiWithBuiltinGrounding = actualModelId.includes('gemini-2.0') || 
+                                           actualModelId.includes('gemini-2.5') || 
+                                           actualModelId.includes('gemini-2-0') || 
+                                           actualModelId.includes('gemini-2-5');
+        
+        // Check if user is paid for non-Gemini models
+        let isPaidUser = false;
+        if (searchGrounding && !isGeminiWithBuiltinGrounding) {
+          try {
+            isPaidUser = await convex.query(api.users.isPaidUser, { authId: auth.userId });
+            debugLog(`💰 [LLL.CHAT] Paid user check for ${auth.userId}: ${isPaidUser}`);
+          } catch (error) {
+            errorLog(`❌ [LLL.CHAT] Error checking paid user status:`, error);
+            isPaidUser = false;
+          }
+        }
+        
+        // Enable tools only if:
+        // 1. Search grounding is requested AND
+        // 2. It's not a Gemini model with built-in grounding AND
+        // 3. User is paid (for non-Gemini models)
+        const shouldEnableTools = searchGrounding && !isGeminiWithBuiltinGrounding && isPaidUser;
+        const tools = shouldEnableTools ? availableTools : undefined;
+        
+        // Check if user is trying to use web search on non-Gemini model without being paid
+        if (searchGrounding && !isGeminiWithBuiltinGrounding && !isPaidUser) {
+          warnLog(`🚫 [LLL.CHAT] Non-paid user attempted to use web search on non-Gemini model: ${actualModelId}`);
+          write(`f:{"error":"Web search is a premium feature for non-Gemini models. Please upgrade to a paid plan or use a Gemini model which includes free search grounding."}\n`);
+          controller.close();
+          return;
+        }
+        
+        if (tools) {
+          debugLog(`🔧 [LLL.CHAT] Tools enabled for model: ${actualModelId}`);
+        }
+
         // Check if this is an image generation request
         if (isImageGenerationModel(model)) {
           debugLog(`🎨 [LLL.CHAT] Image generation request detected for model: ${model}`);
@@ -387,117 +500,228 @@ export default async function handler(req: NextRequest) {
         }, requestTimeoutMs);
         
         try {
-          const aiStream = await aiClient.createChatCompletion({
-            messages: aiMessages,
-            model: actualModelId,
-            stream: true,
-            apiKey,
-            enableGrounding: searchGrounding,
-          });
+          // Tool calling conversation loop
+          let conversationMessages = [...aiMessages];
+          let isToolCallLoop = true;
+          let fullResponse = '';
+          let chunkCount = 0;
+          let firstChunkReceived = false;
+          let firstChunkTime = 0;
+          let tokenStats = {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0
+          };
+          let streamStartTime = Date.now();
+          let groundingMetadata: any = null;
+          let webSearchUsed = false; // Track if web search has been used
+
+          // Generate a message ID for this response
+          const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           
-          clearTimeout(requestTimeout); // Clear timeout since request succeeded
+          // Send initial metadata (T3.chat style)
+          write(`f:{"messageId":"${messageId}"}\n`);
 
-        const streamReceived = Date.now();
-        debugLog(`⚡ [LLL.CHAT] AI stream received after ${streamReceived - aiCallStart}ms`);
+          while (isToolCallLoop) {
+            try {
+              const aiStream = await aiClient.createChatCompletion({
+                messages: conversationMessages,
+                model: actualModelId,
+                stream: true,
+                apiKey,
+                enableGrounding: searchGrounding && isGeminiWithBuiltinGrounding, // Only enable built-in grounding for Gemini
+                tools: webSearchUsed ? undefined : tools, // Disable tools after first web search
+              });
+              
+              clearTimeout(requestTimeout); // Clear timeout since request succeeded
 
-        let fullResponse = '';
-        let chunkCount = 0;
-        let firstChunkReceived = false;
-        let firstChunkTime = 0;
-        let tokenStats = {
-          inputTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0
-        };
-        let streamStartTime = Date.now();
+              const streamReceived = Date.now();
+              debugLog(`⚡ [LLL.CHAT] AI stream received after ${streamReceived - aiCallStart}ms`);
 
-        // Generate a message ID for this response
-        const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Send initial metadata (T3.chat style)
-        write(`f:{"messageId":"${messageId}"}\n`);
+              // Stream the response - handle both old string format and new StreamChunk format
+              const isStreamChunk = (chunk: any): chunk is import('@/server/ai/client').StreamChunk => {
+                return chunk && typeof chunk === 'object' && 'content' in chunk;
+              };
 
-        // Stream the response - handle both old string format and new StreamChunk format
-        const isStreamChunk = (chunk: any): chunk is import('@/server/ai/client').StreamChunk => {
-          return chunk && typeof chunk === 'object' && 'content' in chunk;
-        };
+              let toolCallsPending: ToolCall[] = [];
+              let assistantMessage = '';
 
-        let groundingMetadata: any = null;
+              for await (const chunk of aiStream as AsyncIterable<any>) {
+                const content = isStreamChunk(chunk) ? chunk.content : chunk;
+                const tokenUsage = isStreamChunk(chunk) ? chunk.tokenUsage : undefined;
+                const isComplete = isStreamChunk(chunk) ? chunk.isComplete : false;
+                const toolCalls = isStreamChunk(chunk) ? chunk.toolCalls : undefined;
+                
+                // Check for grounding metadata in the chunk
+                if (isStreamChunk(chunk) && chunk.groundingMetadata) {
+                  groundingMetadata = chunk.groundingMetadata;
+                  debugLog(`🔍 [LLL.CHAT] Grounding metadata received with ${groundingMetadata.groundingChunks?.length || 0} sources`);
+                }
 
-        for await (const chunk of aiStream as AsyncIterable<any>) {
-          const content = isStreamChunk(chunk) ? chunk.content : chunk;
-          const tokenUsage = isStreamChunk(chunk) ? chunk.tokenUsage : undefined;
-          const isComplete = isStreamChunk(chunk) ? chunk.isComplete : false;
+                // Handle tool calls
+                if (toolCalls && toolCalls.length > 0) {
+                  toolCallsPending = toolCalls;
+                  debugLog(`🔧 [LLL.CHAT] Tool calls received: ${toolCalls.map(tc => tc.function.name).join(', ')}`);
+                }
+
+                if (!firstChunkReceived && content) {
+                  firstChunkTime = Date.now();
+                  const ttfb = firstChunkTime - aiCallStart;
+                  const totalTime = firstChunkTime - requestStart;
+                  debugLog(`🎯 [LLL.CHAT] First content chunk received after ${ttfb}ms (TTFB: ${totalTime}ms)`);
+                  
+                  // Warn about slow OpenRouter responses
+                  if (actualProvider === "openrouter" && ttfb > 5000) {
+                    warnLog(`⚠️  [OPENROUTER-SLOW] Model ${actualModelId} took ${ttfb}ms for first chunk - this is unusually slow`);
+                  }
+                  
+                  firstChunkReceived = true;
+                }
+
+                if (content) {
+                  chunkCount++;
+                  fullResponse += content;
+                  assistantMessage += content;
+
+                  // Log only first chunk to avoid performance overhead
+                  if (chunkCount === 1) {
+                    debugLog(`📦 [LLL.CHAT] First chunk: "${content}" (${content.length} chars)`);
+                  }
+
+                  // Send content in T3.chat format: 0:"content"
+                  write(`0:${JSON.stringify(content)}\n`);
+                }
+
+                // Update token statistics (only log final stats to avoid performance overhead)
+                if (tokenUsage) {
+                  tokenStats = tokenUsage;
+                  
+                  if (isComplete) {
+                    const currentTime = Date.now();
+                    const elapsedSeconds = (currentTime - streamStartTime) / 1000;
+                    const tokensPerSecond = tokenStats.outputTokens / elapsedSeconds;
+                    debugLog(`🎯 [LLL.CHAT] FINAL STATS - Input: ${tokenStats.inputTokens}, Output: ${tokenStats.outputTokens}, Total: ${tokenStats.totalTokens}, TPS: ${tokensPerSecond.toFixed(2)}`);
+                  }
+                }
+
+                // Log completion with final token stats
+                if (isComplete && tokenStats.totalTokens > 0) {
+                  const totalTime = Date.now() - streamStartTime;
+                  const finalTps = tokenStats.outputTokens / (totalTime / 1000);
+                  debugLog(`✅ [LLL.CHAT] Stream completed with final token stats:`);
+                  debugLog(`📊 [LLL.CHAT] Final tokens - Input: ${tokenStats.inputTokens}, Output: ${tokenStats.outputTokens}, Total: ${tokenStats.totalTokens}`);
+                  debugLog(`🚀 [LLL.CHAT] Final TPS: ${finalTps.toFixed(2)} tokens/second`);
+                }
+              }
+
+              // Handle tool calls if any were made
+              if (toolCallsPending.length > 0) {
+                debugLog(`🔧 [LLL.CHAT] Executing ${toolCallsPending.length} tool calls`);
+                
+                // Add the assistant's message with tool calls to conversation
+                conversationMessages.push({
+                  role: 'assistant',
+                  content: assistantMessage || null,
+                  tool_calls: toolCallsPending
+                } as any);
+
+                // Execute each tool call and collect sources
+                let webSearchSources: any[] = [];
+                
+                for (const toolCall of toolCallsPending) {
+                  if (toolCall.function.name === 'web_search') {
+                    // Mark that web search has been used
+                    webSearchUsed = true;
+                    debugLog(`🚫 [LLL.CHAT] Web search used - future tool calls will be disabled`);
+                    
+                    try {
+                      const args: WebSearchArgs = JSON.parse(toolCall.function.arguments);
+                      const result = await executeWebSearchTool(args, req);
+                      
+                      // Parse the search result to extract sources and AI content
+                      let aiContent = result;
+                      try {
+                        const searchResponse = JSON.parse(result);
+                        if (searchResponse.aiContent) {
+                          aiContent = searchResponse.aiContent; // Use formatted content for AI
+                        }
+                        if (searchResponse.searchResults && Array.isArray(searchResponse.searchResults)) {
+                          const sources = searchResponse.searchResults.map((item: any) => ({
+                            title: item.title || '',
+                            url: item.url || '',
+                            snippet: item.snippet || item.text || '',
+                            confidence: Math.round((item.confidence || 0.8) * 100), // Convert to percentage
+                            unfurled: item.unfurled || undefined
+                          }));
+                          webSearchSources.push(...sources);
+                          debugLog(`🔍 [LLL.CHAT] Extracted ${sources.length} sources from web search`);
+                        }
+                      } catch (parseError) {
+                        debugLog(`⚠️ [LLL.CHAT] Could not parse search results for sources: ${parseError}`);
+                      }
+                      
+                      // Add tool result to conversation (use AI content, not raw JSON)
+                      conversationMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        content: aiContent
+                      } as any);
+                      
+                      debugLog(`🔧 [LLL.CHAT] Tool executed successfully: ${toolCall.function.name}`);
+                      
+                    } catch (error) {
+                      errorLog(`❌ [LLL.CHAT] Tool execution failed:`, error);
+                      
+                      // Add error result to conversation
+                      conversationMessages.push({
+                        role: 'tool',
+                        tool_call_id: toolCall.id,
+                        content: `Error executing web search: ${error instanceof Error ? error.message : 'Unknown error'}`
+                      } as any);
+                    }
+                  }
+                }
+                
+                // Set grounding metadata if we have web search sources
+                if (webSearchSources.length > 0) {
+                  groundingMetadata = {
+                    sources: webSearchSources,
+                    rawData: { searchProvider: 'exa', toolCall: true }
+                  };
+                  debugLog(`🔗 [LLL.CHAT] Set grounding metadata with ${webSearchSources.length} web search sources`);
+                }
+                
+                // Continue the loop to get AI's response incorporating tool results
+                debugLog(`🔄 [LLL.CHAT] Continuing conversation with tool results`);
+                
+              } else {
+                // No tool calls, conversation is complete
+                isToolCallLoop = false;
+                debugLog(`✅ [LLL.CHAT] Conversation completed without tool calls`);
+              }
+
+            } catch (loopError) {
+              errorLog(`❌ [LLL.CHAT] Error in tool calling loop:`, loopError);
+              isToolCallLoop = false;
+              throw loopError;
+            }
+          }
           
-          // Check for grounding metadata in the chunk
-          if (isStreamChunk(chunk) && chunk.groundingMetadata) {
-            groundingMetadata = chunk.groundingMetadata;
-            debugLog(`🔍 [LLL.CHAT] Grounding metadata received with ${groundingMetadata.groundingChunks?.length || 0} sources`);
+          const streamComplete = Date.now();
+          debugLog(`✅ [LLL.CHAT] Stream completed after ${streamComplete - aiCallStart}ms`);
+          debugLog(`📊 [LLL.CHAT] Total: ${chunkCount} chunks, ${fullResponse.length} characters`);
+          debugLog(`⏱️  [LLL.CHAT] Total request time: ${streamComplete - requestStart}ms`);
+          
+          // Send grounding metadata if available (Gemini built-in grounding only for now)
+          // Tool call results will be included in the AI's response directly
+          if (groundingMetadata) {
+            debugLog(`🔗 [LLL.CHAT] Sending Gemini grounding metadata with response`);
+            write(`f:{"grounding":${JSON.stringify(groundingMetadata)}}\n`);
           }
-
-          if (!firstChunkReceived && content) {
-            firstChunkTime = Date.now();
-            const ttfb = firstChunkTime - aiCallStart;
-            const totalTime = firstChunkTime - requestStart;
-            debugLog(`🎯 [LLL.CHAT] First content chunk received after ${ttfb}ms (TTFB: ${totalTime}ms)`);
-            
-            // Warn about slow OpenRouter responses
-            if (actualProvider === "openrouter" && ttfb > 5000) {
-              warnLog(`⚠️  [OPENROUTER-SLOW] Model ${actualModelId} took ${ttfb}ms for first chunk - this is unusually slow`);
-            }
-            
-            firstChunkReceived = true;
-          }
-
-          if (content) {
-            chunkCount++;
-            fullResponse += content;
-
-            // Log only first chunk to avoid performance overhead
-            if (chunkCount === 1) {
-              debugLog(`📦 [LLL.CHAT] First chunk: "${content}" (${content.length} chars)`);
-            }
-
-            // Send content in T3.chat format: 0:"content"
-            write(`0:${JSON.stringify(content)}\n`);
-          }
-
-          // Update token statistics (only log final stats to avoid performance overhead)
-          if (tokenUsage) {
-            tokenStats = tokenUsage;
-            
-            if (isComplete) {
-              const currentTime = Date.now();
-              const elapsedSeconds = (currentTime - streamStartTime) / 1000;
-              const tokensPerSecond = tokenStats.outputTokens / elapsedSeconds;
-              debugLog(`🎯 [LLL.CHAT] FINAL STATS - Input: ${tokenStats.inputTokens}, Output: ${tokenStats.outputTokens}, Total: ${tokenStats.totalTokens}, TPS: ${tokensPerSecond.toFixed(2)}`);
-            }
-          }
-
-          // Log completion with final token stats
-          if (isComplete && tokenStats.totalTokens > 0) {
-            const totalTime = Date.now() - streamStartTime;
-            const finalTps = tokenStats.outputTokens / (totalTime / 1000);
-            debugLog(`✅ [LLL.CHAT] Stream completed with final token stats:`);
-            debugLog(`📊 [LLL.CHAT] Final tokens - Input: ${tokenStats.inputTokens}, Output: ${tokenStats.outputTokens}, Total: ${tokenStats.totalTokens}`);
-            debugLog(`🚀 [LLL.CHAT] Final TPS: ${finalTps.toFixed(2)} tokens/second`);
-          }
-        }
-        
-        const streamComplete = Date.now();
-        debugLog(`✅ [LLL.CHAT] Stream completed after ${streamComplete - aiCallStart}ms`);
-        debugLog(`📊 [LLL.CHAT] Total: ${chunkCount} chunks, ${fullResponse.length} characters`);
-        debugLog(`⏱️  [LLL.CHAT] Total request time: ${streamComplete - requestStart}ms`);
-        
-        // Send grounding metadata if available
-        if (groundingMetadata) {
-          debugLog(`🔗 [LLL.CHAT] Sending grounding metadata with response`);
-          write(`f:{"grounding":${JSON.stringify(groundingMetadata)}}\n`);
-        }
-        
-        // Send completion signal (T3.chat style) - don't include full content to avoid parsing issues
-        write(`d:{"type":"done","length":${fullResponse.length}}\n`);
-        
+          
+          // Send completion signal (T3.chat style) - don't include full content to avoid parsing issues
+          write(`d:{"type":"done","length":${fullResponse.length}}\n`);
+          
         } catch (timeoutError: any) {
           clearTimeout(requestTimeout);
           if (timeoutError.name === 'AbortError') {

@@ -45,6 +45,7 @@ export interface GroundingSource {
 
 export interface GroundingMetadata {
   sources?: GroundingSource[];
+  rawData?: any; // Include raw data for debugging (used for both Gemini and Exa.AI)
 }
 
 export interface FileAttachmentData {
