@@ -465,9 +465,15 @@ export function ModelSelector({ selectedModel, onModelChange, size = 'sm', onCli
     const handleFilterClickOutside = (event: MouseEvent) => {
       if (filterModalRef.current && !filterModalRef.current.contains(event.target as Node)) {
         // Also check if the click was on the filter toggle button to avoid immediate reopening
-        const target = event.target as Element;
-        const isFilterButton = target.closest('[data-filter-toggle]');
-        if (!isFilterButton) {
+        const target = event.target;
+        // Check if target is an Element that has the closest method
+        if (target instanceof Element) {
+          const isFilterButton = target.closest('[data-filter-toggle]');
+          if (!isFilterButton) {
+            setShowFilters(false);
+          }
+        } else {
+          // If target is not an Element, just close the filters
           setShowFilters(false);
         }
       }
