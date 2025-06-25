@@ -725,7 +725,15 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         
         onThreadCreate(newThreadId);
         await refetchMessages();
-        utils.chat.getThreads.invalidate();
+        
+        // Force sidebar to refresh immediately - multiple invalidation strategies
+        await utils.chat.getThreads.invalidate();
+        refetchThreads();
+        
+        // Also invalidate after a brief delay to catch any race conditions
+        setTimeout(() => {
+          utils.chat.getThreads.invalidate();
+        }, 100);
         
         toast.dismiss();
         toast.success("Conversation branched successfully with all attachments and images");
@@ -1004,7 +1012,15 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
         
         // Make thread appear in sidebar immediately
         onThreadCreate(newThread.id);
-        await refetchThreads();
+        
+        // Force sidebar to refresh immediately - multiple invalidation strategies
+        await utils.chat.getThreads.invalidate();
+        refetchThreads();
+        
+        // Also invalidate after a brief delay to catch any race conditions
+        setTimeout(() => {
+          utils.chat.getThreads.invalidate();
+        }, 100);
 
         // Save user message to database immediately before attempting AI response
         let savedUserMessage: { id: string; content: string; role: string } | null = null;

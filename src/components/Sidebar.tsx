@@ -155,9 +155,12 @@ function MobileSidebar({ isOpen, onClose, currentThreadId, onThreadSelect, onNew
 
   const utils = trpc.useUtils();
   const { data: threads } = trpc.chat.getThreads.useQuery(undefined, {
-    refetchOnWindowFocus: true,
-    staleTime: 5000,
-    refetchInterval: 30000,
+    // Use same settings as main sidebar for consistency
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    staleTime: 1000, // 1 second
+    cacheTime: 5000, // 5 seconds  
+    refetchInterval: false,
   });
   const { data: models } = trpc.models.getModels.useQuery();
 
@@ -591,12 +594,12 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
   
   const utils = trpc.useUtils();
   const { data: threads, refetch: refetchThreads } = trpc.chat.getThreads.useQuery(undefined, {
-    // Automatically refetch when window regains focus, but with a delay to avoid jittery behavior
-    refetchOnWindowFocus: true,
-    // Stale time of 5 seconds - data is considered fresh for 5 seconds
-    staleTime: 5000,
-    // Refetch in background every 30 seconds when data is stale
-    refetchInterval: 30000,
+    // Use same settings as main sidebar for consistency
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    staleTime: 1000, // 1 second
+    cacheTime: 5000, // 5 seconds  
+    refetchInterval: false,
   });
   const { data: models } = trpc.models.getModels.useQuery();
   const { data: favoriteModels } = trpc.models.getFavoriteModels.useQuery();
@@ -616,8 +619,9 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
 
   const createThread = trpc.chat.createThread.useMutation({
     onSuccess: (newThread) => {
-      // Invalidate and refetch threads to update the UI
+      // Force immediate invalidation and refetch
       utils.chat.getThreads.invalidate();
+      // Navigate immediately while cache updates
       onThreadSelect(newThread.id);
     },
     onError: () => {
@@ -627,16 +631,34 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
   });
 
   const deleteThread = trpc.chat.deleteThread.useMutation({
-    onSuccess: () => {
-      // Invalidate and refetch threads to update the UI
-      utils.chat.getThreads.invalidate();
+    onMutate: async (deleteData) => {
+      // Cancel any outgoing refetches 
+      await utils.chat.getThreads.cancel();
       
-      if (currentThreadId && threads?.find(t => t.id === currentThreadId)) {
-        // If current thread was deleted, redirect to home welcome
+      // Snapshot the previous value
+      const previousThreads = utils.chat.getThreads.getData();
+      
+      // Optimistically remove the thread
+      utils.chat.getThreads.setData(undefined, (old) => {
+        if (!old) return old;
+        return old.filter(thread => thread.id !== deleteData.id);
+      });
+      
+      return { previousThreads, deletedId: deleteData.id };
+    },
+    onSuccess: (result, variables, context) => {
+      // If current thread was deleted, redirect to home
+      if (currentThreadId === context?.deletedId) {
         router.push("/");
       }
+      // Force a final cache refresh to ensure consistency
+      utils.chat.getThreads.invalidate();
     },
-    onError: () => {
+    onError: (err, deleteData, context) => {
+      // Rollback on error
+      if (context?.previousThreads) {
+        utils.chat.getThreads.setData(undefined, context.previousThreads);
+      }
       toast.dismiss();
       toast.error("Failed to delete conversation");
     },
@@ -644,16 +666,10 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
 
   const updateThread = trpc.chat.updateThread.useMutation({
     onMutate: async (newData) => {
-      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
       await utils.chat.getThreads.cancel();
-
-      // Snapshot the previous value
       const previousThreads = utils.chat.getThreads.getData();
-
-      // Optimistically update to the new value
       utils.chat.getThreads.setData(undefined, (old) => {
         if (!old) return old;
-        
         return old.map(thread => 
           thread.id === newData.id 
             ? { 
@@ -664,22 +680,16 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
             : thread
         );
       });
-
-      // Return a context object with the snapshotted value
       return { previousThreads };
     },
     onError: (err, newData, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousThreads) {
         utils.chat.getThreads.setData(undefined, context.previousThreads);
       }
       toast.dismiss();
       toast.error("Failed to update conversation");
     },
-    // Remove onSettled to avoid unnecessary refetch since we have optimistic updates
   });
-
-
 
   // Close context menu when clicking outside
   useEffect(() => {

@@ -86,15 +86,15 @@ export function useQueryWithLocalCache<T>(
     }
   }, [queryKey, refetchOnMount]);
 
-  // Background refetch if data is stale
-  useEffect(() => {
-    if (data && isStale && !isLoading) {
-      // Background refresh without showing loading state
-      executeQuery().catch(() => {
-        // Silently handle background refresh errors
-      });
-    }
-  }, [isStale, data, isLoading]);
+  // Background refetch if data is stale - DISABLED to prevent cache conflicts
+  // useEffect(() => {
+  //   if (data && isStale && !isLoading) {
+  //     // Background refresh without showing loading state
+  //     executeQuery().catch(() => {
+  //       // Silently handle background refresh errors
+  //     });
+  //   }
+  // }, [isStale, data, isLoading]);
 
   const refetch = () => {
     executeQuery(true);
