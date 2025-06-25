@@ -793,7 +793,27 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
   const handleConfirmDelete = () => {
     if (!deleteConfirmation.threadId) return;
     
-    deleteThread.mutate({ id: deleteConfirmation.threadId });
+    const threadIdToDelete = deleteConfirmation.threadId;
+    
+    // IMMEDIATELY remove from global store - no waiting!
+    const { deleteThread: deleteFromStore } = useChatStore.getState();
+    deleteFromStore(threadIdToDelete);
+    
+    // IMMEDIATELY remove from TRPC cache 
+    utils.chat.getThreads.setData(undefined, (old) => {
+      if (!old) return old;
+      return old.filter(thread => thread.id !== threadIdToDelete);
+    });
+    
+    // Navigate away if this was the current thread
+    if (currentThreadId === threadIdToDelete) {
+      router.push("/");
+    }
+    
+    // Now trigger the server deletion (this is just for persistence)
+    deleteThread.mutate({ id: threadIdToDelete });
+    
+    // Close modal and show success
     setDeleteConfirmation({
       isOpen: false,
       threadId: null,

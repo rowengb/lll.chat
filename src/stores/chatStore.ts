@@ -91,6 +91,9 @@ interface ChatStore {
   // Get messages for a thread
   getMessages: (threadId: string) => Message[];
   getDisplayMessages: () => Message[];
+  
+  // Comprehensive thread cleanup - removes ALL traces of a thread
+  deleteThread: (threadId: string) => void;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -278,6 +281,43 @@ export const useChatStore = create<ChatStore>()(
       const newMessagesByThread = { ...state.messagesByThread };
       delete newMessagesByThread[threadId];
       return { messagesByThread: newMessagesByThread };
+    });
+  },
+  
+  // Comprehensive thread cleanup - removes ALL traces of a thread
+  deleteThread: (threadId: string) => {
+    set((state) => {
+      const newMessagesByThread = { ...state.messagesByThread };
+      const newLoadingStatus = { ...state.loadingStatus };
+      const newLoadingTimelines = { ...state.loadingTimelines };
+      const newTimelineBuilders = { ...state.timelineBuilders };
+      const newLoadingStates = new Map(state.loadingStates);
+      const newStreamingStates = new Map(state.streamingStates);
+      
+      // Remove all traces of this thread
+      delete newMessagesByThread[threadId];
+      delete newLoadingStatus[threadId];
+      delete newLoadingTimelines[threadId];
+      delete newTimelineBuilders[threadId];
+      newLoadingStates.delete(threadId);
+      newStreamingStates.delete(threadId);
+      
+      return {
+        messagesByThread: newMessagesByThread,
+        loadingStatus: newLoadingStatus,
+        loadingTimelines: newLoadingTimelines,
+        timelineBuilders: newTimelineBuilders,
+        loadingStates: newLoadingStates,
+        streamingStates: newStreamingStates,
+        // Reset current thread if it was the deleted one
+        currentDisplayThreadId: state.currentDisplayThreadId === threadId ? null : state.currentDisplayThreadId,
+        displayMessages: state.currentDisplayThreadId === threadId ? [] : state.displayMessages,
+        // Reset loading/streaming if it was for this thread
+        isLoading: state.loadingThreadId === threadId ? false : state.isLoading,
+        loadingThreadId: state.loadingThreadId === threadId ? null : state.loadingThreadId,
+        isStreaming: state.streamingThreadId === threadId ? false : state.isStreaming,
+        streamingThreadId: state.streamingThreadId === threadId ? null : state.streamingThreadId,
+      };
     });
   },
   
