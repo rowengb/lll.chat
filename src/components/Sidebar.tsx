@@ -630,22 +630,19 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     },
   });
 
+  const deleteThread = trpc.chat.deleteThread.useMutation({
     // NO optimistic updates - they fight with our immediate clearing
     onSuccess: () => {
       // Just ensure server sync - the UI already updated immediately
-      console.log("🗑️ Server deletion completed");
+      console.log('🗑️ Server deletion completed');
     },
     onError: (err) => {
       // If server deletion fails, we need to restore the thread
-      console.error("❌ Server deletion failed:", err);
+      console.error('❌ Server deletion failed:', err);
       toast.dismiss();
       toast.error("Failed to delete conversation on server - refreshing...");
       // Force a refetch to restore server state
       utils.chat.getThreads.invalidate();
-    },        utils.chat.getThreads.setData(undefined, context.previousThreads);
-      }
-      toast.dismiss();
-      toast.error("Failed to delete conversation");
     },
   });
 
@@ -780,32 +777,32 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     
     const threadIdToDelete = deleteConfirmation.threadId;
     
-    console.log("🚀 NUCLEAR DELETION STARTED for thread:", threadIdToDelete);
+    console.log('🚀 NUCLEAR DELETION STARTED for thread:', threadIdToDelete);
     
     // 1. IMMEDIATELY remove from global store - no waiting!
     const { deleteThread: deleteFromStore } = useChatStore.getState();
     deleteFromStore(threadIdToDelete);
-    console.log("✅ Removed from chat store");
+    console.log('✅ Removed from chat store');
     
     // 2. NUCLEAR CACHE CLEARING - multiple strategies
-    // Cancel any ongoing queries first
+    // Cancel any ongoing queries
     utils.chat.getThreads.cancel();
     
     // Clear TRPC cache immediately
     utils.chat.getThreads.setData(undefined, (old) => {
-      console.log("�� Before filter:", old?.length || 0, "threads");
+      console.log('🔥 Before filter:', old?.length || 0, 'threads');
       const filtered = old?.filter(thread => thread.id !== threadIdToDelete) || [];
-      console.log("🔥 After filter:", filtered.length, "threads");
+      console.log('🔥 After filter:', filtered.length, 'threads');
       return filtered;
     });
     
-    // Force multiple invalidations with different timing to be absolutely sure
+    // Force multiple invalidations with different timing
     utils.chat.getThreads.invalidate();
     setTimeout(() => utils.chat.getThreads.invalidate(), 10);
     setTimeout(() => utils.chat.getThreads.invalidate(), 100);
     setTimeout(() => utils.chat.getThreads.invalidate(), 500);
     
-    console.log("✅ TRPC cache nuked");
+    console.log('✅ TRPC cache nuked');
     
     // 3. Navigate away if this was the current thread
     if (currentThreadId === threadIdToDelete) {
@@ -825,8 +822,8 @@ export function Sidebar({ currentThreadId, onThreadSelect, onNewChat, onNavigate
     
     // 6. FINALLY trigger server deletion (fire and forget)
     deleteThread.mutate({ id: threadIdToDelete });
-    console.log("🔥 Server deletion triggered");
-  };  };
+    console.log('🔥 Server deletion triggered');
+  };
 
   const handleCancelDelete = () => {
     setDeleteConfirmation({
