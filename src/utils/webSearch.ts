@@ -33,6 +33,8 @@ export interface WebSearchResult {
     favicon?: string;
     siteName?: string;
     finalUrl?: string;
+    author?: string;
+    publishedDate?: string;
   };
 }
 
@@ -67,23 +69,40 @@ export async function performWebSearch(
     });
 
     debugLog(`🔍 [EXA-SEARCH] Search completed with ${result.results?.length || 0} results`);
+    
+    // Debug: Log the rich metadata from first result
+    if (result.results && result.results.length > 0 && result.results[0]) {
+      const firstResult = result.results[0];
+      debugLog(`🔍 [EXA-SEARCH] First result metadata:`, {
+        title: firstResult.title,
+        image: firstResult.image,
+        favicon: firstResult.favicon,
+        author: firstResult.author,
+        publishedDate: firstResult.publishedDate,
+        url: firstResult.url
+      });
+    }
 
     if (!result.results || result.results.length === 0) {
       warnLog(`⚠️ [EXA-SEARCH] No search results found for query: "${query}"`);
       return null;
     }
 
-    // Format search results
+    // Format search results using rich Exa.AI metadata
     const searchResults: WebSearchResult[] = result.results.map((item: any, index: number) => ({
-      title: item.title || `Result ${index + 1}`,
+      title: item.title || extractDomainName(item.url) || `Result ${index + 1}`,
       url: item.url,
       snippet: item.text ? item.text.substring(0, 300) + (item.text.length > 300 ? '...' : '') : undefined,
       confidence: 95 - (index * 5), // Assign confidence based on ranking
       unfurled: {
         title: item.title,
         description: item.text ? item.text.substring(0, 200) + (item.text.length > 200 ? '...' : '') : undefined,
+        image: item.image,  // Use Exa.AI provided image
+        favicon: item.favicon,  // Use Exa.AI provided favicon
+        siteName: extractDomainName(item.url),
         finalUrl: item.url,
-        siteName: extractDomainName(item.url)
+        author: item.author,  // Use Exa.AI provided author
+        publishedDate: item.publishedDate  // Use Exa.AI provided publish date
       }
     }));
 

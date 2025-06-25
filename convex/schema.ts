@@ -55,6 +55,8 @@ export default defineSchema({
       unfurledFavicon: v.optional(v.string()), // Site favicon
       unfurledSiteName: v.optional(v.string()), // Site name
       unfurledFinalUrl: v.optional(v.string()), // Final URL after redirects
+      unfurledAuthor: v.optional(v.string()), // Article author
+      unfurledPublishedDate: v.optional(v.string()), // Article published date
       unfurledAt: v.optional(v.number()), // Timestamp when unfurled
     }))),
     // Image generation fields

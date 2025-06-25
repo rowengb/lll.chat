@@ -28,7 +28,8 @@ export const useChatStreaming = () => {
     addMessage,
     updateStreamingMessage,
     setStreaming,
-    setLoading
+    setLoading,
+    setLoadingStatus
   } = useChatStore();
   
   // Refs to track streaming state and prevent race conditions
@@ -189,6 +190,9 @@ export const useChatStreaming = () => {
     isStreamingRef.current = false;
     setStreaming(null, false);
     setLoading(null, false);
+    if (currentStreamDataRef.current) {
+      setLoadingStatus(currentStreamDataRef.current.threadId, null); // Clear dynamic status
+    }
     abortControllerRef.current = null;
     currentStreamDataRef.current = null;
     
@@ -414,6 +418,11 @@ export const useChatStreaming = () => {
                   
                   debugLog(`🎨 [STREAM] Image URL received, keeping loading state until image loads`);
                 }
+                if (metadata.status) {
+                  // Handle dynamic loading status updates
+                  setLoadingStatus(threadId, metadata.status);
+                  debugLog(`🔄 [STREAM] Status update: ${metadata.status.step} - ${metadata.status.message}`);
+                }
                 if (metadata.error) {
                   errorLog(`[STREAM] API Error: ${metadata.error}`);
                   
@@ -452,6 +461,7 @@ export const useChatStreaming = () => {
                   // Clear loading and streaming states
                   setLoading(null, false);
                   setStreaming(null, false);
+                  setLoadingStatus(threadId, null);
                   isStreamingRef.current = false;
                   return; // Exit the stream processing
                 }
@@ -493,6 +503,7 @@ export const useChatStreaming = () => {
                   // Clear loading and streaming states
                   setLoading(null, false);
                   setStreaming(null, false);
+                  setLoadingStatus(threadId, null);
                   isStreamingRef.current = false;
                   return; // Exit the stream processing
                 }
@@ -724,6 +735,7 @@ export const useChatStreaming = () => {
                 lastStreamCompletedAt.current = Date.now();
                 setStreaming(null, false);
                 setLoading(null, false);
+                setLoadingStatus(threadId, null); // Clear dynamic status
                 
                 // Auto-focus input after streaming completes so user can immediately type next message
                 smartFocus(inputRef, { delay: 200, reason: 'stream-complete' });

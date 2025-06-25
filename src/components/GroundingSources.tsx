@@ -1,13 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDownIcon, ChevronRightIcon, ExternalLinkIcon, SearchIcon, LoaderIcon } from 'lucide-react';
-import { useUnfurlUrl } from '../hooks/useUnfurlUrl';
+import { trpc } from '../utils/trpc';
 
 interface GroundingSource {
   title: string; // Domain name (e.g., "pbs.org", "democracynow.org")
   url: string; // Vertexaisearch redirect URL (e.g., "https://vertexaisearch.cloud.google.com/grounding-api-redirect/...")
   snippet?: string;
   confidence?: number; // Confidence percentage (0-100)
-  // Unfurled metadata from the actual destination
+  // Database fields (from saved unfurled data)
+  unfurledTitle?: string;
+  unfurledDescription?: string;
+  unfurledImage?: string;
+  unfurledFavicon?: string;
+  unfurledSiteName?: string;
+  unfurledFinalUrl?: string;
+  unfurledAuthor?: string;
+  unfurledPublishedDate?: string;
+  unfurledAt?: number;
+  // Real-time unfurled metadata from Exa.AI
   unfurled?: {
     title?: string; // Actual article title
     description?: string; // Article description
@@ -15,6 +25,8 @@ interface GroundingSource {
     favicon?: string; // Site favicon
     siteName?: string; // Site name
     finalUrl?: string; // Final URL after redirects
+    author?: string; // Article author
+    publishedDate?: string; // Article publish date
   };
 }
 
@@ -39,52 +51,99 @@ function SourceListItem({
   index: number; 
   messageId?: string;
 }) {
-  const { data: unfurlData, loading: unfurlLoading } = useUnfurlUrl(
-    source.url, 
-    messageId, 
-    index,
-    source.unfurled
-  );
+  // Unfurling disabled - use basic source data only
+  const unfurlLoading = false;
 
-  // Use unfurled data if available, otherwise fall back to source data
-  const displayTitle = unfurlData?.title || source.title;
-  const displaySiteName = unfurlData?.siteName || source.unfurled?.siteName;
-  const displayFavicon = unfurlData?.favicon || source.unfurled?.favicon;
+  // Use rich data - prioritize real-time Exa.AI data, fallback to saved database data
+  const displayTitle = source.unfurled?.title || source.unfurledTitle || source.title;
+  const displaySiteName = source.unfurled?.siteName || source.unfurledSiteName;
+  const displayFavicon = source.unfurled?.favicon || source.unfurledFavicon;
+  const displayAuthor = source.unfurled?.author || source.unfurledAuthor;
+  const displayPublishedDate = source.unfurled?.publishedDate || source.unfurledPublishedDate;
+  const displayImage = source.unfurled?.image || source.unfurledImage;
 
   return (
     <li className="flex items-start gap-2">
       {/* Bullet point */}
       <span className="text-gray-400 dark:text-gray-500 mt-1 text-xs">•</span>
       
-      <div className="flex items-center gap-2 min-w-0 flex-1">
-        {/* Favicon */}
-        {displayFavicon ? (
-          <img 
-            src={displayFavicon} 
-            alt="" 
-            className="w-4 h-4 flex-shrink-0"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
-          />
-        ) : (
-          <ExternalLinkIcon className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-        )}
-
-        {/* Title and site name */}
-        <a
-          href={source.url}
-          target="_blank"
-          rel="noopener noreferrer"
-                          className="text-sm text-muted-foreground hover:text-primary transition-colors truncate"
-        >
-          {displayTitle}
-          {displaySiteName && displaySiteName !== displayTitle && (
-            <span className="text-gray-500 dark:text-gray-400 ml-1">
-              — {displaySiteName}
-            </span>
+      <div className="flex items-start gap-3 min-w-0 flex-1">
+        {/* Article image with favicon overlay or standalone favicon */}
+        <div className="flex-shrink-0">
+          {displayImage ? (
+            <div className="relative">
+              <img 
+                src={displayImage} 
+                alt={displayTitle}
+                className="w-12 h-12 rounded-lg object-cover border border-gray-200 dark:border-gray-700"
+                onError={(e) => {
+                  // Fallback to favicon if image fails
+                  const img = e.target as HTMLImageElement;
+                  if (displayFavicon) {
+                    img.src = displayFavicon;
+                    img.className = "w-6 h-6 flex-shrink-0 mt-0.5 rounded";
+                  } else {
+                    img.style.display = 'none';
+                  }
+                }}
+              />
+              {/* Favicon overlay on bottom-right corner of article image */}
+              {displayFavicon && (
+                <img 
+                  src={displayFavicon} 
+                  alt="" 
+                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-sm border border-white dark:border-gray-800 bg-white dark:bg-gray-800"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              )}
+            </div>
+          ) : displayFavicon ? (
+            <img 
+              src={displayFavicon} 
+              alt="" 
+              className="w-6 h-6 flex-shrink-0 mt-0.5 rounded border border-gray-200 dark:border-gray-700"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <ExternalLinkIcon className="w-6 h-6 text-gray-400 dark:text-gray-500 flex-shrink-0 mt-0.5" />
           )}
-        </a>
+        </div>
+
+        {/* Title, author, and metadata */}
+        <div className="flex flex-col min-w-0 flex-1">
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground hover:text-primary transition-colors truncate leading-snug"
+          >
+            {displayTitle}
+            {displaySiteName && displaySiteName !== displayTitle && (
+              <span className="text-gray-500 dark:text-gray-400 ml-1">
+                — {displaySiteName}
+              </span>
+            )}
+          </a>
+          
+          {/* Author and date metadata */}
+          {(displayAuthor || displayPublishedDate) && (
+            <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">
+              {displayAuthor && (
+                <span>by {displayAuthor}</span>
+              )}
+              {displayAuthor && displayPublishedDate && (
+                <span className="mx-1">•</span>
+              )}
+              {displayPublishedDate && (
+                <span>{new Date(displayPublishedDate).toLocaleDateString()}</span>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Loading indicator */}
         {unfurlLoading && (
@@ -119,6 +178,9 @@ export function GroundingSources({
 }: GroundingSourcesProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Rich metadata is now saved directly to database during streaming process
+  // No secondary unfurling needed since Exa.AI data is captured and saved immediately
 
   const handleToggle = () => {
     const newExpanded = !isExpanded;

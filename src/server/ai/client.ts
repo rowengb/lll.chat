@@ -46,6 +46,7 @@ export interface AIClient {
     apiKey?: string;
     enableGrounding?: boolean;
     tools?: Tool[];
+    forceWebSearch?: boolean; // Force web search tool on first message
   }): Promise<AsyncIterable<StreamChunk> | string>;
 }
 
@@ -57,6 +58,7 @@ class MockAIClient implements AIClient {
     apiKey?: string;
     enableGrounding?: boolean;
     tools?: Tool[];
+    forceWebSearch?: boolean;
   }): Promise<AsyncIterable<StreamChunk> | string> {
     const lastMessage = params.messages[params.messages.length - 1];
     const response = `Mock response to: "${lastMessage?.content}" (using ${params.model || 'mock-model'})`;
@@ -105,6 +107,7 @@ class OpenAIClient implements AIClient {
     apiKey?: string;
     enableGrounding?: boolean;
     tools?: Tool[];
+    forceWebSearch?: boolean;
   }): Promise<AsyncIterable<StreamChunk> | string> {
     // Configure API endpoint based on provider
     const clientConfig: any = {
@@ -132,7 +135,22 @@ class OpenAIClient implements AIClient {
     // Add tools if provided
     if (params.tools && params.tools.length > 0) {
       requestConfig.tools = params.tools;
-      requestConfig.tool_choice = "auto"; // Let the model decide when to use tools
+      
+      // Force web search tool on first message if requested
+      if (params.forceWebSearch) {
+        const webSearchTool = params.tools.find(tool => tool.function.name === "web_search");
+        if (webSearchTool) {
+          requestConfig.tool_choice = {
+            type: "function",
+            function: { name: "web_search" }
+          };
+          debugLog(`🔧 [${this.provider?.toUpperCase() || 'OPENAI'}-DEBUG] Forcing web search tool on first message`);
+        } else {
+          requestConfig.tool_choice = "auto";
+        }
+      } else {
+        requestConfig.tool_choice = "auto"; // Let the model decide when to use tools
+      }
     }
     
     const completion = await client.chat.completions.create(requestConfig);
@@ -283,6 +301,7 @@ class AnthropicClient implements AIClient {
     apiKey?: string;
     enableGrounding?: boolean;
     tools?: Tool[];
+    forceWebSearch?: boolean;
   }): Promise<AsyncIterable<StreamChunk> | string> {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -374,6 +393,7 @@ class GeminiClient implements AIClient {
     apiKey?: string;
     enableGrounding?: boolean;
     tools?: Tool[];
+    forceWebSearch?: boolean;
   }): Promise<AsyncIterable<StreamChunk> | string> {
     const model = params.model || "gemini-pro";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${params.apiKey}`;

@@ -217,24 +217,62 @@
   }
 }
 
-/* Fix Next.js webpack error overlay positioning - only when they exist */
-[data-nextjs-dialog-overlay][style*="position"],
-.__next-error-overlay[style*="position"],
-[data-nextjs-errors-overlay][style*="position"] {
+/* Hide Next.js build status overlay completely */
+[data-nextjs-dialog-overlay],
+[data-nextjs-dialog-overlay][style],
+.__next-dev-overlay,
+.__next-dev-overlay[style],
+[data-nextjs-dev-overlay],
+[data-nextjs-dev-overlay][style] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Fix Next.js webpack error overlay positioning - only when error content exists */
+[data-nextjs-errors-overlay]:not(:empty),
+[data-nextjs-errors-overlay][style]:not(:empty),
+[data-nextjs-error-overlay]:not(:empty),
+[data-nextjs-error-overlay][style]:not(:empty),
+.__next-error-overlay:not(:empty),
+.__next-error-overlay[style]:not(:empty) {
   position: fixed !important;
-  z-index: 9999 !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 99999 !important;
+  transform: none !important;
+  contain: none !important;
+  isolation: auto !important;
+  background: rgba(0, 0, 0, 0.8) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Override global transform for Next.js error content only */
+[data-nextjs-errors-overlay]:not(:empty) *,
+[data-nextjs-error-overlay]:not(:empty) *,
+.__next-error-overlay:not(:empty) * {
   transform: none !important;
   contain: none !important;
   isolation: auto !important;
 }
 
-/* Override global transform for Next.js error content only */
-[data-nextjs-dialog-overlay] *,
-.__next-error-overlay *,
-[data-nextjs-errors-overlay] * {
-  transform: none !important;
-  contain: none !important;
-  isolation: auto !important;
+/* Ensure error content is properly styled */
+[data-nextjs-errors-overlay]:not(:empty) > div,
+[data-nextjs-error-overlay]:not(:empty) > div,
+.__next-error-overlay:not(:empty) > div {
+  max-width: 90vw !important;
+  max-height: 90vh !important;
+  overflow: auto !important;
+  background: white !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Syntax highlighting for code blocks */

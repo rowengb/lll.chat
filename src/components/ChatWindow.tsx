@@ -14,7 +14,8 @@ import { FileAttachmentWithUrl } from './FileAttachmentWithUrl';
 import { GroundingSources } from './GroundingSources';
 import { MessageImage } from './MessageImage';
 import { ImageSkeleton } from './ImageSkeleton';
-import { LoadingDots } from './LoadingDots';
+import { DynamicLoadingStatus, createLoadingStatus } from './DynamicLoadingStatus';
+import { useChatLoadingStatus } from '@/stores/chatStore';
 import { isImageGenerationModel } from '../utils/modelUtils';
 import { ApiKeyWarningBanner } from './ApiKeyWarningBanner';
 import { WelcomeScreen } from './chat/WelcomeScreen';
@@ -68,6 +69,9 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
     isLoading,
     setLoading,
   } = useChatStore();
+  
+  // Dynamic loading status
+  const loadingStatus = useChatLoadingStatus(threadId || "");
   
   // Thread-specific streaming state
   const isStreaming = useChatStreamingState(threadId || '');
@@ -1252,8 +1256,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                             </div>
                           </div>
                         ) : (
-                          <div className="max-w-full rounded-lg bg-muted/80 px-5 py-3">
-                            <LoadingDots text="AI is thinking" size="sm" />
+                          <div className="max-w-full">
+                            <DynamicLoadingStatus 
+                              status={loadingStatus || { step: 'thinking', message: 'AI is thinking', timestamp: Date.now() }} 
+                              size="sm"
+                              className="bg-gray-50/80 dark:bg-gray-800/30 rounded-2xl px-4 py-3 border border-gray-200/50 dark:border-gray-700/50 shadow-sm"
+                            />
                           </div>
                         )}
                       </div>
@@ -1293,8 +1301,12 @@ const ChatWindowComponent = ({ threadId, onThreadCreate, selectedModel, onModelC
                             </div>
                           </div>
                         ) : (
-                          <div className="max-w-full rounded-lg bg-muted/80 px-5 py-3">
-                            <LoadingDots text="AI is thinking" size="sm" />
+                          <div className="max-w-full">
+                            <DynamicLoadingStatus 
+                              status={loadingStatus || { step: 'thinking', message: 'AI is thinking', timestamp: Date.now() }} 
+                              size="sm"
+                              className="bg-gray-50/80 dark:bg-gray-800/30 rounded-2xl px-4 py-3 border border-gray-200/50 dark:border-gray-700/50 shadow-sm"
+                            />
                           </div>
                         )}
                       </div>

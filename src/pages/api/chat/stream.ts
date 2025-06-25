@@ -516,11 +516,25 @@ export default async function handler(req: NextRequest) {
           let groundingMetadata: any = null;
           let webSearchUsed = false; // Track if web search has been used
 
+          // Check if this is the first user message in the conversation (force web search)
+          const userMessages = messages.filter(m => m.role === 'user');
+          const isFirstUserMessage = userMessages.length === 1;
+          const shouldForceWebSearch = shouldEnableTools && isFirstUserMessage && searchGrounding;
+          
+          if (shouldForceWebSearch) {
+            debugLog(`🎯 [LLL.CHAT] Forcing web search on first message for user`);
+          }
+
           // Generate a message ID for this response
           const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           
           // Send initial metadata (T3.chat style)
           write(`f:{"messageId":"${messageId}"}\n`);
+          
+          // Send initial status update
+          if (shouldForceWebSearch) {
+            write(`f:{"status":{"step":"thinking","message":"AI is thinking","timestamp":${Date.now()}}}\n`);
+          }
 
           while (isToolCallLoop) {
             try {
@@ -531,6 +545,7 @@ export default async function handler(req: NextRequest) {
                 apiKey,
                 enableGrounding: searchGrounding && isGeminiWithBuiltinGrounding, // Only enable built-in grounding for Gemini
                 tools: webSearchUsed ? undefined : tools, // Disable tools after first web search
+                forceWebSearch: shouldForceWebSearch && !webSearchUsed, // Force web search on first message only
               });
               
               clearTimeout(requestTimeout); // Clear timeout since request succeeded
@@ -636,6 +651,12 @@ export default async function handler(req: NextRequest) {
                     
                     try {
                       const args: WebSearchArgs = JSON.parse(toolCall.function.arguments);
+                      debugLog(`🔍 [LLL.CHAT] Parsed tool arguments:`, args);
+                      
+                      // Send searching status with properly escaped query
+                      const escapedQuery = args.query?.replace(/"/g, '\\"') || 'unknown query';
+                      write(`f:{"status":{"step":"searching","message":"Searching the web","details":"${escapedQuery}","progress":20,"timestamp":${Date.now()}}}\n`);
+                      
                       const result = await executeWebSearchTool(args, req);
                       
                       // Parse the search result to extract sources and AI content
@@ -651,10 +672,29 @@ export default async function handler(req: NextRequest) {
                             url: item.url || '',
                             snippet: item.snippet || item.text || '',
                             confidence: Math.round((item.confidence || 0.8) * 100), // Convert to percentage
+                            // Flatten rich Exa.AI metadata into database schema fields
+                            unfurledTitle: item.unfurled?.title,
+                            unfurledDescription: item.unfurled?.description,
+                            unfurledImage: item.unfurled?.image,
+                            unfurledFavicon: item.unfurled?.favicon,
+                            unfurledSiteName: item.unfurled?.siteName,
+                            unfurledFinalUrl: item.unfurled?.finalUrl,
+                            unfurledAuthor: item.unfurled?.author,
+                            unfurledPublishedDate: item.unfurled?.publishedDate,
+                            unfurledAt: item.unfurled ? Date.now() : undefined,
+                            // Keep unfurled object for real-time UI display
                             unfurled: item.unfurled || undefined
                           }));
                           webSearchSources.push(...sources);
                           debugLog(`🔍 [LLL.CHAT] Extracted ${sources.length} sources from web search`);
+                          
+                          // Send sources found status
+                          write(`f:{"status":{"step":"sources_found","message":"${sources.length} source${sources.length !== 1 ? 's' : ''} found","progress":60,"timestamp":${Date.now()}}}\n`);
+                          
+                          // Send analyzing status
+                          setTimeout(() => {
+                            write(`f:{"status":{"step":"analyzing","message":"Analyzing sources","progress":80,"timestamp":${Date.now()}}}\n`);
+                          }, 500);
                         }
                       } catch (parseError) {
                         debugLog(`⚠️ [LLL.CHAT] Could not parse search results for sources: ${parseError}`);
@@ -690,6 +730,9 @@ export default async function handler(req: NextRequest) {
                   };
                   debugLog(`🔗 [LLL.CHAT] Set grounding metadata with ${webSearchSources.length} web search sources`);
                 }
+                
+                // Send processing status before generating response
+                write(`f:{"status":{"step":"processing","message":"Processing information","progress":90,"timestamp":${Date.now()}}}\n`);
                 
                 // Continue the loop to get AI's response incorporating tool results
                 debugLog(`🔄 [LLL.CHAT] Continuing conversation with tool results`);

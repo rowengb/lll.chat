@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { Message } from '../types/chat';
+import { LoadingStatus, TimelineStep, TimelineBuilder } from '../components/DynamicLoadingStatus';
 
 interface FileAttachment {
   id: string;
@@ -45,6 +46,11 @@ interface ChatStore {
   isLoading: boolean;
   loadingThreadId: string | null;
   
+  // Dynamic loading status
+  loadingStatus: Record<string, LoadingStatus>; // threadId -> status
+  loadingTimelines: Record<string, TimelineStep[]>; // threadId -> timeline steps
+  timelineBuilders: Record<string, TimelineBuilder>; // threadId -> timeline builder instance
+  
   // Transition state for smooth chat switching
   isTransitioning: boolean;
   currentDisplayThreadId: string | null;
@@ -65,6 +71,8 @@ interface ChatStore {
   updateStreamingMessage: (threadId: string, messageId: string, updates: Partial<Message>) => void;
   setStreaming: (threadId: string | null, isStreaming: boolean) => void;
   setLoading: (threadId: string | null, isLoading: boolean) => void;
+  setLoadingStatus: (threadId: string, status: LoadingStatus | null) => void;
+  getTimeline: (threadId: string) => TimelineStep[];
   clearThread: (threadId: string) => void;
   
   // Optimized selectors
@@ -93,6 +101,9 @@ export const useChatStore = create<ChatStore>()(
       streamingThreadId: null,
       isLoading: false,
       loadingThreadId: null,
+      loadingStatus: {},
+      loadingTimelines: {},
+      timelineBuilders: {},
       
       // Transition state
       isTransitioning: false,
@@ -192,7 +203,52 @@ export const useChatStore = create<ChatStore>()(
             loadingThreadId: isLoading ? threadId : null
           };
         });
-  },
+      },
+      
+      setLoadingStatus: (threadId: string, status: LoadingStatus | null) => {
+        set((state) => {
+          // Check if status actually changed to prevent unnecessary updates
+          const currentStatus = state.loadingStatus[threadId];
+          if (status && currentStatus && 
+              currentStatus.step === status.step && 
+              currentStatus.message === status.message &&
+              currentStatus.details === status.details) {
+            return state; // No change, return current state
+          }
+          
+          const newLoadingStatus = { ...state.loadingStatus };
+          const newLoadingTimelines = { ...state.loadingTimelines };
+          const newTimelineBuilders = { ...state.timelineBuilders };
+          
+          if (status) {
+            newLoadingStatus[threadId] = status;
+            
+            // Initialize timeline builder if not exists
+            if (!newTimelineBuilders[threadId]) {
+              newTimelineBuilders[threadId] = new TimelineBuilder();
+            }
+            
+            // Update timeline only if status actually changed
+            const timeline = newTimelineBuilders[threadId].updateStep(status);
+            newLoadingTimelines[threadId] = timeline;
+          } else {
+            delete newLoadingStatus[threadId];
+            delete newLoadingTimelines[threadId];
+            delete newTimelineBuilders[threadId];
+          }
+          
+          return { 
+            loadingStatus: newLoadingStatus,
+            loadingTimelines: newLoadingTimelines,
+            timelineBuilders: newTimelineBuilders
+          };
+        });
+      },
+      
+      getTimeline: (threadId: string) => {
+        const state = get();
+        return state.loadingTimelines[threadId] || EMPTY_TIMELINE;
+      },
   
   setStreaming: (threadId: string | null, isStreaming: boolean) => {
         set((state) => {
@@ -307,6 +363,15 @@ export const useChatLastMessage = (threadId: string) =>
 
 export const useChatLoading = (threadId: string) => 
   useChatStore((state) => state.loadingStates.get(threadId) || false);
+
+export const useChatLoadingStatus = (threadId: string) => 
+  useChatStore((state) => state.loadingStatus[threadId]);
+
+// Stable empty array to prevent infinite re-renders
+const EMPTY_TIMELINE: TimelineStep[] = [];
+
+export const useChatTimeline = (threadId: string) => 
+  useChatStore((state) => state.loadingTimelines[threadId] || EMPTY_TIMELINE);
 
 export const useChatStreaming = (threadId: string) => 
   useChatStore((state) => state.streamingStates.get(threadId) || false);
